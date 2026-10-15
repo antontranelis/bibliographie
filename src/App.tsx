@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { leeresWerk, neueId, type Datenstamm, type ErschienenIn, type Person, type Schlagwort, type TextArt, type Werk } from './model'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { TEXT_ARTEN, leeresWerk, neueId, type Datenstamm, type ErschienenIn, type Person, type Schlagwort, type TextArt, type Verlag, type Werk } from './model'
 import { Karteikarte } from './Karteikarte'
-import { Katalogsuche } from './Katalogsuche'
+import { Kartei, LEERE_SICHT, type KarteiSicht, type ListenVorgabe } from './Kartei'
 import { Liste } from './Liste'
 import { Verlage } from './Verlage'
 import { beispielDaten } from './beispiel'
 import { exportiere, exportiereCsl, importiere, ladeLokal, speichereLokal, zusammenfuehren } from './speicher'
 import { herunterladen } from './herunterladen'
 import { ortFuerJahr } from './verlag'
-import type { Treffer } from './lobid'
+import { Abwaerts, Nadel, StatusPunkt } from './Symbole'
 
 export interface Fixierung {
   personen?: Person[]
@@ -18,7 +18,7 @@ export interface Fixierung {
   schlagwoerter?: Schlagwort[]
 }
 
-type Ansicht = 'kartei' | 'liste' | 'verlage'
+type Ansicht = 'erfassen' | 'kartei' | 'liste' | 'verlage'
 
 const FIX_SCHLUESSEL = 'bibliographie:fixierung'
 
@@ -30,14 +30,49 @@ function ladeFixierung(): Fixierung {
   }
 }
 
+/** Neue Karte mit allen fixierten Feldern vorbelegt. */
+function mitFixierung(w: Werk, fixiert: Fixierung, verlage: Verlag[]): Werk {
+  const neu = { ...w }
+  if (fixiert.personen) neu.personen = fixiert.personen.map((p) => ({ ...p }))
+  if (fixiert.art) neu.art = fixiert.art
+  if (fixiert.erschienenIn) neu.erschienenIn = { ...fixiert.erschienenIn }
+  if (fixiert.schlagwoerter) neu.schlagwoerter = fixiert.schlagwoerter.map((s) => ({ ...s }))
+  if (fixiert.verlag !== undefined) {
+    const v = verlages(verlage, fixiert.verlag)
+    neu.auflagen = neu.auflagen.map((a) => ({ ...a, verlag: fixiert.verlag ?? '', ort: v ? ortFuerJahr(v, a.jahr)?.ort ?? a.ort : a.ort }))
+  }
+  return neu
+}
+const verlages = (verlage: Verlag[], name: string) => verlage.find((x) => x.name === name)
+
+/** Erst eine Karte mit eigenem Inhalt kommt in die Kartei; eine nur vorbelegte bleibt Entwurf. */
+function hatInhalt(w: Werk): boolean {
+  return Boolean(
+    w.titel.trim() ||
+      w.untertitel.trim() ||
+      w.kommentar.trim() ||
+      w.auflagen.some((a) => a.jahr.trim() || a.ort.trim() || a.seiten.trim() || a.nummer.trim()),
+  )
+}
+
+const REITER: { ansicht: Ansicht; label: string; taste: string }[] = [
+  { ansicht: 'erfassen', label: 'Erfassen', taste: 'F2' },
+  { ansicht: 'kartei', label: 'Kartei', taste: 'F3' },
+  { ansicht: 'liste', label: 'Liste', taste: 'F4' },
+]
+
 export default function App() {
   const [daten, setDaten] = useState<Datenstamm>(() => ladeLokal() ?? { werke: [], verlage: [] })
-  const [aktivId, setAktivId] = useState<string | null>(() => daten.werke[0]?.id ?? null)
-  const [ansicht, setAnsicht] = useState<Ansicht>('kartei')
-  const [suche, setSuche] = useState('')
-  const [filter, setFilter] = useState<'alle' | 'vorlaeufig' | 'fest'>('alle')
-  const [katalogOffen, setKatalogOffen] = useState(false)
   const [fixiert, setFixiert] = useState<Fixierung>(ladeFixierung)
+  const [ansicht, setAnsicht] = useState<Ansicht>('erfassen')
+  const [entwurf, setEntwurf] = useState<Werk | null>(() => mitFixierung(leeresWerk(), fixiert, daten.verlage))
+  const [erfassenId, setErfassenId] = useState<string>(() => entwurf?.id ?? '')
+  /** Karte, die in dieser Erfassung aus dem Entwurf entstanden ist */
+  const [frischId, setFrischId] = useState<string | null>(null)
+  const [nachholenId, setNachholenId] = useState<string | null>(null)
+  const [sitzung, setSitzung] = useState<string[]>([])
+  const [karteiSicht, setKarteiSicht] = useState<KarteiSicht>(LEERE_SICHT)
+  const [listenVorgabe, setListenVorgabe] = useState<ListenVorgabe & { nr: number }>({ nr: 0 })
   const [meldung, setMeldung] = useState('')
   const dateiEingabe = useRef<HTMLInputElement>(null)
 
@@ -51,85 +86,90 @@ export default function App() {
   }, [fixiert])
   useEffect(() => {
     if (!meldung) return
-    const t = setTimeout(() => setMeldung(''), 4000)
+    const t = setTimeout(() => setMeldung(''), 5000)
     return () => clearTimeout(t)
   }, [meldung])
 
-  const aktiv = daten.werke.find((w) => w.id === aktivId) ?? null
+  const gespeichert = daten.werke.find((w) => w.id === erfassenId)
+  const karte = gespeichert ?? (entwurf?.id === erfassenId ? entwurf : null)
+
   const alleSchlagwoerter = useMemo(
     () => [...new Set(daten.werke.flatMap((w) => w.schlagwoerter.map((s) => s.begriff)))].sort((a, b) => a.localeCompare(b, 'de')),
     [daten.werke],
   )
 
-  const sichtbar = useMemo(() => {
-    const s = suche.trim().toLowerCase()
-    return daten.werke
-      .filter((w) => filter === 'alle' || w.status === filter)
-      .filter(
-        (w) =>
-          !s ||
-          [w.titel, w.untertitel, w.kommentar, ...w.personen.map((p) => `${p.vorname} ${p.nachname}`), ...w.schlagwoerter.map((x) => x.begriff), ...w.auflagen.map((a) => `${a.verlag} ${a.ort} ${a.jahr}`)]
-            .join(' ')
-            .toLowerCase()
-            .includes(s),
-      )
-      .sort((a, b) => b.geaendert.localeCompare(a.geaendert))
-  }, [daten.werke, suche, filter])
+  const merkeSitzung = (id: string) => setSitzung((s) => (s[0] === id ? s : [id, ...s.filter((x) => x !== id)].slice(0, 40)))
 
-  const aendereWerk = (w: Werk) =>
-    setDaten((d) => ({ ...d, werke: d.werke.map((x) => (x.id === w.id ? { ...w, geaendert: new Date().toISOString() } : x)) }))
+  const neueKarte = useCallback(() => {
+    const w = mitFixierung(leeresWerk(), fixiert, daten.verlage)
+    setEntwurf(w)
+    setErfassenId(w.id)
+    setFrischId(null)
+    setNachholenId(null)
+    setAnsicht('erfassen')
+  }, [fixiert, daten.verlage])
 
-  const fixierungAnwenden = (w: Werk): Werk => {
-    const neu = { ...w }
-    if (fixiert.personen) neu.personen = fixiert.personen.map((p) => ({ ...p }))
-    if (fixiert.art) neu.art = fixiert.art
-    if (fixiert.erschienenIn) neu.erschienenIn = { ...fixiert.erschienenIn }
-    if (fixiert.schlagwoerter) neu.schlagwoerter = fixiert.schlagwoerter.map((s) => ({ ...s }))
-    if (fixiert.verlag !== undefined) {
-      const v = daten.verlage.find((x) => x.name === fixiert.verlag)
-      neu.auflagen = neu.auflagen.map((a) => ({ ...a, verlag: fixiert.verlag ?? '', ort: v ? ortFuerJahr(v, a.jahr)?.ort ?? a.ort : a.ort }))
+  // Karte verschwunden (gelöscht, eingelesen): gleich eine neue bereitlegen
+  useEffect(() => {
+    if (!karte) neueKarte()
+  }, [karte, neueKarte])
+
+  const aendereKarte = (w: Werk) => {
+    const jetzt = new Date().toISOString()
+    if (daten.werke.some((x) => x.id === w.id)) {
+      setDaten((d) => ({ ...d, werke: d.werke.map((x) => (x.id === w.id ? { ...w, geaendert: jetzt } : x)) }))
+      merkeSitzung(w.id)
+    } else if (hatInhalt(w)) {
+      setDaten((d) => ({ ...d, werke: [{ ...w, angelegt: jetzt, geaendert: jetzt }, ...d.werke] }))
+      setEntwurf(null)
+      setFrischId(w.id)
+      merkeSitzung(w.id)
+    } else {
+      setEntwurf(w)
     }
-    return neu
   }
 
-  const neueKarte = () => {
-    const w = fixierungAnwenden(leeresWerk())
-    setDaten((d) => ({ ...d, werke: [w, ...d.werke] }))
-    setAktivId(w.id)
-    setAnsicht('kartei')
+  const festAnlegen = () => {
+    if (!karte) return
+    if (!karte.titel.trim()) {
+      setMeldung('Zum Festanlegen fehlt noch der Titel.')
+      return
+    }
+    aendereKarte({ ...karte, status: 'fest' })
+    setMeldung(`„${karte.titel.trim()}“ ist fest angelegt. Die nächste Karte liegt bereit.`)
+    neueKarte()
   }
 
-  const ausKatalog = (vorschlag: { titel: string; untertitel: string; personen: Person[] }, auswahl: Treffer[]) => {
-    const w = fixierungAnwenden({
-      ...leeresWerk(),
-      titel: vorschlag.titel,
-      untertitel: vorschlag.untertitel,
-      personen: vorschlag.personen.length ? vorschlag.personen : [{ vorname: '', nachname: '', rolle: 'autor' }],
-      auflagen: auswahl.map((t) => ({ ...t.auflage, id: neueId() })),
-    })
-    // Katalogdaten haben Vorrang vor fixierten Personen und Verlag
-    w.personen = vorschlag.personen.length ? vorschlag.personen : w.personen
-    w.auflagen = auswahl.map((t) => ({ ...t.auflage, id: neueId() }))
-    setDaten((d) => ({ ...d, werke: [w, ...d.werke] }))
-    setAktivId(w.id)
-    setKatalogOffen(false)
-    setMeldung(`Neue vorläufige Karte mit ${auswahl.length} ${auswahl.length === 1 ? 'Ausgabe' : 'Ausgaben'} angelegt.`)
+  const oeffne = (id: string, nachholen = false) => {
+    setEntwurf(null)
+    setErfassenId(id)
+    setFrischId(null)
+    setNachholenId(nachholen ? id : null)
+    setAnsicht('erfassen')
   }
 
-  const zuKarte = (auswahl: Treffer[]) => {
-    if (!aktiv) return
-    const leer = (a: Werk['auflagen'][number]) => !a.jahr && !a.verlag && !a.ort
-    aendereWerk({ ...aktiv, auflagen: [...aktiv.auflagen.filter((a) => !leer(a)), ...auswahl.map((t) => ({ ...t.auflage, id: neueId() }))] })
-    setKatalogOffen(false)
-    setMeldung(`${auswahl.length} ${auswahl.length === 1 ? 'Ausgabe' : 'Ausgaben'} zur Karte hinzugefügt.`)
+  const zuVorhandener = (id: string) => {
+    if (karte && frischId === karte.id && karte.status === 'vorlaeufig') {
+      const nurAngefangen = !karte.kommentar.trim() && karte.auflagen.every((a) => !a.jahr.trim() && !a.ort.trim() && !a.seiten.trim())
+      if (nurAngefangen) {
+        setDaten((d) => ({ ...d, werke: d.werke.filter((w) => w.id !== karte.id) }))
+        setSitzung((s) => s.filter((x) => x !== karte.id))
+        setMeldung('Das Werk steht schon in der Kartei. Die angefangene Karte ist verworfen.')
+      } else {
+        setMeldung('Das Werk steht schon in der Kartei. Die angefangene Karte bleibt vorläufig erhalten.')
+      }
+    }
+    oeffne(id)
   }
 
   const loeschen = () => {
-    if (!aktiv) return
-    if (!confirm(`Karte „${aktiv.titel || 'ohne Titel'}“ löschen?`)) return
-    const rest = daten.werke.filter((w) => w.id !== aktiv.id)
-    setDaten({ ...daten, werke: rest })
-    setAktivId(rest[0]?.id ?? null)
+    if (!karte) return
+    if (gespeichert) {
+      if (!confirm(`Karte „${karte.titel || 'ohne Titel'}“ löschen?`)) return
+      setDaten((d) => ({ ...d, werke: d.werke.filter((w) => w.id !== karte.id) }))
+      setSitzung((s) => s.filter((x) => x !== karte.id))
+    }
+    neueKarte()
   }
 
   const verlagMerken = (name: string, ort: string, jahr: string) => {
@@ -143,7 +183,13 @@ export default function App() {
       ...d,
       verlage: [...d.verlage, { id: neueId(), name, kuerzel, orte: [{ abJahr: /^\d{4}$/.test(jahr) ? jahr : '', ort, wechselImJahr: false }] }],
     }))
-    setMeldung(`Verlag „${name}“ gemerkt (Kürzel „${kuerzel}“). Unter „Verlage“ lässt sich das ändern.`)
+    setMeldung(`Verlag „${name}“ gemerkt (Kürzel „${kuerzel}“). Unter Ablage › Verlage lässt sich das ändern.`)
+  }
+
+  const beispieleLaden = () => {
+    const b = beispielDaten()
+    setDaten((d) => zusammenfuehren(d, b))
+    setMeldung(`${b.werke.length} Beispielkarten geladen.`)
   }
 
   const exportJson = () => {
@@ -164,58 +210,86 @@ export default function App() {
     }
   }
 
-  const fixierteTeile = [
-    fixiert.personen && `Personen: ${fixiert.personen.map((p) => [p.vorname, p.nachname].filter(Boolean).join(' ')).join(' / ') || '(leer)'}`,
-    fixiert.art && `Art: ${fixiert.art}`,
-    fixiert.verlag !== undefined && `Verlag: ${fixiert.verlag || '(leer)'}`,
-    fixiert.erschienenIn && `Erschienen in: ${fixiert.erschienenIn.titel || '(leer)'}`,
-    fixiert.schlagwoerter && `Schlagwörter: ${fixiert.schlagwoerter.map((s) => s.begriff).join(', ') || '(leer)'}`,
-  ].filter(Boolean) as string[]
+  // Tastatur für die Serienerfassung
+  const tastenRef = useRef<(e: KeyboardEvent) => void>(() => {})
+  tastenRef.current = (e: KeyboardEvent) => {
+    const wechsel: Record<string, Ansicht> = { F2: 'erfassen', F3: 'kartei', F4: 'liste' }
+    if (wechsel[e.key] && !e.ctrlKey && !e.altKey) {
+      e.preventDefault()
+      setAnsicht(wechsel[e.key])
+      return
+    }
+    if (ansicht !== 'erfassen') return
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault()
+      festAnlegen()
+    } else if (e.altKey && !e.ctrlKey && e.code === 'KeyN') {
+      e.preventDefault()
+      neueKarte()
+    }
+  }
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => tastenRef.current(e)
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [])
 
-  const anzahlFest = daten.werke.filter((w) => w.status === 'fest').length
+  const anzahlVorlaeufig = daten.werke.filter((w) => w.status === 'vorlaeufig').length
+  const sitzungsKarten = sitzung.map((id) => daten.werke.find((w) => w.id === id)).filter((w): w is Werk => Boolean(w))
 
   return (
     <div className="app">
       <header className="kopf">
-        <h1>Bibliographie</h1>
-        <nav>
-          <button type="button" className={ansicht === 'kartei' ? 'aktiv' : ''} onClick={() => setAnsicht('kartei')}>
-            Kartei
-          </button>
-          <button type="button" className={ansicht === 'liste' ? 'aktiv' : ''} onClick={() => setAnsicht('liste')}>
-            Liste
-          </button>
-          <button type="button" className={ansicht === 'verlage' ? 'aktiv' : ''} onClick={() => setAnsicht('verlage')}>
-            Verlage
-          </button>
-        </nav>
-        <div className="datei">
-          <button type="button" onClick={exportJson} title="Alle Daten als Datei sichern">
-            Sichern
-          </button>
-          <button type="button" onClick={() => dateiEingabe.current?.click()} title="Gesicherte Datei einlesen">
-            Einlesen
-          </button>
-          <button type="button" className="leise" onClick={exportCsl} title="Für Zotero, Citavi, Pandoc">
-            CSL-Export
-          </button>
-          <input
-            ref={dateiEingabe}
-            type="file"
-            accept="application/json,.json"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) importJson(f)
-              e.target.value = ''
-            }}
-          />
+        <div className="kopf-innen">
+          <span className="marke">Bibliographie</span>
+          <nav className="reiter" aria-label="Bereiche">
+            {REITER.map((r) => (
+              <button key={r.ansicht} type="button" aria-current={ansicht === r.ansicht ? 'page' : undefined} onClick={() => setAnsicht(r.ansicht)}>
+                {r.label} <kbd>{r.taste}</kbd>
+              </button>
+            ))}
+          </nav>
+          <div className="kopf-rechts">
+            <span>
+              {daten.werke.length.toLocaleString('de-DE')} {daten.werke.length === 1 ? 'Karte' : 'Karten'}
+              {anzahlVorlaeufig > 0 && (
+                <>
+                  {' · '}
+                  <button
+                    type="button"
+                    className="textknopf warnfarbe"
+                    onClick={() => {
+                      setKarteiSicht({ ...karteiSicht, nurVorlaeufig: true, buchstabe: null })
+                      setAnsicht('kartei')
+                    }}
+                  >
+                    {anzahlVorlaeufig.toLocaleString('de-DE')} vorläufig
+                  </button>
+                </>
+              )}
+            </span>
+            <Ablage
+              karteiLeer={daten.werke.length === 0}
+              onSichern={exportJson}
+              onEinlesen={() => dateiEingabe.current?.click()}
+              onCsl={exportCsl}
+              onVerlage={() => setAnsicht('verlage')}
+              onBeispiele={beispieleLaden}
+            />
+            <input
+              ref={dateiEingabe}
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) importJson(f)
+                e.target.value = ''
+              }}
+            />
+          </div>
         </div>
       </header>
-
-      <div className="hinweisband">
-        Prototyp zum Ausprobieren. Die Daten liegen nur in diesem Browser. Mit „Sichern“ entsteht eine Datei, die sich mit „Einlesen“ zurückholen lässt.
-      </div>
 
       {meldung && (
         <div className="meldung" role="status">
@@ -223,101 +297,205 @@ export default function App() {
         </div>
       )}
 
-      {ansicht === 'kartei' && (
-        <div className="kartei">
-          <aside className="register">
-            <button type="button" className="primaer gross" onClick={neueKarte}>
-              + Neue Karte
-            </button>
-            <button type="button" onClick={() => setKatalogOffen(true)}>
-              Im Katalog suchen
-            </button>
-            <input className="suche" placeholder="In der Kartei suchen" value={suche} onChange={(e) => setSuche(e.target.value)} />
-            <div className="filter">
-              {(['alle', 'vorlaeufig', 'fest'] as const).map((f) => (
-                <button key={f} type="button" className={filter === f ? 'aktiv' : ''} onClick={() => setFilter(f)}>
-                  {f === 'alle' ? 'alle' : f === 'fest' ? 'fest' : 'vorläufig'}
-                </button>
-              ))}
-            </div>
-            <p className="zaehler">
-              {daten.werke.length} Karten, davon {anzahlFest} fest angelegt
-            </p>
-            <ul className="kartenliste">
-              {sichtbar.map((w) => (
-                <li key={w.id}>
-                  <button type="button" className={w.id === aktivId ? 'aktiv' : ''} onClick={() => setAktivId(w.id)}>
-                    <span className={`punkt ${w.status}`} title={w.status === 'fest' ? 'fest angelegt' : 'vorläufig'} />
-                    <span className="eintrag-text">
-                      <span className="name">{w.personen.map((p) => p.nachname).filter(Boolean).join(' / ') || '—'}</span>
-                      <span className="titel">{w.titel || 'ohne Titel'}</span>
-                      <span className="jahr">{w.art === 'aufsatz' ? w.erschienenIn?.jahr : w.auflagen.map((a) => a.jahr).filter(Boolean)[0]}</span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-            {daten.werke.length === 0 && (
-              <div className="leer-register">
-                <p>Die Kartei ist leer.</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const b = beispielDaten()
-                    setDaten(b)
-                    setAktivId(b.werke[0].id)
-                  }}
-                >
-                  Beispielkarten laden
-                </button>
-              </div>
-            )}
-          </aside>
-
-          <main className="arbeitsflaeche">
-            {fixierteTeile.length > 0 && (
-              <div className="fixiert-band">
-                <span>📌 Fixiert für neue Karten: {fixierteTeile.join(' · ')}</span>
-                <button type="button" className="leise" onClick={() => setFixiert({})}>
-                  alle lösen
-                </button>
-              </div>
-            )}
-            {katalogOffen && (
-              <Katalogsuche
-                vorbelegung={{ autor: aktiv?.personen[0]?.nachname ?? '', titel: aktiv?.titel ?? '' }}
-                hatAktuelleKarte={Boolean(aktiv)}
-                onNeueKarte={ausKatalog}
-                onZuKarte={zuKarte}
-                onSchliessen={() => setKatalogOffen(false)}
-              />
-            )}
-            {aktiv ? (
-              <Karteikarte
-                key={aktiv.id}
-                werk={aktiv}
-                verlage={daten.verlage}
-                alleSchlagwoerter={alleSchlagwoerter}
-                fixiert={fixiert}
-                onAendern={aendereWerk}
-                onLoeschen={loeschen}
-                onFixieren={setFixiert}
-                onVerlagMerken={verlagMerken}
-              />
-            ) : (
-              !katalogOffen && (
-                <div className="willkommen">
-                  <h2>Willkommen</h2>
-                  <p>Links eine neue Karte anlegen oder im Bibliothekskatalog suchen. Gefundene Ausgaben werden als vorläufige Karte übernommen und lassen sich dann prüfen und fest anlegen.</p>
+      <main className="flaeche">
+        {ansicht === 'erfassen' && karte && (
+          <Karteikarte
+            key={karte.id}
+            werk={karte}
+            istNeu={!gespeichert || karte.id === frischId}
+            alleWerke={daten.werke}
+            verlage={daten.verlage}
+            alleSchlagwoerter={alleSchlagwoerter}
+            fixiert={fixiert}
+            nachholen={nachholenId === karte.id}
+            onAendern={aendereKarte}
+            onFixieren={setFixiert}
+            onVerlagMerken={verlagMerken}
+            onZuVorhandener={zuVorhandener}
+            onFestAnlegen={festAnlegen}
+            onNaechste={neueKarte}
+            onLoeschen={loeschen}
+            seitenleiste={
+              <>
+                <FixiertKasten fixiert={fixiert} onFixieren={setFixiert} />
+                <SitzungKasten karten={sitzungsKarten} aktivId={karte.id} onOeffnen={oeffne} />
+                {daten.werke.length === 0 && (
+                  <div className="papier kasten-innen">
+                    <p className="leise">Die Kartei ist noch leer. Zum Ausprobieren gibt es ein paar Beispielkarten.</p>
+                    <button type="button" className="knopf" onClick={beispieleLaden}>
+                      Beispielkarten laden
+                    </button>
+                  </div>
+                )}
+                <div className="tastenhilfe">
+                  <div>
+                    <kbd>Strg ↵</kbd> fest anlegen, nächste Karte
+                  </div>
+                  <div>
+                    <kbd>Alt N</kbd> nächste Karte, Fixiertes bleibt
+                  </div>
+                  <div>
+                    <kbd>↓</kbd> im Titel: Vorschläge durchgehen
+                  </div>
                 </div>
-              )
-            )}
-          </main>
+              </>
+            }
+          />
+        )}
+        {ansicht === 'kartei' && (
+          <Kartei
+            werke={daten.werke}
+            sicht={karteiSicht}
+            onSicht={setKarteiSicht}
+            onBearbeiten={oeffne}
+            onListe={(v) => {
+              setListenVorgabe((alt) => ({ ...v, nr: alt.nr + 1 }))
+              setAnsicht('liste')
+            }}
+            onBeispiele={beispieleLaden}
+            onNeueKarte={neueKarte}
+          />
+        )}
+        {ansicht === 'liste' && <Liste key={listenVorgabe.nr} werke={daten.werke} vorgabe={listenVorgabe} />}
+        {ansicht === 'verlage' && <Verlage verlage={daten.verlage} onAendern={(verlage) => setDaten((d) => ({ ...d, verlage }))} onZurueck={() => setAnsicht('erfassen')} />}
+      </main>
+    </div>
+  )
+}
+
+function Ablage({
+  karteiLeer,
+  onSichern,
+  onEinlesen,
+  onCsl,
+  onVerlage,
+  onBeispiele,
+}: {
+  karteiLeer: boolean
+  onSichern: () => void
+  onEinlesen: () => void
+  onCsl: () => void
+  onVerlage: () => void
+  onBeispiele: () => void
+}) {
+  const [offen, setOffen] = useState(false)
+  const rahmen = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!offen) return
+    const klick = (e: MouseEvent) => !rahmen.current?.contains(e.target as Node) && setOffen(false)
+    const taste = (e: KeyboardEvent) => e.key === 'Escape' && setOffen(false)
+    document.addEventListener('mousedown', klick)
+    document.addEventListener('keydown', taste)
+    return () => {
+      document.removeEventListener('mousedown', klick)
+      document.removeEventListener('keydown', taste)
+    }
+  }, [offen])
+  const tu = (f: () => void) => () => {
+    setOffen(false)
+    f()
+  }
+  return (
+    <div className="ablage" ref={rahmen}>
+      <button type="button" className="knopf" aria-expanded={offen} aria-haspopup="menu" onClick={() => setOffen(!offen)}>
+        Ablage <Abwaerts />
+      </button>
+      {offen && (
+        <div className="ablage-menue" role="menu">
+          <button type="button" role="menuitem" onClick={tu(onSichern)}>
+            Sichern <span>alle Daten als Datei</span>
+          </button>
+          <button type="button" role="menuitem" onClick={tu(onEinlesen)}>
+            Einlesen <span>gesicherte Datei zurückholen</span>
+          </button>
+          <div className="menue-linie" />
+          <button type="button" role="menuitem" onClick={tu(onVerlage)}>
+            Verlage <span>Kürzel und Ortsgeschichte</span>
+          </button>
+          <button type="button" role="menuitem" onClick={tu(onCsl)}>
+            CSL-Export <span>für Zotero, Citavi, Pandoc</span>
+          </button>
+          {karteiLeer && (
+            <button type="button" role="menuitem" onClick={tu(onBeispiele)}>
+              Beispielkarten laden
+            </button>
+          )}
+          <p className="menue-hinweis">Prototyp: Die Daten liegen nur in diesem Browser. Regelmäßig sichern.</p>
         </div>
       )}
-
-      {ansicht === 'liste' && <Liste werke={daten.werke} />}
-      {ansicht === 'verlage' && <Verlage verlage={daten.verlage} onAendern={(verlage) => setDaten((d) => ({ ...d, verlage }))} />}
     </div>
+  )
+}
+
+function FixiertKasten({ fixiert, onFixieren }: { fixiert: Fixierung; onFixieren: (f: Fixierung) => void }) {
+  const zeilen: { was: string; wert: string; loesen: () => void }[] = []
+  if (fixiert.personen)
+    zeilen.push({
+      was: fixiert.personen.every((p) => p.rolle === 'hrsg') ? 'Hrsg.' : 'Autor',
+      wert: fixiert.personen.map((p) => [p.nachname, p.vorname].filter(Boolean).join(', ')).join(' / ') || '(leer)',
+      loesen: () => onFixieren({ ...fixiert, personen: undefined }),
+    })
+  if (fixiert.art) zeilen.push({ was: 'Art', wert: TEXT_ARTEN.find((a) => a.value === fixiert.art)?.label ?? fixiert.art, loesen: () => onFixieren({ ...fixiert, art: undefined }) })
+  if (fixiert.verlag !== undefined) zeilen.push({ was: 'Verlag', wert: fixiert.verlag || '(leer)', loesen: () => onFixieren({ ...fixiert, verlag: undefined }) })
+  if (fixiert.erschienenIn)
+    zeilen.push({ was: 'Erschienen in', wert: fixiert.erschienenIn.titel || '(leer)', loesen: () => onFixieren({ ...fixiert, erschienenIn: undefined }) })
+  if (fixiert.schlagwoerter)
+    zeilen.push({
+      was: 'Schlagwörter',
+      wert: fixiert.schlagwoerter.map((s) => s.begriff).join(', ') || '(leer)',
+      loesen: () => onFixieren({ ...fixiert, schlagwoerter: undefined }),
+    })
+
+  return (
+    <section className={`papier kasten-innen fixiert-kasten ${zeilen.length ? 'aktiv' : ''}`} aria-label="Fixierte Felder">
+      <h2>
+        <Nadel /> Fixiert für die nächsten Karten
+      </h2>
+      {zeilen.length === 0 ? (
+        <p className="leise klein">Nichts fixiert. Die Stecknadel an einem Feld hält es für alle folgenden Karten fest.</p>
+      ) : (
+        <>
+          <dl>
+            {zeilen.map((z) => (
+              <div key={z.was} className="fix-zeile">
+                <dt>{z.was}</dt>
+                <dd>{z.wert}</dd>
+                <dd>
+                  <button type="button" className="textknopf" onClick={z.loesen}>
+                    lösen
+                  </button>
+                </dd>
+              </div>
+            ))}
+          </dl>
+          {zeilen.length > 1 && (
+            <button type="button" className="textknopf leise" onClick={() => onFixieren({})}>
+              alle lösen
+            </button>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
+function SitzungKasten({ karten, aktivId, onOeffnen }: { karten: Werk[]; aktivId: string; onOeffnen: (id: string) => void }) {
+  if (karten.length === 0) return null
+  return (
+    <section className="papier kasten-innen" aria-label="In dieser Sitzung">
+      <h2>
+        In dieser Sitzung <span className="leise rechts">{karten.length}</span>
+      </h2>
+      <ol className="sitzung">
+        {karten.slice(0, 8).map((w) => (
+          <li key={w.id}>
+            <StatusPunkt status={w.status} />
+            <button type="button" className={`sitzung-titel ${w.id === aktivId ? 'aktiv' : ''}`} onClick={() => onOeffnen(w.id)}>
+              {w.titel || 'ohne Titel'}
+            </button>
+          </li>
+        ))}
+      </ol>
+    </section>
   )
 }
