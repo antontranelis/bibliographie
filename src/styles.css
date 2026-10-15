@@ -472,6 +472,7 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
 
 /* Verlagsvorschläge liegen über der Seite (Portal), nicht im scrollbaren Tabellenrahmen */
 .verlag-menue { position: fixed; right: auto; z-index: 40; }
+.vorschlaege-menue.verlag-menue[style*='bottom'] { top: auto; }
 .verlag-menue ul { max-height: 320px; }
 .verlag-menue .vorschlag { padding: 9px 14px; }
 .verlag-kuerzel { font: 600 12px/1 var(--sans); color: var(--leise); border: 1px solid var(--linie2); border-radius: 4px; padding: 4px 6px; background: #faf8f3; }

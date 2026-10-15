@@ -11,6 +11,35 @@ interface Props {
   onWaehlen: (v: Verlag) => void
 }
 
+interface Lage {
+  left: number
+  width: number
+  /** Abstand von oben (Liste unter dem Feld) oder von unten (Liste über dem Feld) */
+  top?: number
+  bottom?: number
+  maxHoehe: number
+}
+
+const RAND = 16
+const ABSTAND = 6
+const FUSS = 44
+const WUNSCHHOEHE = 320
+
+/**
+ * Lage der Liste im Fenster: nie breiter als das Fenster, rechts und links mit Rand,
+ * nach oben aufgeklappt, wenn unten der Platz nicht reicht und oben mehr ist.
+ */
+export function berechneLage(feld: { left: number; top: number; bottom: number; width: number }, fenster: { breite: number; hoehe: number }): Lage {
+  const width = Math.min(Math.max(feld.width, 420), fenster.breite - 2 * RAND)
+  const left = Math.min(Math.max(feld.left, RAND), fenster.breite - width - RAND)
+  const unten = fenster.hoehe - feld.bottom - ABSTAND - RAND
+  const oben = feld.top - ABSTAND - RAND
+  if (unten >= WUNSCHHOEHE + FUSS || unten >= oben) {
+    return { left, width, top: feld.bottom + ABSTAND, maxHoehe: Math.max(unten - FUSS, 80) }
+  }
+  return { left, width, bottom: fenster.hoehe - feld.top + ABSTAND, maxHoehe: Math.max(oben - FUSS, 80) }
+}
+
 /** Kurzfassung der Ortsgeschichte: „Berlin, ab 1923 Dornach“. */
 function ortsGeschichte(v: Verlag): string {
   return v.orte
@@ -26,7 +55,7 @@ function ortsGeschichte(v: Verlag): string {
 export function VerlagFeld({ wert, jahr, verlage, onText, onWaehlen }: Props) {
   const [offen, setOffen] = useState(false)
   const [markiert, setMarkiert] = useState(0)
-  const [lage, setLage] = useState<{ left: number; top: number; width: number } | null>(null)
+  const [lage, setLage] = useState<Lage | null>(null)
   const feld = useRef<HTMLInputElement>(null)
   const listeId = useId()
   const vorschlaege = useMemo(() => (offen ? verlagVorschlaege(verlage, wert) : []), [offen, verlage, wert])
@@ -36,7 +65,7 @@ export function VerlagFeld({ wert, jahr, verlage, onText, onWaehlen }: Props) {
     if (!sichtbar) return
     const messen = () => {
       const r = feld.current?.getBoundingClientRect()
-      if (r) setLage({ left: r.left, top: r.bottom + 6, width: Math.max(r.width, 420) })
+      if (r) setLage(berechneLage(r, { breite: window.innerWidth, hoehe: window.innerHeight }))
     }
     messen()
     window.addEventListener('scroll', messen, true)
@@ -47,6 +76,10 @@ export function VerlagFeld({ wert, jahr, verlage, onText, onWaehlen }: Props) {
     }
   }, [sichtbar])
   useEffect(() => setMarkiert(0), [wert])
+  // Die markierte Option bleibt beim Blättern mit den Pfeiltasten sichtbar
+  useEffect(() => {
+    if (sichtbar) document.getElementById(`${listeId}-${markiert}`)?.scrollIntoView({ block: 'nearest' })
+  }, [markiert, sichtbar, listeId])
 
   const waehle = (v: Verlag) => {
     onWaehlen(v)
@@ -92,8 +125,8 @@ export function VerlagFeld({ wert, jahr, verlage, onText, onWaehlen }: Props) {
       {sichtbar &&
         lage &&
         createPortal(
-          <div className="vorschlaege-menue verlag-menue" style={{ left: lage.left, top: lage.top, width: lage.width }}>
-            <ul role="listbox" id={listeId} aria-label="Verlage">
+          <div className="vorschlaege-menue verlag-menue" style={{ left: lage.left, top: lage.top, bottom: lage.bottom, width: lage.width }}>
+            <ul role="listbox" id={listeId} aria-label="Verlage" style={{ maxHeight: lage.maxHoehe }}>
               {vorschlaege.map((v, i) => {
                 const name = (/^\d{4}$/.test(jahr.trim()) && nameFuerJahr(v, jahr)) || anzeigeName(v)
                 const ort = /^\d{4}$/.test(jahr.trim()) ? ortFuerJahr(v, jahr)?.ort : undefined
