@@ -3,22 +3,20 @@ import { gruppiere, istIsbn, sucheLobid, type Treffer, type WerkVorschlag } from
 
 // Fragt Deutsche Nationalbibliothek und hbz-Verbundkatalog gleichzeitig und führt die Ausgaben zusammen.
 
-const vertraeglich = (a: string, b: string) => !a.trim() || !b.trim() || a.trim() === b.trim()
+const textNormal = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
 
 /**
- * Dieselbe Ausgabe nur, wenn ISBN und Jahr gleich sind und Auflagennummer und Umfang sich nicht widersprechen.
- * Verlage drucken neue Auflagen oft unter derselben ISBN nach; die ISBN allein ist nur ein Hinweis.
+ * Dieselbe Ausgabe nur bei vollständiger Übereinstimmung von ISBN, Jahr, Auflagennummer, Umfang und Vermerk.
+ * Verlage drucken neue Auflagen oft unter derselben ISBN nach. Eine fehlende Angabe ist kein Beleg für Gleichheit:
+ * im Zweifel bleiben beide Treffer zur Auswahl.
  */
 export function selbeAusgabe(a: Treffer, b: Treffer): boolean {
   const isbn = istIsbn(a.auflage.isbn)
-  return (
-    Boolean(isbn) &&
-    isbn === istIsbn(b.auflage.isbn) &&
-    a.auflage.jahr.trim() !== '' &&
-    a.auflage.jahr.trim() === b.auflage.jahr.trim() &&
-    vertraeglich(a.auflage.nummer, b.auflage.nummer) &&
-    vertraeglich(a.auflage.seiten, b.auflage.seiten)
-  )
+  if (!isbn || isbn !== istIsbn(b.auflage.isbn)) return false
+  return (['jahr', 'nummer', 'seiten', 'vermerk'] as const).every((f) => {
+    const x = textNormal(a.auflage[f])
+    return x !== '' || f === 'vermerk' ? x === textNormal(b.auflage[f]) : false
+  })
 }
 
 /** Dieselbe Ausgabe aus mehreren Katalogen nur einmal. Im Zweifel bleiben beide zur Auswahl. */
