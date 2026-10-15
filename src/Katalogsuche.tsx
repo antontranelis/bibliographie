@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { istIsbn, vorauswahl, sucheImKatalog, type Treffer, type WerkVorschlag } from './lobid'
+import { istIsbn, vorauswahl, type Treffer, type WerkVorschlag } from './lobid'
+import { sucheImKatalog } from './katalog'
 import type { Werk } from './model'
 import { Bibliothek, Kasten } from './Symbole'
 
@@ -296,7 +297,7 @@ export function AusgabenWahl({
         <button type="button" className="knopf" onClick={onVerwerfen}>
           Keine übernehmen
         </button>
-        <span className="rechts leise">Quelle: hbz-Verbundkatalog (lobid.org)</span>
+        <span className="rechts leise">Quellen: Deutsche Nationalbibliothek, hbz-Verbundkatalog</span>
       </div>
     </section>
   )

@@ -41,9 +41,31 @@ export function auflagenNummer(edition: string): string {
   return m ? m[1] : ''
 }
 
+/** Untertitel aus Katalogteilen: „a ; b“ wird „A. B“, wie in der Skizze mit Punkt getrennt. */
+export function untertitelAus(teile: string[]): string {
+  return teile
+    .join(' ; ')
+    .split(/\s+[;:]\s+/)
+    .map((t) =>
+      t
+        .trim()
+        .replace(/^\((.*)\)$/, '$1')
+        .replace(/[\s/:;,]+$/, '')
+        .replace(/^\p{Ll}/u, (c) => c.toUpperCase()),
+    )
+    .filter(Boolean)
+    .join('. ')
+}
+
+/** Bevorzugt die dreizehnstellige ISBN. */
+export function besteIsbn(kandidaten: string[]): string {
+  const gueltig = kandidaten.filter((k) => istIsbn(k))
+  return gueltig.find((k) => istIsbn(k).length === 13) ?? gueltig[0] ?? ''
+}
+
 export function seitenAusUmfang(extent: string): { seiten: string; roemisch: string } {
   const roem = extent.match(/^\s*([IVXLC]+)\s*,/)
-  const s = extent.match(/(\d+)\s*S\./)
+  const s = extent.match(/(\d+)\s*(?:S\.|Seiten)/)
   return { seiten: s ? s[1] : '', roemisch: roem ? roem[1] : '' }
 }
 
@@ -61,12 +83,7 @@ export function trefferAusRecord(r: LobidRecord): Treffer {
   const nummer = auflagenNummer(edition)
   return {
     titel: (r.title ?? '').trim(),
-    untertitel: (r.otherTitleInformation ?? [])
-      .join(' ; ')
-      .split(/\s+;\s+/)
-      .map((t) => t.trim().replace(/^\p{Ll}/u, (c) => c.toUpperCase()))
-      .join('. ')
-      .trim(),
+    untertitel: untertitelAus(r.otherTitleInformation ?? []),
     personen,
     auflage: {
       ...leereAuflage(),
@@ -78,7 +95,7 @@ export function trefferAusRecord(r: LobidRecord): Treffer {
       seiten,
       seitenRoemisch: roemisch,
       vermerk: nummer ? '' : edition,
-      isbn: (r.isbn ?? []).find((i) => istIsbn(i).length === 13) ?? (r.isbn ?? [])[0] ?? '',
+      isbn: besteIsbn(r.isbn ?? []),
       quelle: { katalog: 'lobid', id: r.hbzId ?? r.id ?? '' },
     },
   }
@@ -138,12 +155,13 @@ export function suchAnfrage(autor: string, titel: string): string {
   return teile.join(' AND ')
 }
 
-export async function sucheImKatalog(autor: string, titel: string, signal?: AbortSignal): Promise<WerkVorschlag[]> {
+/** Ausgaben aus dem hbz-Verbundkatalog. */
+export async function sucheLobid(autor: string, titel: string, signal?: AbortSignal): Promise<Treffer[]> {
   const q = suchAnfrage(autor, titel)
   if (!q) return []
   const url = `https://lobid.org/resources/search?q=${encodeURIComponent(q)}&format=json&size=100`
   const antwort = await fetch(url, { signal })
-  if (!antwort.ok) throw new Error(`Katalog antwortet mit ${antwort.status}`)
+  if (!antwort.ok) throw new Error(`hbz antwortet mit ${antwort.status}`)
   const daten = (await antwort.json()) as { member?: LobidRecord[] }
-  return gruppiere((daten.member ?? []).map(trefferAusRecord))
+  return (daten.member ?? []).map(trefferAusRecord)
 }

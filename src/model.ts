@@ -58,7 +58,7 @@ export interface Auflage {
   seitenRoemisch: string
   vermerk: string
   isbn: string
-  quelle?: { katalog: 'lobid'; id: string }
+  quelle?: { katalog: 'lobid' | 'dnb'; id: string }
 }
 
 export interface ErschienenIn {
