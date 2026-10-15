@@ -10,7 +10,9 @@ Dies ist ein Klick-Prototyp. Die Daten liegen nur im Browser. Mit „Sichern“ 
 - Ein Werk mit beliebig vielen Auflagen: Auflagenzahl, reales und abweichend gedrucktes Jahr, Erscheinungstag, Verlag, Ort, Seiten
 - Aufsätze mit „erschienen in“ (Zeitschrift, Zeitung, Sammelband)
 - Status „vorläufig“ bis „fest anlegen“
-- Suche im hbz-Verbundkatalog (lobid.org): gefundene Ausgaben werden zu einem Werk zusammengefasst und als vorläufige Karte übernommen
+- Drei Bereiche wie am Karteikasten: Erfassen (F2), Kartei (F3), Liste (F4); Sichern, Einlesen, Verlage und CSL-Export liegen unter „Ablage“
+- Nach dem Start liegt eine leere Karte bereit; Strg+Enter legt fest an und holt die nächste Karte, Alt+N nimmt die nächste und lässt die aktuelle vorläufig
+- Beim Tippen von Autor und Titel schlägt die Karte Werke vor: zuerst aus der eigenen Kartei („schon vorhanden“), nach einer Tipppause aus dem hbz-Verbundkatalog (lobid.org), je Werk mit Zahl der Ausgaben. Nach der Auswahl werden die Ausgaben zum Abhaken gezeigt, je Jahr eine vorausgewählt. Auch auf einer bestehenden Karte lassen sich weitere Auflagen nachholen
 - Verlage mit Kürzel für die Schnelleingabe und Ortsgeschichte; im Jahr eines Ortswechsels warnt die Karte
 - Felder fixieren für die Serieneingabe
 - Literaturliste nach Person oder Schlagwort, in zwei Mustern, sortiert nach Name oder Jahr; Ausgabe als Word-Datei oder Druck
