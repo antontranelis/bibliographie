@@ -11,9 +11,25 @@ const treffer = (jahr: string, isbn = ''): Treffer => ({
 })
 
 describe('ohneDoppelte', () => {
-  it('führt dieselbe ISBN aus beiden Katalogen zusammen, auch anders geschrieben', () => {
-    const r = ohneDoppelte([treffer('1987', '3-7274-6280-9'), treffer('1987', '3727462809'), treffer('1918'), treffer('1918')])
+  const mit = (jahr: string, isbn: string, nummer = '', seiten = ''): Treffer => {
+    const t = treffer(jahr, isbn)
+    return { ...t, auflage: { ...t.auflage, nummer, seiten } }
+  }
+  it('führt dieselbe Ausgabe aus beiden Katalogen zusammen, auch bei anders geschriebener ISBN', () => {
+    const r = ohneDoppelte([mit('1987', '3-7274-0040-5', '15', '288'), mit('1987', '3727400405', '', '288'), treffer('1918'), treffer('1918')])
     expect(r.map((t) => t.auflage.jahr)).toEqual(['1987', '1918', '1918'])
+  })
+  it('behält Auflagen verschiedener Jahre mit derselben ISBN (DNB, 9783867720724)', () => {
+    const r = ohneDoppelte([mit('2021', '9783867720724', '7'), mit('2018', '9783867720724', '5'), mit('2017', '9783867720724', '4'), mit('2013', '9783867720724', '1')])
+    expect(r.map((t) => `${t.auflage.nummer}/${t.auflage.jahr}`)).toEqual(['7/2021', '5/2018', '4/2017', '1/2013'])
+  })
+  it('behält Auflagen mit derselben ISBN und abweichendem Umfang (DNB, 9783727400407)', () => {
+    const r = ohneDoppelte([mit('1995', '9783727400407', '16', '288'), mit('1987', '9783727400407', '15', '288'), mit('1978', '9783727400407', '14', '278')])
+    expect(r).toHaveLength(3)
+  })
+  it('behält im selben Jahr verschiedene Auflagen oder verschiedenen Umfang', () => {
+    expect(ohneDoppelte([mit('2020', '9783867720724', '6'), mit('2020', '9783867720724', '7')])).toHaveLength(2)
+    expect(ohneDoppelte([mit('2020', '9783867720724', '', '200'), mit('2020', '9783867720724', '', '240')])).toHaveLength(2)
   })
 })
 
