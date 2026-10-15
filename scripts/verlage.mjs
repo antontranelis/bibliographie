@@ -10,7 +10,10 @@ const fehler = []
 async function seite({ katalog = false } = {}) {
   const page = await browser.newPage({ viewport: { width: 1360, height: 900 } })
   page.on('pageerror', (e) => fehler.push(e.message))
-  if (!katalog) await page.route('https://lobid.org/**', (r) => r.abort())
+  if (!katalog) {
+    await page.route('https://lobid.org/**', (r) => r.abort())
+    await page.route('https://services.dnb.de/**', (r) => r.abort())
+  }
   await page.goto(url)
   await page.evaluate(() => localStorage.clear())
   await page.reload()
