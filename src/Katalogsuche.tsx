@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { vorauswahl, sucheImKatalog, type Treffer, type WerkVorschlag } from './lobid'
+import { istIsbn, vorauswahl, sucheImKatalog, type Treffer, type WerkVorschlag } from './lobid'
 import type { Werk } from './model'
 import { Bibliothek, Kasten } from './Symbole'
 
@@ -48,6 +48,8 @@ const normal = (s: string) =>
 
 /** Werke der eigenen Kartei, die zu Autor und Titel passen. */
 export function karteiTreffer(werke: Werk[], selbst: string, autor: string, titel: string, hoechstens = 4): Werk[] {
+  const isbn = istIsbn(titel)
+  if (isbn) return werke.filter((w) => w.id !== selbst && w.auflagen.some((a) => istIsbn(a.isbn) === isbn)).slice(0, hoechstens)
   const woerter = normal(titel).split(' ').filter(Boolean)
   if (woerter.join('').length < 2) return []
   const a = normal(autor)

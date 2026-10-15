@@ -1,7 +1,7 @@
-import { neueId, type Datenstamm, type Werk } from './model'
+import { neueId, type Datenstamm, type Verlag, type Werk } from './model'
 
 export const FORMAT = 'bibliographie-datenstamm'
-export const VERSION = 1
+export const VERSION = 2
 
 export interface Exportdatei extends Datenstamm {
   format: typeof FORMAT
@@ -25,7 +25,35 @@ export function importiere(text: string): Datenstamm {
   if (d.format !== FORMAT) throw new Error('Die Datei stammt nicht aus diesem Programm.')
   if (typeof d.version !== 'number' || d.version > VERSION)
     throw new Error('Die Datei stammt aus einer neueren Programmversion.')
-  return { werke: d.werke ?? [], verlage: d.verlage ?? [] }
+  return migriere({ werke: d.werke ?? [], verlage: d.verlage ?? [] })
+}
+
+/**
+ * Bringt Daten auf den Stand von Version 2. Version 1 kannte pro Verlag nur einen Namen,
+ * und Auflagen verwiesen über den Namenstext auf ihn.
+ */
+export function migriere(d: Datenstamm): Datenstamm {
+  const verlage: Verlag[] = d.verlage.map((v) => {
+    const alt = v as Partial<Verlag> & { name?: string }
+    return {
+      id: alt.id ?? neueId(),
+      kuerzel: alt.kuerzel ?? '',
+      namen: alt.namen ?? [{ abJahr: '', name: alt.name ?? '' }],
+      orte: alt.orte ?? [],
+      schreibweisen: alt.schreibweisen ?? [],
+    }
+  })
+  const nachName = new Map(verlage.map((v) => [v.namen[0]?.name.trim().toLowerCase(), v.id]))
+  const werke = d.werke.map((w) => ({
+    ...w,
+    auflagen: w.auflagen.map((a) => ({
+      ...a,
+      isbn: a.isbn ?? '',
+      verlagId: a.verlagId ?? nachName.get(a.verlag.trim().toLowerCase()),
+    })),
+  }))
+  for (const w of werke) for (const a of w.auflagen) if (a.verlagId === undefined) delete a.verlagId
+  return { werke, verlage }
 }
 
 /** Führt importierte Daten mit dem Bestand zusammen. Gleiche ID: die neuere Fassung gewinnt. */
@@ -76,6 +104,7 @@ export function exportiereCsl(werke: Werk[]): string {
       edition: a.nummer || undefined,
       issued: a.jahr ? { 'date-parts': [[parseInt(a.jahr, 10)]] } : undefined,
       'number-of-pages': a.seiten || undefined,
+      ISBN: a.isbn || undefined,
       'collection-title': w.reihe || undefined,
       'collection-number': w.reiheBand || undefined,
       note: w.kommentar || undefined,
@@ -89,7 +118,7 @@ const SCHLUESSEL = 'bibliographie:datenstamm:v1'
 export function ladeLokal(): Datenstamm | null {
   try {
     const text = localStorage.getItem(SCHLUESSEL)
-    return text ? (JSON.parse(text) as Datenstamm) : null
+    return text ? migriere(JSON.parse(text) as Datenstamm) : null
   } catch {
     return null
   }

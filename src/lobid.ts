@@ -11,6 +11,7 @@ export interface LobidRecord {
   publication?: { startDate?: string; location?: string[] | string; publishedBy?: string[] | string }[] | null
   edition?: string[] | null
   extent?: string | null
+  isbn?: string[] | null
 }
 
 export interface Treffer {
@@ -77,6 +78,7 @@ export function trefferAusRecord(r: LobidRecord): Treffer {
       seiten,
       seitenRoemisch: roemisch,
       vermerk: nummer ? '' : edition,
+      isbn: (r.isbn ?? []).find((i) => istIsbn(i).length === 13) ?? (r.isbn ?? [])[0] ?? '',
       quelle: { katalog: 'lobid', id: r.hbzId ?? r.id ?? '' },
     },
   }
@@ -120,7 +122,15 @@ export function gruppiere(treffer: Treffer[]): WerkVorschlag[] {
   return [...gruppen.values()].sort((a, b) => b.treffer.length - a.treffer.length)
 }
 
+/** Die ISBN ohne Bindestriche, wenn der Text eine ist, sonst leer. */
+export function istIsbn(text: string): string {
+  const roh = text.replace(/[\s-]/g, '').toUpperCase()
+  return /^(\d{9}[\dX]|97[89]\d{10})$/.test(roh) ? roh : ''
+}
+
 export function suchAnfrage(autor: string, titel: string): string {
+  const isbn = istIsbn(titel)
+  if (isbn) return `isbn:${isbn}`
   const teile: string[] = []
   const zitat = (s: string) => s.replace(/"/g, '').trim()
   if (autor.trim()) teile.push(`contribution.agent.label:"${zitat(autor)}"`)

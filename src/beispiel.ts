@@ -1,4 +1,5 @@
-import { leereAuflage, neueId, type Datenstamm, type Werk } from './model'
+import { leereAuflage, neueId, type Datenstamm, type Verlag, type Werk } from './model'
+import { migriere } from './speicher'
 
 const jetzt = () => new Date().toISOString()
 
@@ -25,20 +26,17 @@ const steiner = { vorname: 'Rudolf', nachname: 'Steiner', rolle: 'autor' as cons
 
 /** Wenige Beispielkarten zum Ausprobieren. */
 export function beispielDaten(): Datenstamm {
-  return {
+  const v = (name: string, kuerzel: string, orte: Verlag['orte']): Verlag => ({ id: neueId(), kuerzel, namen: [{ abJahr: '', name }], orte, schreibweisen: [] })
+  // migriere verknüpft die Auflagen über den Verlagsnamen
+  return migriere({
     verlage: [
-      {
-        id: neueId(),
-        name: 'Philosophisch-Anthroposophischer Verlag',
-        kuerzel: 'pav',
-        orte: [
-          { abJahr: '1908', ort: 'Berlin', wechselImJahr: false },
-          { abJahr: '1923', ort: 'Dornach', wechselImJahr: true },
-        ],
-      },
-      { id: neueId(), name: 'Verlag am Goetheanum', kuerzel: 'goe', orte: [{ abJahr: '1923', ort: 'Dornach', wechselImJahr: false }] },
-      { id: neueId(), name: 'Verlag Freies Geistesleben', kuerzel: 'fg', orte: [{ abJahr: '1947', ort: 'Stuttgart', wechselImJahr: false }] },
-      { id: neueId(), name: 'Rudolf Steiner Verlag', kuerzel: 'rsv', orte: [{ abJahr: '1945', ort: 'Dornach', wechselImJahr: false }] },
+      v('Philosophisch-Anthroposophischer Verlag', 'pav', [
+        { abJahr: '1908', ort: 'Berlin', wechselImJahr: false },
+        { abJahr: '1923', ort: 'Dornach', wechselImJahr: true },
+      ]),
+      v('Verlag am Goetheanum', 'goe', [{ abJahr: '1923', ort: 'Dornach', wechselImJahr: false }]),
+      v('Verlag Freies Geistesleben', 'fg', [{ abJahr: '1947', ort: 'Stuttgart', wechselImJahr: false }]),
+      v('Rudolf Steiner Verlag', 'rsv', [{ abJahr: '1945', ort: 'Dornach', wechselImJahr: false }]),
     ],
     werke: [
       werk({
@@ -69,5 +67,5 @@ export function beispielDaten(): Datenstamm {
         schlagwoerter: [{ begriff: 'Pädagogik', primaer: true }],
       }),
     ],
-  }
+  })
 }

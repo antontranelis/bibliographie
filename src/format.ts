@@ -7,6 +7,7 @@ export interface Stil {
   untertitelTrenner: '. ' | ' – ' | ': '
   auflagen: 'erste' | 'alle'
   seitenzahl: boolean
+  isbn: boolean
 }
 
 export const STANDARD_STIL: Stil = {
@@ -15,6 +16,7 @@ export const STANDARD_STIL: Stil = {
   untertitelTrenner: '. ',
   auflagen: 'erste',
   seitenzahl: false,
+  isbn: false,
 }
 
 function name(p: Person, folge: Stil['namensfolge']): string {
@@ -69,6 +71,7 @@ function impressum(a: Auflage, stil: Stil): string {
   if (kopf && zaehlung) text = `${kopf}, ${ende}`
   else text = [kopf, ende].filter(Boolean).join(' ')
   if (stil.seitenzahl && seiten(a)) text += `, ${seiten(a)}`
+  if (stil.isbn && a.isbn.trim()) text += `, ISBN ${a.isbn.trim()}`
   return text
 }
 

@@ -24,6 +24,7 @@ describe('weichtAb', () => {
     ['nur ein Verlag', (w) => (w.auflagen[0].verlag = 'Mein Verlag')],
     ['nur ein Vermerk', (w) => (w.auflagen[0].vermerk = '20.–25. Tsd.')],
     ['nur ein Druckjahr', (w) => (w.auflagen[0].gedrucktesJahr = '1894')],
+    ['nur eine ISBN', (w) => (w.auflagen[0].isbn = '3-7274-0040-5')],
     ['nur ein Schlagwort', (w) => w.schlagwoerter.push({ begriff: 'Ethik', primaer: true })],
     ['nur die Reihe', (w) => (w.reihe = 'Gesamtausgabe')],
     ['nur die Art', (w) => (w.art = 'aufsatz')],
@@ -62,7 +63,7 @@ describe('auflageLeer', () => {
   it('ist leer ohne jede Angabe', () => {
     expect(auflageLeer(leereAuflage())).toBe(true)
   })
-  it.each(['verlag', 'ort', 'jahr', 'nummer', 'seiten', 'seitenRoemisch', 'gedrucktesJahr', 'erscheinungstag', 'vermerk'] as const)(
+  it.each(['verlag', 'ort', 'jahr', 'nummer', 'seiten', 'seitenRoemisch', 'gedrucktesJahr', 'erscheinungstag', 'vermerk', 'isbn'] as const)(
     'ist nicht leer mit %s',
     (feld) => {
       expect(auflageLeer({ ...leereAuflage(), [feld]: 'x' })).toBe(false)

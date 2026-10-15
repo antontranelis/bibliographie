@@ -11,7 +11,7 @@ import {
   type Verlag,
   type Werk,
 } from './model'
-import { ortFuerJahr, verlagVorschlaege } from './verlag'
+import { anzeigeName, findeExakt, nameFuerJahr, ortFuerJahr, ortName, ortsAbweichung, ortswechselEintragen, planeVerlage, verlagVorschlaege, type VerlagsGruppe } from './verlag'
 import { auflageLeer } from './entwurf'
 import { druckzeile } from './format'
 import { sucheImKatalog, type Treffer, type WerkVorschlag } from './lobid'
@@ -31,7 +31,8 @@ interface Props {
   seitenleiste: React.ReactNode
   onAendern: (w: Werk) => void
   onFixieren: (f: Fixierung) => void
-  onVerlagMerken: (name: string, ort: string, jahr: string) => void
+  onVerlagsAbgleich: (g: VerlagsGruppe[], derselbe: boolean) => void
+  onVerlagAendern: (v: Verlag) => void
   onZuVorhandener: (id: string) => void
   onFestAnlegen: () => void
   onNaechste: () => void
@@ -46,7 +47,7 @@ const jahrZahl = (a: Auflage) => parseInt(a.jahr, 10) || 9999
 
 export function Karteikarte(props: Props) {
   const { werk, istNeu, alleWerke, verlage, alleSchlagwoerter, fixiert, nachholen, seitenleiste } = props
-  const { onAendern, onFixieren, onVerlagMerken, onZuVorhandener, onFestAnlegen, onNaechste, onLoeschen } = props
+  const { onAendern, onFixieren, onVerlagsAbgleich, onVerlagAendern, onZuVorhandener, onFestAnlegen, onNaechste, onLoeschen } = props
   const setze = (teil: Partial<Werk>) => onAendern({ ...werk, ...teil })
   const istAufsatz = werk.art === 'aufsatz'
   const listeId = useId()
@@ -316,7 +317,8 @@ export function Karteikarte(props: Props) {
               onAendern={(auflagen) => setze({ auflagen })}
               onFixieren={onFixieren}
               onNachholen={holeNach}
-              onVerlagMerken={onVerlagMerken}
+              onVerlagsAbgleich={onVerlagsAbgleich}
+              onVerlagAendern={onVerlagAendern}
             />
           )}
 
@@ -417,7 +419,8 @@ function Auflagen({
   onAendern,
   onFixieren,
   onNachholen,
-  onVerlagMerken,
+  onVerlagsAbgleich,
+  onVerlagAendern,
 }: {
   werk: Werk
   verlage: Verlag[]
@@ -426,7 +429,8 @@ function Auflagen({
   onAendern: (a: Auflage[]) => void
   onFixieren: (f: Fixierung) => void
   onNachholen: () => void
-  onVerlagMerken: (name: string, ort: string, jahr: string) => void
+  onVerlagsAbgleich: (g: VerlagsGruppe[], derselbe: boolean) => void
+  onVerlagAendern: (v: Verlag) => void
 }) {
   const [alle, setAlle] = useState(false)
   const [neuId, setNeuId] = useState<string | null>(null)
@@ -437,7 +441,7 @@ function Auflagen({
 
   const neueAuflage = () => {
     const letzte = auflagen[auflagen.length - 1]
-    const a = { ...leereAuflage(), verlag: letzte?.verlag ?? '', ort: letzte?.ort ?? '' }
+    const a = { ...leereAuflage(), verlag: letzte?.verlag ?? '', ort: letzte?.ort ?? '', ...(letzte?.verlagId ? { verlagId: letzte.verlagId } : {}) }
     setNeuId(a.id)
     onAendern([...auflagen, a])
   }
@@ -499,11 +503,12 @@ function Auflagen({
               ) : null}
               onAendern={(neu) => onAendern(auflagen.map((x, j) => (j === i ? neu : x)))}
               onEntfernen={auflagen.length > 1 ? () => onAendern(auflagen.filter((_, j) => j !== i)) : undefined}
-              onVerlagMerken={onVerlagMerken}
+              onVerlagAendern={onVerlagAendern}
             />
           ))}
         </table>
       </div>
+      <VerlagsAbgleich werk={werk} verlage={verlage} onAbgleich={onVerlagsAbgleich} />
       {alle && auflagen.length > 8 && (
         <button type="button" className="textknopf" onClick={() => setAlle(false)}>
           Mittlere Auflagen wieder einklappen
@@ -520,7 +525,7 @@ function AuflageZeile({
   davor,
   onAendern,
   onEntfernen,
-  onVerlagMerken,
+  onVerlagAendern,
 }: {
   auflage: Auflage
   verlage: Verlag[]
@@ -528,25 +533,38 @@ function AuflageZeile({
   davor: React.ReactNode
   onAendern: (a: Auflage) => void
   onEntfernen?: () => void
-  onVerlagMerken: (name: string, ort: string, jahr: string) => void
+  onVerlagAendern: (v: Verlag) => void
 }) {
   const [verlagOffen, setVerlagOffen] = useState(false)
   const [mehr, setMehr] = useState(false)
   const setze = (teil: Partial<Auflage>) => onAendern({ ...auflage, ...teil })
   const vorschlaege = useMemo(() => (verlagOffen ? verlagVorschlaege(verlage, auflage.verlag) : []), [verlagOffen, verlage, auflage.verlag])
-  const bekannt = verlage.find((v) => v.name === auflage.verlag)
+  const bekannt = verlage.find((v) => v.id === auflage.verlagId) ?? findeExakt(verlage, auflage.verlag)
   const auskunft = bekannt ? ortFuerJahr(bekannt, auflage.jahr) : null
-  const hatMehr = Boolean(auflage.gedrucktesJahr || auflage.erscheinungstag || auflage.vermerk || auflage.seitenRoemisch)
+  const abweichung = bekannt && !auskunft?.zweiOrteMoeglich ? ortsAbweichung(bekannt, auflage) : null
+  const hatMehr = Boolean(auflage.gedrucktesJahr || auflage.erscheinungstag || auflage.vermerk || auflage.seitenRoemisch || auflage.isbn)
 
   const waehle = (v: Verlag) => {
     const a = ortFuerJahr(v, auflage.jahr)
-    setze({ verlag: v.name, ort: a?.ort ?? auflage.ort })
+    setze({ verlag: nameFuerJahr(v, auflage.jahr) || anzeigeName(v), verlagId: v.id, ort: a?.ort ?? auflage.ort, ortBestaetigt: false })
     setVerlagOffen(false)
   }
-  const setzeJahr = (jahr: string) => {
-    const a = bekannt ? ortFuerJahr(bekannt, jahr) : null
-    setze({ jahr, ort: a && /^\d{4}$/.test(jahr) ? a.ort : auflage.ort })
+  /** Neues Jahr: Name und Ort folgen der Verlagskarte, solange sie dem bisherigen Stand entsprachen. */
+  const mitJahr = (jahr: string): Partial<Auflage> => {
+    if (!bekannt || !/^\d{4}$/.test(jahr)) return { jahr }
+    const teil: Partial<Auflage> = { jahr }
+    const alterName = nameFuerJahr(bekannt, auflage.jahr)
+    if (!auflage.verlag.trim() || auflage.verlag.trim() === alterName) teil.verlag = nameFuerJahr(bekannt, jahr) || auflage.verlag
+    const ort = ortFuerJahr(bekannt, jahr)?.ort
+    if (ort && !auflage.ortBestaetigt) teil.ort = ort
+    return teil
   }
+  const setzeJahr = (jahr: string) => setze(mitJahr(jahr))
+  const setzeErscheinungstag = (tag: string) => {
+    const jahr = tag.slice(0, 4)
+    setze({ erscheinungstag: tag, ...(tag && !auflage.jahr.trim() ? mitJahr(jahr) : {}) })
+  }
+  const jahrGrenzen = /^\d{4}$/.test(auflage.jahr.trim()) ? { min: `${auflage.jahr.trim()}-01-01`, max: `${auflage.jahr.trim()}-12-31` } : {}
 
   return (
     <tbody className={auskunft?.zweiOrteMoeglich ? 'mit-warnung' : ''}>
@@ -566,7 +584,9 @@ function AuflageZeile({
             autoComplete="off"
             value={auflage.verlag}
             onChange={(e) => {
-              setze({ verlag: e.target.value })
+              const v = findeExakt(verlage, e.target.value)
+              const ort = v && !auflage.ort.trim() ? ortFuerJahr(v, auflage.jahr)?.ort : undefined
+              setze({ verlag: e.target.value, verlagId: v?.id, ...(ort ? { ort } : {}) })
               setVerlagOffen(true)
             }}
             onFocus={() => setVerlagOffen(true)}
@@ -583,14 +603,14 @@ function AuflageZeile({
             <ul className="klein-menue">
               {vorschlaege.map((v) => (
                 <li key={v.id} onMouseDown={(e) => e.preventDefault()} onClick={() => waehle(v)}>
-                  {v.name} {v.kuerzel && <span className="kuerzel">{v.kuerzel}</span>}
+                  {anzeigeName(v)} {v.kuerzel && <span className="kuerzel">{v.kuerzel}</span>}
                 </li>
               ))}
             </ul>
           )}
         </td>
         <td>
-          <input className={`eingabe zelle ${auskunft?.zweiOrteMoeglich ? 'warnfarbe' : ''}`} aria-label="Ort" value={auflage.ort} onChange={(e) => setze({ ort: e.target.value })} />
+          <input className={`eingabe zelle ${auskunft?.zweiOrteMoeglich ? 'warnfarbe' : ''}`} aria-label="Ort" value={auflage.ort} onChange={(e) => setze({ ort: e.target.value, ortBestaetigt: false })} />
         </td>
         <td>
           <input className="eingabe zelle" aria-label="Seiten" value={auflage.seiten} maxLength={5} inputMode="numeric" onChange={(e) => setze({ seiten: e.target.value })} />
@@ -601,7 +621,7 @@ function AuflageZeile({
             className={`mehr-knopf ${hatMehr ? 'hat-mehr' : ''}`}
             aria-expanded={mehr}
             aria-label={`Weitere Angaben zur Auflage ${auflage.jahr}`}
-            title="Druckjahr, Seiten röm., Vermerk, Erscheinungstag"
+            title="Druckjahr, Seiten röm., Vermerk, Erscheinungstag, ISBN"
             onClick={() => setMehr(!mehr)}
           >
             ⋯
@@ -614,7 +634,7 @@ function AuflageZeile({
             <div role="alert" className="warnung">
               <Warnung />
               <span>
-                {bekannt?.name} wechselte <b>{auflage.jahr}</b> von {auskunft.zweiOrteMoeglich[0]} nach {auskunft.zweiOrteMoeglich[1]}. In diesem Jahr ist beides möglich, bitte im Buch nachsehen.
+                {bekannt ? anzeigeName(bekannt) : ''} wechselte <b>{auflage.jahr}</b> von {auskunft.zweiOrteMoeglich[0]} nach {auskunft.zweiOrteMoeglich[1]}. In diesem Jahr ist beides möglich, bitte im Buch nachsehen.
               </span>
               <span className="knopfreihe">
                 {auskunft.zweiOrteMoeglich.map((o) => (
@@ -622,6 +642,28 @@ function AuflageZeile({
                     {o}
                   </button>
                 ))}
+              </span>
+            </div>
+          </td>
+        </tr>
+      )}
+      {abweichung && bekannt && (
+        <tr className="warnzeile">
+          <td colSpan={6}>
+            <div className="warnung leise-warnung">
+              <Warnung />
+              <span>
+                Laut Verlagskarte saß {anzeigeName(bekannt)} {auflage.jahr ? <b>{auflage.jahr}</b> : null} in {abweichung.erwartet}.
+              </span>
+              <span className="knopfreihe">
+                {/^\d{4}$/.test(auflage.jahr.trim()) && (
+                  <button type="button" className="klein-knopf" onClick={() => onVerlagAendern(ortswechselEintragen(bekannt, auflage.jahr, auflage.ort))}>
+                    Ortswechsel nach {ortName(auflage.ort)} ab {auflage.jahr.trim()} eintragen
+                  </button>
+                )}
+                <button type="button" className="klein-knopf" onClick={() => setze({ ortBestaetigt: true })}>
+                  Stimmt so, nur hier
+                </button>
               </span>
             </div>
           </td>
@@ -645,16 +687,15 @@ function AuflageZeile({
               </label>
               <label>
                 <span className="lab">Erscheinungstag</span>
-                <input className="eingabe" type="date" value={auflage.erscheinungstag} onChange={(e) => setze({ erscheinungstag: e.target.value })} />
+                <input className="eingabe" type="date" value={auflage.erscheinungstag} {...jahrGrenzen} onChange={(e) => setzeErscheinungstag(e.target.value)} />
+              </label>
+              <label>
+                <span className="lab">ISBN</span>
+                <input className="eingabe" value={auflage.isbn} inputMode="numeric" onChange={(e) => setze({ isbn: e.target.value })} />
               </label>
             </div>
             <div className="knopfreihe">
               {auflage.quelle && <span className="leise klein">aus dem Katalog übernommen</span>}
-              {auflage.verlag.trim() && !bekannt && (
-                <button type="button" className="textknopf" onClick={() => onVerlagMerken(auflage.verlag.trim(), auflage.ort.trim(), auflage.jahr.trim())}>
-                  „{auflage.verlag.trim()}“ als Verlag merken
-                </button>
-              )}
               {onEntfernen && (
                 <button type="button" className="textknopf leise rechts" onClick={onEntfernen}>
                   Auflage entfernen
@@ -665,6 +706,46 @@ function AuflageZeile({
         </tr>
       )}
     </tbody>
+  )
+}
+
+/** Verlage der Karte, die noch keinem Verlag zugeordnet sind: ähnliche bestätigen, neue gleich merken. */
+function VerlagsAbgleich({ werk, verlage, onAbgleich }: { werk: Werk; verlage: Verlag[]; onAbgleich: (g: VerlagsGruppe[], derselbe: boolean) => void }) {
+  const plan = planeVerlage(werk, verlage)
+  const aehnliche = plan.filter((g) => g.art === 'aehnlich' && g.verlag)
+  const neue = plan.filter((g) => g.art === 'neu')
+  if (aehnliche.length + neue.length === 0) return null
+  const namen = (g: VerlagsGruppe) => g.texte.map((t) => `„${t}“`).join(', ')
+  const anzahl = (g: VerlagsGruppe) => (g.auflagen.length > 1 ? ` (${g.auflagen.length} Auflagen)` : '')
+  return (
+    <div className="verlags-abgleich" aria-label="Verlage zuordnen">
+      {aehnliche.map((g) => (
+        <div className="abgleich-zeile" key={g.texte.join('|')}>
+          <span>
+            {namen(g)}
+            {anzahl(g)} ist vermutlich <b>{anzeigeName(g.verlag!)}</b>.
+          </span>
+          <span className="knopfreihe">
+            <button type="button" className="klein-knopf" onClick={() => onAbgleich([g], true)}>
+              Ja, derselbe Verlag
+            </button>
+            <button type="button" className="klein-knopf" onClick={() => onAbgleich([g], false)}>
+              Nein, ein anderer
+            </button>
+          </span>
+        </div>
+      ))}
+      {neue.length > 0 && (
+        <div className="abgleich-zeile neu">
+          <span>
+            {neue.length === 1 ? 'Neuer Verlag' : 'Neue Verlage'}: {neue.map((g) => g.texte[0]).join(', ')}. {neue.length === 1 ? 'Er wird' : 'Sie werden'} beim Festanlegen gemerkt.
+          </span>
+          <button type="button" className="textknopf" onClick={() => onAbgleich(neue, false)}>
+            Jetzt merken
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 

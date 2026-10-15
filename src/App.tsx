@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { TEXT_ARTEN, leeresWerk, neueId, type Datenstamm, type ErschienenIn, type Person, type Schlagwort, type TextArt, type Verlag, type Werk } from './model'
+import { TEXT_ARTEN, leeresWerk, type Datenstamm, type ErschienenIn, type Person, type Schlagwort, type TextArt, type Verlag, type Werk } from './model'
 import { Karteikarte } from './Karteikarte'
 import { Kartei, LEERE_SICHT, type KarteiSicht, type ListenVorgabe } from './Kartei'
 import { Liste } from './Liste'
@@ -7,7 +7,7 @@ import { Verlage } from './Verlage'
 import { beispielDaten } from './beispiel'
 import { exportiere, exportiereCsl, importiere, ladeLokal, speichereLokal, zusammenfuehren } from './speicher'
 import { herunterladen } from './herunterladen'
-import { ortFuerJahr } from './verlag'
+import { anzeigeName, findeExakt, nachVerlagsAenderung, nameFuerJahr, ortFuerJahr, planeVerlage, wendePlanAn, type VerlagsGruppe } from './verlag'
 import { Abwaerts, Nadel, StatusPunkt } from './Symbole'
 import { eigeneAngaben, weichtAb, type Inhaltsfeld } from './entwurf'
 
@@ -39,12 +39,16 @@ function mitFixierung(w: Werk, fixiert: Fixierung, verlage: Verlag[]): Werk {
   if (fixiert.erschienenIn) neu.erschienenIn = { ...fixiert.erschienenIn }
   if (fixiert.schlagwoerter) neu.schlagwoerter = fixiert.schlagwoerter.map((s) => ({ ...s }))
   if (fixiert.verlag !== undefined) {
-    const v = verlages(verlage, fixiert.verlag)
-    neu.auflagen = neu.auflagen.map((a) => ({ ...a, verlag: fixiert.verlag ?? '', ort: v ? ortFuerJahr(v, a.jahr)?.ort ?? a.ort : a.ort }))
+    const v = findeExakt(verlage, fixiert.verlag)
+    neu.auflagen = neu.auflagen.map((a) => ({
+      ...a,
+      verlag: v ? nameFuerJahr(v, a.jahr) || fixiert.verlag! : fixiert.verlag ?? '',
+      ...(v ? { verlagId: v.id } : {}),
+      ort: v ? ortFuerJahr(v, a.jahr)?.ort ?? a.ort : a.ort,
+    }))
   }
   return neu
 }
-const verlages = (verlage: Verlag[], name: string) => verlage.find((x) => x.name === name)
 
 /** Felder, über die die Karte vorhandene Werke vorschlägt. */
 const SUCHFELDER: Inhaltsfeld[] = ['personen', 'titel', 'untertitel']
@@ -67,6 +71,7 @@ const REITER: { ansicht: Ansicht; label: string; taste: string }[] = [
   { ansicht: 'erfassen', label: 'Erfassen', taste: 'F2' },
   { ansicht: 'kartei', label: 'Kartei', taste: 'F3' },
   { ansicht: 'liste', label: 'Liste', taste: 'F4' },
+  { ansicht: 'verlage', label: 'Verlage', taste: 'F5' },
 ]
 
 export default function App() {
@@ -146,8 +151,22 @@ export default function App() {
       setMeldung('Zum Festanlegen fehlt noch der Titel.')
       return
     }
-    aendereKarte({ ...karte, status: 'fest' })
-    setMeldung(`„${karte.titel.trim()}“ ist fest angelegt. Die nächste Karte liegt bereit.`)
+    // Verlage der Karte abgleichen: bekannte verknüpfen, neue merken, bei ähnlichen einmal fragen
+    const plan = planeVerlage(karte, daten.verlage)
+    const r = wendePlanAn(karte, daten.verlage, plan, (g) =>
+      confirm(
+        `Auf der Karte steht ${g.texte.map((t) => `„${t}“`).join(', ')}.\nIst das der Verlag „${g.verlag ? anzeigeName(g.verlag) : ''}“?\n\n` +
+          'OK: derselbe Verlag, die Schreibweise wird gemerkt.\nAbbrechen: ein anderer Verlag, er wird neu angelegt.',
+      ),
+    )
+    const neueVerlage = r.verlage.length - daten.verlage.length
+    if (r.verlage !== daten.verlage) setDaten((d) => ({ ...d, verlage: r.verlage }))
+    aendereKarte({ ...r.werk, status: 'fest' })
+    setMeldung(
+      `„${karte.titel.trim()}“ ist fest angelegt.` +
+        (neueVerlage > 0 ? ` ${neueVerlage === 1 ? 'Ein neuer Verlag ist' : `${neueVerlage} neue Verlage sind`} gemerkt.` : '') +
+        ' Die nächste Karte liegt bereit.',
+    )
     neueKarte()
   }
 
@@ -191,19 +210,35 @@ export default function App() {
     neueKarte()
   }
 
-  const verlagMerken = (name: string, ort: string, jahr: string) => {
-    const kuerzel = name
-      .split(/\s+/)
-      .filter((t) => !/^(verlag|verl\.?|der|die|das|am|im|und|&)$/i.test(t))
-      .map((t) => t[0]?.toLowerCase() ?? '')
-      .join('')
-      .slice(0, 4)
-    setDaten((d) => ({
-      ...d,
-      verlage: [...d.verlage, { id: neueId(), name, kuerzel, orte: [{ abJahr: /^\d{4}$/.test(jahr) ? jahr : '', ort, wechselImJahr: false }] }],
-    }))
-    setMeldung(`Verlag „${name}“ gemerkt (Kürzel „${kuerzel}“). Unter Ablage › Verlage lässt sich das ändern.`)
+  /** Abgleich für eine Gruppe von Verlagsnamen der Karte: true = derselbe bekannte Verlag, false = neuer Verlag. */
+  const verlagsAbgleich = (gruppen: VerlagsGruppe[], derselbe: boolean) => {
+    if (!karte || gruppen.length === 0) return
+    const r = wendePlanAn(karte, daten.verlage, gruppen, () => derselbe)
+    setDaten((d) => ({ ...d, verlage: r.verlage }))
+    aendereKarte(r.werk)
+    const ziel = r.verlage.find((v) => v.id === r.werk.auflagen.find((a) => a.id === gruppen[0].auflagen[0])?.verlagId)
+    if (gruppen.length > 1) setMeldung(`${gruppen.length} Verlage gemerkt.`)
+    else if (ziel) setMeldung(derselbe ? `Schreibweise zu „${anzeigeName(ziel)}“ gemerkt.` : `Verlag „${anzeigeName(ziel)}“ gemerkt (Kürzel „${ziel.kuerzel}“).`)
   }
+
+  /** Verlagskarten ändern; verknüpfte Auflagen ziehen Name und Ort nach, gelöschte Verlage werden gelöst. */
+  const aendereVerlage = (verlage: Verlag[]) => {
+    setDaten((d) => {
+      let werke = d.werke
+      for (const alt of d.verlage) {
+        const neu = verlage.find((v) => v.id === alt.id)
+        if (!neu) {
+          werke = werke.map((w) =>
+            w.auflagen.some((a) => a.verlagId === alt.id)
+              ? { ...w, auflagen: w.auflagen.map((a) => (a.verlagId === alt.id ? { ...a, verlagId: undefined } : a)) }
+              : w,
+          )
+        } else if (neu !== alt) werke = nachVerlagsAenderung(werke, alt, neu)
+      }
+      return { werke, verlage }
+    })
+  }
+  const aendereVerlag = (v: Verlag) => aendereVerlage(daten.verlage.map((x) => (x.id === v.id ? v : x)))
 
   const beispieleLaden = () => {
     const b = beispielDaten()
@@ -232,7 +267,7 @@ export default function App() {
   // Tastatur für die Serienerfassung
   const tastenRef = useRef<(e: KeyboardEvent) => void>(() => {})
   tastenRef.current = (e: KeyboardEvent) => {
-    const wechsel: Record<string, Ansicht> = { F2: 'erfassen', F3: 'kartei', F4: 'liste' }
+    const wechsel: Record<string, Ansicht> = { F2: 'erfassen', F3: 'kartei', F4: 'liste', F5: 'verlage' }
     if (wechsel[e.key] && !e.ctrlKey && !e.altKey) {
       e.preventDefault()
       setAnsicht(wechsel[e.key])
@@ -292,7 +327,6 @@ export default function App() {
               onSichern={exportJson}
               onEinlesen={() => dateiEingabe.current?.click()}
               onCsl={exportCsl}
-              onVerlage={() => setAnsicht('verlage')}
               onBeispiele={beispieleLaden}
             />
             <input
@@ -329,7 +363,8 @@ export default function App() {
             nachholen={nachholenId === karte.id}
             onAendern={aendereKarte}
             onFixieren={setFixiert}
-            onVerlagMerken={verlagMerken}
+            onVerlagsAbgleich={verlagsAbgleich}
+            onVerlagAendern={aendereVerlag}
             onZuVorhandener={zuVorhandener}
             onFestAnlegen={festAnlegen}
             onNaechste={neueKarte}
@@ -376,7 +411,7 @@ export default function App() {
           />
         )}
         {ansicht === 'liste' && <Liste key={listenVorgabe.nr} werke={daten.werke} vorgabe={listenVorgabe} />}
-        {ansicht === 'verlage' && <Verlage verlage={daten.verlage} onAendern={(verlage) => setDaten((d) => ({ ...d, verlage }))} onZurueck={() => setAnsicht('erfassen')} />}
+        {ansicht === 'verlage' && <Verlage verlage={daten.verlage} werke={daten.werke} onAendern={aendereVerlage} onZurueck={() => setAnsicht('erfassen')} />}
       </main>
     </div>
   )
@@ -387,14 +422,12 @@ function Ablage({
   onSichern,
   onEinlesen,
   onCsl,
-  onVerlage,
   onBeispiele,
 }: {
   karteiLeer: boolean
   onSichern: () => void
   onEinlesen: () => void
   onCsl: () => void
-  onVerlage: () => void
   onBeispiele: () => void
 }) {
   const [offen, setOffen] = useState(false)
@@ -428,9 +461,6 @@ function Ablage({
             Einlesen <span>gesicherte Datei zurückholen</span>
           </button>
           <div className="menue-linie" />
-          <button type="button" role="menuitem" onClick={tu(onVerlage)}>
-            Verlage <span>Kürzel und Ortsgeschichte</span>
-          </button>
           <button type="button" role="menuitem" onClick={tu(onCsl)}>
             CSL-Export <span>für Zotero, Citavi, Pandoc</span>
           </button>

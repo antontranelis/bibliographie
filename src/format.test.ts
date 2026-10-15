@@ -81,3 +81,11 @@ describe('sortiere', () => {
     expect(sortiere([a, b, c], 'jahr').map((w) => w.titel)).toEqual(['c', 'b', 'a'])
   })
 })
+
+describe('ISBN in der Liste', () => {
+  it('zeigt die ISBN nur, wenn gewünscht', () => {
+    const w = werk({ personen: [steiner], titel: 'T', auflagen: [{ ...leereAuflage(), ort: 'Dornach', jahr: '1995', isbn: '3-7274-0040-5' }] })
+    expect(druckzeile(w)).toBe('Rudolf Steiner: T, Dornach 1995.')
+    expect(druckzeile(w, { ...STANDARD_STIL, isbn: true })).toBe('Rudolf Steiner: T, Dornach 1995, ISBN 3-7274-0040-5.')
+  })
+})
