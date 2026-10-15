@@ -12,6 +12,7 @@ import {
   type Werk,
 } from './model'
 import { ortFuerJahr, verlagVorschlaege } from './verlag'
+import { auflageLeer } from './entwurf'
 import { druckzeile } from './format'
 import { sucheImKatalog, type Treffer, type WerkVorschlag } from './lobid'
 import { AusgabenWahl, Vorschlagsliste, besterVorschlag, ohneNichtsortier, karteiTreffer, optionenAus, useKatalog, jahrspanne, type Option } from './Katalogsuche'
@@ -40,7 +41,7 @@ interface Props {
 const HAUPTARTEN: TextArt[] = ['buch', 'aufsatz', 'sammelband']
 const artLabel = (a: TextArt) => TEXT_ARTEN.find((x) => x.value === a)?.label ?? a
 
-const istLeer = (a: Auflage) => !a.jahr.trim() && !a.ort.trim() && !a.seiten.trim() && !a.nummer.trim()
+const istLeer = auflageLeer
 const jahrZahl = (a: Auflage) => parseInt(a.jahr, 10) || 9999
 
 export function Karteikarte(props: Props) {

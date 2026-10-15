@@ -9,6 +9,7 @@ import { exportiere, exportiereCsl, importiere, ladeLokal, speichereLokal, zusam
 import { herunterladen } from './herunterladen'
 import { ortFuerJahr } from './verlag'
 import { Abwaerts, Nadel, StatusPunkt } from './Symbole'
+import { eigeneAngaben, weichtAb, type Inhaltsfeld } from './entwurf'
 
 export interface Fixierung {
   personen?: Person[]
@@ -45,14 +46,21 @@ function mitFixierung(w: Werk, fixiert: Fixierung, verlage: Verlag[]): Werk {
 }
 const verlages = (verlage: Verlag[], name: string) => verlage.find((x) => x.name === name)
 
-/** Erst eine Karte mit eigenem Inhalt kommt in die Kartei; eine nur vorbelegte bleibt Entwurf. */
-function hatInhalt(w: Werk): boolean {
-  return Boolean(
-    w.titel.trim() ||
-      w.untertitel.trim() ||
-      w.kommentar.trim() ||
-      w.auflagen.some((a) => a.jahr.trim() || a.ort.trim() || a.seiten.trim() || a.nummer.trim()),
-  )
+/** Felder, über die die Karte vorhandene Werke vorschlägt. */
+const SUCHFELDER: Inhaltsfeld[] = ['personen', 'titel', 'untertitel']
+
+const FELDNAMEN: Record<Inhaltsfeld, string> = {
+  art: 'Art des Textes',
+  status: 'Status',
+  personen: 'Personen',
+  titel: 'Titel',
+  untertitel: 'Untertitel',
+  reihe: 'Schriftenreihe',
+  reiheBand: 'Band',
+  auflagen: 'Auflagen',
+  erschienenIn: 'Erschienen in',
+  kommentar: 'Rückseite',
+  schlagwoerter: 'Schlagwörter',
 }
 
 const REITER: { ansicht: Ansicht; label: string; taste: string }[] = [
@@ -66,6 +74,8 @@ export default function App() {
   const [fixiert, setFixiert] = useState<Fixierung>(ladeFixierung)
   const [ansicht, setAnsicht] = useState<Ansicht>('erfassen')
   const [entwurf, setEntwurf] = useState<Werk | null>(() => mitFixierung(leeresWerk(), fixiert, daten.verlage))
+  /** Die Karte, wie sie angelegt wurde. Alles, was davon abweicht, hat der Nutzer eingetragen. */
+  const [vorlage, setVorlage] = useState<Werk | null>(() => (entwurf ? structuredClone(entwurf) : null))
   const [erfassenId, setErfassenId] = useState<string>(() => entwurf?.id ?? '')
   /** Karte, die in dieser Erfassung aus dem Entwurf entstanden ist */
   const [frischId, setFrischId] = useState<string | null>(null)
@@ -103,6 +113,7 @@ export default function App() {
   const neueKarte = useCallback(() => {
     const w = mitFixierung(leeresWerk(), fixiert, daten.verlage)
     setEntwurf(w)
+    setVorlage(structuredClone(w))
     setErfassenId(w.id)
     setFrischId(null)
     setNachholenId(null)
@@ -119,7 +130,7 @@ export default function App() {
     if (daten.werke.some((x) => x.id === w.id)) {
       setDaten((d) => ({ ...d, werke: d.werke.map((x) => (x.id === w.id ? { ...w, geaendert: jetzt } : x)) }))
       merkeSitzung(w.id)
-    } else if (hatInhalt(w)) {
+    } else if (!vorlage || vorlage.id !== w.id || weichtAb(w, vorlage)) {
       setDaten((d) => ({ ...d, werke: [{ ...w, angelegt: jetzt, geaendert: jetzt }, ...d.werke] }))
       setEntwurf(null)
       setFrischId(w.id)
@@ -150,8 +161,16 @@ export default function App() {
 
   const zuVorhandener = (id: string) => {
     if (karte && frischId === karte.id && karte.status === 'vorlaeufig') {
-      const nurAngefangen = !karte.kommentar.trim() && karte.auflagen.every((a) => !a.jahr.trim() && !a.ort.trim() && !a.seiten.trim())
-      if (nurAngefangen) {
+      // Nur Suchangaben getippt: die Karte war bloß der Weg zum vorhandenen Werk und darf weg.
+      // Alles Weitere wird nie still verworfen.
+      const weitere = vorlage?.id === karte.id ? eigeneAngaben(karte, vorlage, SUCHFELDER) : ['auflagen' as Inhaltsfeld]
+      const verwerfen =
+        weitere.length === 0 ||
+        confirm(
+          `Die angefangene Karte enthält eigene Angaben (${weitere.map((f) => FELDNAMEN[f]).join(', ')}).\n\n` +
+            'OK verwirft sie. Abbrechen behält sie als vorläufige Karte.',
+        )
+      if (verwerfen) {
         setDaten((d) => ({ ...d, werke: d.werke.filter((w) => w.id !== karte.id) }))
         setSitzung((s) => s.filter((x) => x !== karte.id))
         setMeldung('Das Werk steht schon in der Kartei. Die angefangene Karte ist verworfen.')
