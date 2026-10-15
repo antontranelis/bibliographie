@@ -7,7 +7,7 @@ import { Verlage } from './Verlage'
 import { beispielDaten } from './beispiel'
 import { exportiere, exportiereCsl, importiere, ladeLokal, speichereLokal, zusammenfuehren } from './speicher'
 import { herunterladen } from './herunterladen'
-import { anzeigeName, findeExakt, nachVerlagsAenderung, nameFuerJahr, ortFuerJahr, planeVerlage, wendePlanAn, type VerlagsGruppe } from './verlag'
+import { anzeigeName, findeExakt, nameFuerJahr, ortFuerJahr, planeVerlage, wendePlanAn, type VerlagsGruppe } from './verlag'
 import { Abwaerts, Nadel, StatusPunkt } from './Symbole'
 import { eigeneAngaben, weichtAb, type Inhaltsfeld } from './entwurf'
 
@@ -44,7 +44,7 @@ function mitFixierung(w: Werk, fixiert: Fixierung, verlage: Verlag[]): Werk {
       ...a,
       verlag: v ? nameFuerJahr(v, a.jahr) || fixiert.verlag! : fixiert.verlag ?? '',
       ...(v ? { verlagId: v.id } : {}),
-      ort: v ? ortFuerJahr(v, a.jahr)?.ort ?? a.ort : a.ort,
+      ort: (v && ortFuerJahr(v, a.jahr)?.ort) || a.ort,
     }))
   }
   return neu
@@ -221,23 +221,11 @@ export default function App() {
     else if (ziel) setMeldung(derselbe ? `Schreibweise zu „${anzeigeName(ziel)}“ gemerkt.` : `Verlag „${anzeigeName(ziel)}“ gemerkt (Kürzel „${ziel.kuerzel}“).`)
   }
 
-  /** Verlagskarten ändern; verknüpfte Auflagen ziehen Name und Ort nach, gelöschte Verlage werden gelöst. */
-  const aendereVerlage = (verlage: Verlag[]) => {
-    setDaten((d) => {
-      let werke = d.werke
-      for (const alt of d.verlage) {
-        const neu = verlage.find((v) => v.id === alt.id)
-        if (!neu) {
-          werke = werke.map((w) =>
-            w.auflagen.some((a) => a.verlagId === alt.id)
-              ? { ...w, auflagen: w.auflagen.map((a) => (a.verlagId === alt.id ? { ...a, verlagId: undefined } : a)) }
-              : w,
-          )
-        } else if (neu !== alt) werke = nachVerlagsAenderung(werke, alt, neu)
-      }
-      return { werke, verlage }
-    })
-  }
+  /**
+   * Verlagskarten ändern. Sie sind eine Eingabehilfe für neue Auflagen; bestehende Auflagen bleiben,
+   * wie sie sind. Verweise auf gelöschte Verlage gelten beim nächsten Abgleich als unverknüpft.
+   */
+  const aendereVerlage = (verlage: Verlag[]) => setDaten((d) => ({ ...d, verlage }))
   const aendereVerlag = (v: Verlag) => aendereVerlage(daten.verlage.map((x) => (x.id === v.id ? v : x)))
 
   const beispieleLaden = () => {

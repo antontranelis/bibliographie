@@ -36,7 +36,7 @@ export function Verlage({ verlage, werke, onAendern }: Props) {
           <h1>Verlage</h1>
           <p className="hinweis">
             Verlage werden beim Festanlegen einer Karte von selbst gemerkt. Hier lassen sich Kürzel, Namens- und Ortsgeschichte korrigieren. Ein Name oder Ort gilt bis zur
-            nächsten Änderung. Änderungen gehen auf alle Auflagen über, die dem bisherigen Stand entsprachen.
+            nächsten Änderung. Die Angaben helfen beim Ausfüllen neuer Auflagen; was schon auf den Karten steht, bleibt unverändert.
           </p>
         </div>
         <button

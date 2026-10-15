@@ -76,9 +76,23 @@ async function karte(page, { autor, titel, jahr, verlag, ort }) {
   await page.keyboard.press('F5')
   pruefe('F5 öffnet die Verlage', (await page.getByRole('heading', { name: 'Verlage', level: 1 }).count()) === 1)
   if (aus) await page.screenshot({ path: `${aus}/verlage.png`, fullPage: true })
-  await page.getByLabel('Name', { exact: true }).first().fill('Mein Verlag AG')
+  // Verlagskarte schrittweise bearbeiten wie ein Mensch: löschen, neu tippen, Ortswechsel mit Jahr vor Ort
+  const vorher = JSON.stringify((await daten(page)).werke)
+  const nameFeld = page.getByLabel('Name', { exact: true }).first()
+  await nameFeld.fill('')
+  await nameFeld.pressSequentially('Mein Verlag AG')
+  await page.getByRole('button', { name: '+ Ortswechsel' }).first().click()
+  await page.getByLabel('Ort ab Jahr').last().pressSequentially('1990')
+  await page.getByLabel('Ort', { exact: true }).last().pressSequentially('Leipzig')
   const d3 = await daten(page)
-  pruefe('Umbenennen geht auf die Auflagen über', d3.werke.every((w) => w.auflagen.every((a) => !a.verlagId || a.verlag === 'Mein Verlag AG')), d3.werke.flatMap((w) => w.auflagen.map((a) => a.verlag)).join(' | '))
+  pruefe('Bearbeiten der Verlagskarte lässt die Karten unverändert', JSON.stringify(d3.werke) === vorher)
+  pruefe('Verlagskarte hat die neuen Angaben', name(d3.verlage[0]) === 'Mein Verlag AG' && d3.verlage[0].orte.some((o) => o.abJahr === '1990' && o.ort === 'Leipzig'))
+  // Neue Auflage mit diesem Verlag bekommt den neuen Namen und den Ort zum Jahr
+  await page.keyboard.press('F2')
+  await karte(page, { autor: 'Muster', titel: 'Fünftes Buch', jahr: '1995' })
+  await page.getByLabel('Verlag', { exact: true }).first().fill('m')
+  await page.getByLabel('Verlag', { exact: true }).first().press('Enter')
+  pruefe('Neue Auflage nutzt die bearbeitete Verlagskarte', (await page.getByLabel('Verlag', { exact: true }).first().inputValue()) === 'Mein Verlag AG' && (await page.getByLabel('Ort', { exact: true }).first().inputValue()) === 'Leipzig')
   await page.close()
 }
 

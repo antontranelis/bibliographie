@@ -5,10 +5,10 @@ import {
   findeAehnlich,
   findeExakt,
   kuerzelVorschlag,
-  nachVerlagsAenderung,
   nameFuerJahr,
   ortFuerJahr,
   ortGleich,
+  ortName,
   ortsAbweichung,
   ortswechselEintragen,
   planeVerlage,
@@ -96,10 +96,24 @@ describe('Finden', () => {
     expect(findeAehnlich([pav, goe], 'Philos.-anthropos. Verl.')).toBe(pav)
     expect(findeAehnlich([pav, goe], 'Philosophisch-Anthroposophischer Verlag')).toBeUndefined()
   })
-  it('vergleicht Orte über das erste Wort', () => {
+  it('übergeht Länderzusätze und Postbezirke', () => {
     expect(ortGleich('Dornach (Schweiz)', 'Dornach')).toBe(true)
-    expect(ortGleich('Berlin W.', 'berlin')).toBe(true)
+    expect(ortGleich('Dornach/Schweiz', 'dornach')).toBe(true)
+    expect(ortGleich('Berlin W.', 'Berlin')).toBe(true)
     expect(ortGleich('Dornach/Schweiz', 'Basel')).toBe(false)
+  })
+  it('vergleicht mehrteilige Orte vollständig', () => {
+    expect(ortGleich('New York', 'New Haven')).toBe(false)
+    expect(ortGleich('Frankfurt am Main', 'Frankfurt (Oder)')).toBe(false)
+    expect(ortGleich('Frankfurt/Main', 'Frankfurt (Oder)')).toBe(false)
+    expect(ortGleich('New York', 'new  york')).toBe(true)
+    expect(ortGleich('Bad Homburg', 'Bad Nauheim')).toBe(false)
+  })
+  it('kürzt beim Anzeigen nur Zusätze', () => {
+    expect(ortName('New York')).toBe('New York')
+    expect(ortName('Bad Homburg')).toBe('Bad Homburg')
+    expect(ortName('Dornach (Schweiz)')).toBe('Dornach')
+    expect(ortName('Frankfurt (Oder)')).toBe('Frankfurt (Oder)')
   })
   it('schlägt ein freies Kürzel vor', () => {
     expect(kuerzelVorschlag('Verlag Freies Geistesleben', [])).toBe('fg')
@@ -108,7 +122,7 @@ describe('Finden', () => {
 })
 
 describe('Neuer Verlag aus Auflagen', () => {
-  it('leitet die Ortsgeschichte aus den Auflagen ab und nimmt die ausgeschriebene Form als Namen', () => {
+  it('nimmt die ausgeschriebene Form als Namen und nur den frühesten Ort als Anfang', () => {
     const v = verlagAus(
       ['Philos.-Anthroposophischer Verl.', 'Philosophisch-Anthroposophischer Verlag'],
       [
@@ -120,10 +134,8 @@ describe('Neuer Verlag aus Auflagen', () => {
     )
     expect(v.namen).toEqual([{ abJahr: '', name: 'Philosophisch-Anthroposophischer Verlag' }])
     expect(v.schreibweisen).toEqual(['Philos.-Anthroposophischer Verl.'])
-    expect(v.orte).toEqual([
-      { abJahr: '', ort: 'Berlin', wechselImJahr: false },
-      { abJahr: '1929', ort: 'Dornach', wechselImJahr: false },
-    ])
+    // Weitere Orte können Umzug, Niederlassung oder Katalogfehler sein: nur auf ausdrücklichen Klick
+    expect(v.orte).toEqual([{ abJahr: '', ort: 'Berlin', wechselImJahr: false }])
     expect(v.kuerzel).toBe('pa')
   })
 })
@@ -186,24 +198,5 @@ describe('Ortswechsel lernen', () => {
   it('trägt einen Ortswechsel ab dem Jahr ein, sortiert', () => {
     const v = ortswechselEintragen(pav, '1915', 'Leipzig')
     expect(v.orte.map((o) => `${o.abJahr} ${o.ort}`)).toEqual(['1908 Berlin', '1915 Leipzig', '1923 Dornach'])
-  })
-})
-
-describe('Änderungen an der Verlagskarte', () => {
-  it('zieht Namen und Ort verknüpfter Auflagen nach, solange sie dem alten Stand entsprachen', () => {
-    const w = werk([
-      auflage({ verlagId: 'v1', verlag: 'Philosophisch-Anthroposophischer Verlag', jahr: '1918', ort: 'Berlin' }),
-      auflage({ verlagId: 'v1', verlag: 'Philos. Verl.', jahr: '1925', ort: 'Basel' }),
-      auflage({ verlag: 'Philosophisch-Anthroposophischer Verlag', jahr: '1918', ort: 'Berlin' }),
-    ])
-    const neu: Verlag = { ...pav, namen: [{ abJahr: '', name: 'Phil.-Anthr. Verlag' }], orte: [{ abJahr: '', ort: 'Leipzig', wechselImJahr: false }] }
-    const [r] = nachVerlagsAenderung([w], pav, neu)
-    expect(r.auflagen[0]).toMatchObject({ verlag: 'Phil.-Anthr. Verlag', ort: 'Leipzig' })
-    expect(r.auflagen[1]).toMatchObject({ verlag: 'Philos. Verl.', ort: 'Basel' })
-    expect(r.auflagen[2]).toMatchObject({ verlag: 'Philosophisch-Anthroposophischer Verlag', ort: 'Berlin' })
-  })
-  it('lässt Werke ohne Bezug unverändert', () => {
-    const w = werk([auflage({ verlag: 'X' })])
-    expect(nachVerlagsAenderung([w], pav, { ...pav, kuerzel: 'p' })[0]).toBe(w)
   })
 })

@@ -101,11 +101,26 @@ export function findeAehnlich(verlage: Verlag[], text: string): Verlag | undefin
   return verlage.find((v) => alleNamen(v).some((n) => aehnlich(text, n)))
 }
 
-/** Ortsname ohne Zusätze: „Dornach (Schweiz)“ → „Dornach“, „Berlin W.“ → „Berlin“. */
+const LAENDERZUSAETZE = new Set([
+  'schweiz', 'switzerland', 'suisse', 'deutschland', 'germany', 'brd', 'ddr', 'österreich', 'austria',
+  'usa', 'england', 'uk', 'frankreich', 'france', 'italien', 'niederlande',
+])
+const istLaenderzusatz = (s: string) => LAENDERZUSAETZE.has(s.trim().toLowerCase().replace(/\.$/, ''))
+
+/**
+ * Ortsname ohne Zusätze, die keinen anderen Ort bezeichnen: Länder in Klammern oder nach Schrägstrich
+ * und Postbezirke. „Dornach (Schweiz)“ → „Dornach“, „Berlin W.“ → „Berlin“.
+ * Alles andere bleibt: „New York“, „Frankfurt (Oder)“, „Frankfurt/Main“.
+ */
 export function ortName(ort: string): string {
-  return ort.trim().split(/[\s,/(]+/)[0]?.replace(/\.$/, '') ?? ''
+  let s = ort.trim().replace(/\s+/g, ' ')
+  s = s.replace(/\s*\(([^)]*)\)$/, (m, innen: string) => (istLaenderzusatz(innen) ? '' : m))
+  s = s.replace(/\s*[/,]\s*([^/,]+)$/, (m, rest: string) => (istLaenderzusatz(rest) ? '' : m))
+  s = s.replace(/(\s+[A-ZÄÖÜ]{1,3}\.)+$/, '')
+  return s.trim()
 }
 
+/** Gleicher Ort, wenn die Namen ohne Zusätze vollständig übereinstimmen. */
 export function ortGleich(a: string, b: string): boolean {
   const x = ortName(a).toLowerCase()
   return Boolean(x) && x === ortName(b).toLowerCase()
@@ -136,17 +151,15 @@ function eindeutig(texte: string[]): string[] {
   })
 }
 
-/** Neuer Verlag aus den Schreibweisen einer Karte; die Ortsgeschichte folgt den Auflagen. */
+/**
+ * Neuer Verlag aus den Schreibweisen einer Karte. Als Ort gilt nur der der frühesten Auflage:
+ * ein anderer Ort kann Umzug, Niederlassung oder Katalogfehler sein und wird nur auf Klick eingetragen.
+ */
 export function verlagAus(texte: string[], auflagen: Auflage[], vorhandene: Verlag[]): Verlag {
   const liste = eindeutig(texte)
   const name = ausgeschrieben(liste)
-  const orte: Verlag['orte'] = []
-  const mitOrt = auflagen.filter((a) => a.ort.trim()).sort((a, b) => zahl(a.jahr) - zahl(b.jahr))
-  for (const a of mitOrt) {
-    const letzter = orte[orte.length - 1]
-    if (!letzter) orte.push({ abJahr: '', ort: ortName(a.ort), wechselImJahr: false })
-    else if (!ortGleich(letzter.ort, a.ort)) orte.push({ abJahr: a.jahr.trim(), ort: ortName(a.ort), wechselImJahr: false })
-  }
+  const frueheste = auflagen.filter((a) => a.ort.trim()).sort((a, b) => zahl(a.jahr) - zahl(b.jahr))[0]
+  const orte: Verlag['orte'] = frueheste ? [{ abJahr: '', ort: ortName(frueheste.ort), wechselImJahr: false }] : []
   return {
     id: neueId(),
     kuerzel: kuerzelVorschlag(name, vorhandene),
@@ -237,25 +250,4 @@ export function ortsAbweichung(verlag: Verlag, a: Auflage): { erwartet: string }
 export function ortswechselEintragen(verlag: Verlag, jahr: string, ort: string): Verlag {
   const orte = [...verlag.orte, { abJahr: jahr.trim(), ort: ortName(ort), wechselImJahr: false }].sort((a, b) => zahl(a.abJahr) - zahl(b.abJahr))
   return { ...verlag, orte }
-}
-
-/** Zieht Name und Ort verknüpfter Auflagen nach, solange sie dem alten Stand der Verlagskarte entsprachen. */
-export function nachVerlagsAenderung(werke: Werk[], alt: Verlag, neu: Verlag): Werk[] {
-  return werke.map((w) => {
-    let geaendert = false
-    const auflagen = w.auflagen.map((a) => {
-      if (a.verlagId !== alt.id) return a
-      const n = { ...a }
-      const alterName = nameFuerJahr(alt, a.jahr)
-      if (alterName && textNormal(a.verlag) === textNormal(alterName)) n.verlag = nameFuerJahr(neu, a.jahr) || a.verlag
-      const alterOrt = ortFuerJahr(alt, a.jahr)?.ort
-      if (alterOrt && !a.ortBestaetigt && ortGleich(a.ort, alterOrt)) n.ort = ortFuerJahr(neu, a.jahr)?.ort ?? a.ort
-      if (n.verlag !== a.verlag || n.ort !== a.ort) {
-        geaendert = true
-        return n
-      }
-      return a
-    })
-    return geaendert ? { ...w, auflagen } : w
-  })
 }

@@ -546,7 +546,7 @@ function AuflageZeile({
 
   const waehle = (v: Verlag) => {
     const a = ortFuerJahr(v, auflage.jahr)
-    setze({ verlag: nameFuerJahr(v, auflage.jahr) || anzeigeName(v), verlagId: v.id, ort: a?.ort ?? auflage.ort, ortBestaetigt: false })
+    setze({ verlag: nameFuerJahr(v, auflage.jahr) || anzeigeName(v), verlagId: v.id, ort: a?.ort || auflage.ort, ortBestaetigt: false })
     setVerlagOffen(false)
   }
   /** Neues Jahr: Name und Ort folgen der Verlagskarte, solange sie dem bisherigen Stand entsprachen. */
