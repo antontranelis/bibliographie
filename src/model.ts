@@ -47,11 +47,17 @@ export interface Auflage {
   gedrucktesJahr: string
   /** Tag der Ersterscheinung, ISO-Datum */
   erscheinungstag: string
+  /** Verlagsname, wie er für diese Auflage gedruckt wird */
   verlag: string
+  /** Verweis auf die Verlagskarte, sobald der Name einem Verlag zugeordnet ist */
+  verlagId?: string
   ort: string
+  /** Der Ort weicht bewusst von der Ortsgeschichte des Verlags ab */
+  ortBestaetigt?: boolean
   seiten: string
   seitenRoemisch: string
   vermerk: string
+  isbn: string
   quelle?: { katalog: 'lobid'; id: string }
 }
 
@@ -94,11 +100,20 @@ export interface OrtsAbschnitt {
   wechselImJahr: boolean
 }
 
+export interface NamensAbschnitt {
+  /** Leer beim ersten Namen: gilt von Anfang an */
+  abJahr: string
+  name: string
+}
+
 export interface Verlag {
   id: string
-  name: string
   kuerzel: string
+  /** Namensgeschichte; der erste Name gilt bis zur ersten Änderung */
+  namen: NamensAbschnitt[]
   orte: OrtsAbschnitt[]
+  /** Weitere Schreibweisen, etwa Abkürzungen aus Bibliothekskatalogen */
+  schreibweisen: string[]
 }
 
 export interface Datenstamm {
@@ -121,6 +136,7 @@ export function leereAuflage(): Auflage {
     seiten: '',
     seitenRoemisch: '',
     vermerk: '',
+    isbn: '',
   }
 }
 

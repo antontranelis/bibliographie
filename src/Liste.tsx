@@ -195,6 +195,9 @@ export function Liste({ werke, vorgabe }: { werke: Werk[]; vorgabe: ListenVorgab
           <label className="haken">
             <input type="checkbox" checked={stil.seitenzahl} onChange={(e) => setStil({ ...stil, seitenzahl: e.target.checked })} /> Seitenzahl angeben
           </label>
+          <label className="haken">
+            <input type="checkbox" checked={stil.isbn} onChange={(e) => setStil({ ...stil, isbn: e.target.checked })} /> ISBN angeben
+          </label>
           <div className="trennlinie" />
           <Wahl
             label="Sortieren nach"

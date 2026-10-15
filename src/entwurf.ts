@@ -30,6 +30,7 @@ const AUFLAGEFELDER = [
   'seiten',
   'seitenRoemisch',
   'vermerk',
+  'isbn',
 ] as const satisfies readonly (keyof Auflage)[]
 
 /** Vergleichbare Form: Texte getrimmt, IDs und Herkunft entfernt. */
@@ -40,7 +41,7 @@ function normal(wert: unknown): unknown {
     const o = wert as Record<string, unknown>
     return Object.fromEntries(
       Object.keys(o)
-        .filter((k) => k !== 'id' && k !== 'quelle')
+        .filter((k) => k !== 'id' && k !== 'quelle' && k !== 'verlagId')
         .sort()
         .map((k) => [k, normal(o[k])]),
     )

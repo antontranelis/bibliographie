@@ -13,7 +13,9 @@ Dies ist ein Klick-Prototyp. Die Daten liegen nur im Browser. Mit „Sichern“ 
 - Drei Bereiche wie am Karteikasten: Erfassen (F2), Kartei (F3), Liste (F4); Sichern, Einlesen, Verlage und CSL-Export liegen unter „Ablage“
 - Nach dem Start liegt eine leere Karte bereit; Strg+Enter legt fest an und holt die nächste Karte, Alt+N nimmt die nächste und lässt die aktuelle vorläufig
 - Beim Tippen von Autor und Titel schlägt die Karte Werke vor: zuerst aus der eigenen Kartei („schon vorhanden“), nach einer Tipppause aus dem hbz-Verbundkatalog (lobid.org), je Werk mit Zahl der Ausgaben. Nach der Auswahl werden die Ausgaben zum Abhaken gezeigt, je Jahr eine vorausgewählt. Auch auf einer bestehenden Karte lassen sich weitere Auflagen nachholen
-- Verlage mit Kürzel für die Schnelleingabe und Ortsgeschichte; im Jahr eines Ortswechsels warnt die Karte
+- Verlage als eigener Bereich (F5): Kürzel, Namens- und Ortsgeschichte, weitere Schreibweisen. Beim Festanlegen werden neue Verlage von selbst gemerkt; Katalogschreibweisen wie „Philos.-Anthroposophischer Verl.“ werden einem bekannten Verlag zugeordnet, nach einer Rückfrage pro Verlag
+- Auflagen verweisen über eine feste Kennung auf ihren Verlag. Im Jahr eines Ortswechsels warnt die Karte, ein abweichender Ort lässt sich als neuer Ortswechsel eintragen
+- ISBN je Auflage: aus dem Katalog übernommen, im Titelfeld suchbar, in der Liste zuschaltbar
 - Felder fixieren für die Serieneingabe
 - Literaturliste nach Person oder Schlagwort, in zwei Mustern, sortiert nach Name oder Jahr; Ausgabe als Word-Datei oder Druck
 - Export als CSL-JSON für Zotero, Citavi und Pandoc
@@ -27,7 +29,7 @@ pnpm test
 pnpm build
 ```
 
-Rundgang mit Bildschirmfotos gegen `pnpm preview --port 4321`:
+Rundgang mit Bildschirmfotos gegen `pnpm preview --port 4321`; `scripts/datenverlust.mjs` und `scripts/verlage.mjs` prüfen gezielte Abläufe:
 
 ```sh
 CHROME_BIN=<pfad-zu-chrome> node scripts/rundgang.mjs http://localhost:4321/ <ordner>
@@ -35,4 +37,4 @@ CHROME_BIN=<pfad-zu-chrome> node scripts/rundgang.mjs http://localhost:4321/ <or
 
 ## Datenformat
 
-Die Sicherungsdatei ist JSON mit `format: "bibliographie-datenstamm"` und einer Versionsnummer. Sie enthält `werke` und `verlage`, das Modell steht in `src/model.ts`. Beim Einlesen werden Karten mit gleicher ID zusammengeführt, die zuletzt geänderte Fassung gewinnt.
+Die Sicherungsdatei ist JSON mit `format: "bibliographie-datenstamm"` und einer Versionsnummer, derzeit 2. Dateien der Version 1 werden beim Einlesen übersetzt. Sie enthält `werke` und `verlage`, das Modell steht in `src/model.ts`. Beim Einlesen werden Karten mit gleicher ID zusammengeführt, die zuletzt geänderte Fassung gewinnt.

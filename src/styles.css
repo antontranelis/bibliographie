@@ -291,6 +291,8 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
   display: block; width: 100%; border: 0; resize: vertical; padding: 14px 20px; outline: none;
   font: 400 16px/28px var(--serif); color: var(--tinte); border-radius: 0 0 4px 4px;
   background: repeating-linear-gradient(var(--papier) 0 27px, #e3e8ef 27px 28px); background-attachment: local;
+  /* Linie knapp unter der Grundlinie: Innenrand 14px + halber Zeilenabstand + Oberlänge der Schrift */
+  background-position: 0 8px;
 }
 .rueckseite textarea:focus { box-shadow: inset 0 0 0 2px var(--blau-rand); }
 .fixiert-kasten h2 svg { color: var(--blass); }
@@ -372,7 +374,7 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
 .lesen-auflagen { width: 100%; border-collapse: collapse; font: 400 15px/1.35 var(--serif); }
 .lesen-auflagen caption { text-align: left; padding-bottom: 4px; }
 .lesen-auflagen td { padding: 6px 6px 6px 0; border-top: 1px solid #e3ded3; vertical-align: baseline; }
-.rueckseite-lesen { font: 400 16px/28px var(--serif); white-space: pre-wrap; min-height: 200px; background: repeating-linear-gradient(var(--papier) 0 27px, #e3e8ef 27px 28px); background-position: 0 18px; }
+.rueckseite-lesen { font: 400 16px/28px var(--serif); white-space: pre-wrap; min-height: 200px; background: repeating-linear-gradient(var(--papier) 0 27px, #e3e8ef 27px 28px); background-position: 0 12px; }
 .datumzeile { padding: 8px 4px 0; margin: 0; }
 .leer-kartei { max-width: 560px; margin: 40px auto; padding: 32px; display: flex; flex-direction: column; gap: 14px; }
 .leer-kartei h2 { font: 600 24px/1.2 var(--serif); }
@@ -431,6 +433,21 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
 .verlag-kopf { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; width: 100%; }
 .verlag-kopf .breit { flex: 1 1 300px; }
 .verlag-kopf .schmal { flex: 0 1 110px; }
+.verlag-kopf { align-items: center; }
+.verlag-name { font: 600 21px/1.25 var(--serif); margin: 0; flex: 1 1 260px; }
+.verlag-spalten { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px 28px; width: 100%; }
+.verlag-spalten > div { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; min-width: 0; }
+.verlag-spalten .tabelle.orte { width: 100%; }
+.schreibweisen { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.schreibweisen .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.schreibweisen .chip { gap: 2px; padding: 3px 4px 3px 11px; font: 400 14px/1.3 var(--serif); }
+.schreibweisen .chip button { background: none; border: 0; color: var(--blass); font-size: 16px; padding: 0 4px; }
+.suche-verlage { max-width: 420px; }
+.verlags-abgleich { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.abgleich-zeile { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 14px; background: #fbf3df; border: 1px solid #ecd9a8; border-radius: 6px; padding: 8px 12px; color: #5a3a00; }
+.abgleich-zeile.neu { background: transparent; border-style: dashed; border-color: #d8d2c4; color: var(--leise, #6b6455); }
+.abgleich-zeile .knopfreihe, .abgleich-zeile .textknopf { margin-left: auto; }
+.leise-warnung { color: #5b5240; }
 .tabelle.orte { max-width: 560px; }
 
 /* Schmale Bildschirme: benutzbar, nicht glänzend */
