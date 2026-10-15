@@ -52,9 +52,13 @@ const ohneSteuerzeichen = (s: string) => s.replace(/[\u0098\u009c¬]/g, '').repl
 const ohneSatzzeichenAmEnde = (s: string) => s.replace(/[\s/:;,=]+$/, '').trim()
 const ohneKlammern = (s: string) => s.replace(/^\[|\]$/g, '').trim()
 
+/** Ort ohne Platzhalter: „[S.l.]“, „o.O.“ und Reste wie „@“ fallen weg, Klammern um echte Orte ebenso. */
 function ort(text: string): string {
-  const o = ohneSatzzeichenAmEnde(ohneKlammern(text))
-  return /^(s\.\s?l\.?|o\.\s?o\.?|ohne ort)$/i.test(o) ? '' : o
+  const o = text
+    .replace(/\[?\s*(s\.\s?l\.|o\.\s?o\.|ohne ort)\s*\]?/gi, '')
+    .replace(/[@\[\]]/g, '')
+    .replace(/\s{2,}/g, ' ')
+  return ohneSatzzeichenAmEnde(o.trim())
 }
 
 /** Ein Treffer pro gedrucktem Buch. E-Books, Hörbücher und andere Medien fallen weg. */

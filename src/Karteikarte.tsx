@@ -11,9 +11,10 @@ import {
   type Verlag,
   type Werk,
 } from './model'
-import { anzeigeName, findeExakt, nameFuerJahr, ortFuerJahr, ortName, ortsAbweichung, ortswechselEintragen, planeVerlage, verlagVorschlaege, type VerlagsGruppe } from './verlag'
+import { anzeigeName, findeExakt, nameFuerJahr, ortFuerJahr, ortName, ortsAbweichung, ortswechselEintragen, planeVerlage, type VerlagsGruppe } from './verlag'
 import { auflageLeer } from './entwurf'
 import { druckzeile } from './format'
+import { VerlagFeld } from './VerlagFeld'
 import { type Treffer, type WerkVorschlag } from './lobid'
 import { sucheImKatalog } from './katalog'
 import { AusgabenWahl, Vorschlagsliste, besterVorschlag, ohneNichtsortier, karteiTreffer, optionenAus, useKatalog, jahrspanne, type Option } from './Katalogsuche'
@@ -433,12 +434,9 @@ function Auflagen({
   onVerlagsAbgleich: (g: VerlagsGruppe[], derselbe: boolean) => void
   onVerlagAendern: (v: Verlag) => void
 }) {
-  const [alle, setAlle] = useState(false)
   const [neuId, setNeuId] = useState<string | null>(null)
   const auflagen = werk.auflagen
   const gefuellt = auflagen.filter((a) => !istLeer(a))
-  const eingeklappt = !alle && auflagen.length > 8
-  const sichtbar = eingeklappt ? [0, 1, 2, auflagen.length - 2, auflagen.length - 1] : auflagen.map((_, i) => i)
 
   const neueAuflage = () => {
     const letzte = auflagen[auflagen.length - 1]
@@ -487,21 +485,12 @@ function Auflagen({
               </th>
             </tr>
           </thead>
-          {sichtbar.map((i, k) => (
+          {auflagen.map((a, i) => (
             <AuflageZeile
-              key={auflagen[i].id}
-              auflage={auflagen[i]}
+              key={a.id}
+              auflage={a}
               verlage={verlage}
-              autoFokus={auflagen[i].id === neuId}
-              davor={eingeklappt && k === 3 ? (
-                <tr className="einklapp">
-                  <td colSpan={6}>
-                    <button type="button" className="textknopf" onClick={() => setAlle(true)}>
-                      {auflagen.length - 5} Auflagen dazwischen einblenden ({jahrspanne(auflagen.slice(3, -2).map((a) => a.jahr))})
-                    </button>
-                  </td>
-                </tr>
-              ) : null}
+              autoFokus={a.id === neuId}
               onAendern={(neu) => onAendern(auflagen.map((x, j) => (j === i ? neu : x)))}
               onEntfernen={auflagen.length > 1 ? () => onAendern(auflagen.filter((_, j) => j !== i)) : undefined}
               onVerlagAendern={onVerlagAendern}
@@ -510,11 +499,6 @@ function Auflagen({
         </table>
       </div>
       <VerlagsAbgleich werk={werk} verlage={verlage} onAbgleich={onVerlagsAbgleich} />
-      {alle && auflagen.length > 8 && (
-        <button type="button" className="textknopf" onClick={() => setAlle(false)}>
-          Mittlere Auflagen wieder einklappen
-        </button>
-      )}
     </div>
   )
 }
@@ -523,7 +507,6 @@ function AuflageZeile({
   auflage,
   verlage,
   autoFokus,
-  davor,
   onAendern,
   onEntfernen,
   onVerlagAendern,
@@ -531,15 +514,12 @@ function AuflageZeile({
   auflage: Auflage
   verlage: Verlag[]
   autoFokus: boolean
-  davor: React.ReactNode
   onAendern: (a: Auflage) => void
   onEntfernen?: () => void
   onVerlagAendern: (v: Verlag) => void
 }) {
-  const [verlagOffen, setVerlagOffen] = useState(false)
   const [mehr, setMehr] = useState(false)
   const setze = (teil: Partial<Auflage>) => onAendern({ ...auflage, ...teil })
-  const vorschlaege = useMemo(() => (verlagOffen ? verlagVorschlaege(verlage, auflage.verlag) : []), [verlagOffen, verlage, auflage.verlag])
   const bekannt = verlage.find((v) => v.id === auflage.verlagId) ?? findeExakt(verlage, auflage.verlag)
   const auskunft = bekannt ? ortFuerJahr(bekannt, auflage.jahr) : null
   const abweichung = bekannt && !auskunft?.zweiOrteMoeglich ? ortsAbweichung(bekannt, auflage) : null
@@ -548,7 +528,6 @@ function AuflageZeile({
   const waehle = (v: Verlag) => {
     const a = ortFuerJahr(v, auflage.jahr)
     setze({ verlag: nameFuerJahr(v, auflage.jahr) || anzeigeName(v), verlagId: v.id, ort: a?.ort || auflage.ort, ortBestaetigt: false })
-    setVerlagOffen(false)
   }
   /** Neues Jahr: Name und Ort folgen der Verlagskarte, solange sie dem bisherigen Stand entsprachen. */
   const mitJahr = (jahr: string): Partial<Auflage> => {
@@ -569,7 +548,6 @@ function AuflageZeile({
 
   return (
     <tbody className={auskunft?.zweiOrteMoeglich ? 'mit-warnung' : ''}>
-      {davor}
       <tr>
         <td>
           <input className="eingabe zelle" aria-label="Auflage" value={auflage.nummer} maxLength={3} inputMode="numeric" onChange={(e) => setze({ nummer: e.target.value })} />
@@ -578,37 +556,17 @@ function AuflageZeile({
           <input className="eingabe zelle" aria-label="Jahr" autoFocus={autoFokus} value={auflage.jahr} maxLength={4} inputMode="numeric" onChange={(e) => setzeJahr(e.target.value)} />
         </td>
         <td className="verlag-zelle">
-          <input
-            className="eingabe zelle"
-            aria-label="Verlag"
-            placeholder="Name oder Kürzel"
-            autoComplete="off"
-            value={auflage.verlag}
-            onChange={(e) => {
-              const v = findeExakt(verlage, e.target.value)
+          <VerlagFeld
+            wert={auflage.verlag}
+            jahr={auflage.jahr}
+            verlage={verlage}
+            onText={(text) => {
+              const v = findeExakt(verlage, text)
               const ort = v && !auflage.ort.trim() ? ortFuerJahr(v, auflage.jahr)?.ort : undefined
-              setze({ verlag: e.target.value, verlagId: v?.id, ...(ort ? { ort } : {}) })
-              setVerlagOffen(true)
+              setze({ verlag: text, verlagId: v?.id, ...(ort ? { ort } : {}) })
             }}
-            onFocus={() => setVerlagOffen(true)}
-            onBlur={() => setVerlagOffen(false)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && vorschlaege[0]) {
-                e.preventDefault()
-                waehle(vorschlaege[0])
-              }
-              if (e.key === 'Escape') setVerlagOffen(false)
-            }}
+            onWaehlen={waehle}
           />
-          {vorschlaege.length > 0 && (
-            <ul className="klein-menue">
-              {vorschlaege.map((v) => (
-                <li key={v.id} onMouseDown={(e) => e.preventDefault()} onClick={() => waehle(v)}>
-                  {anzeigeName(v)} {v.kuerzel && <span className="kuerzel">{v.kuerzel}</span>}
-                </li>
-              ))}
-            </ul>
-          )}
         </td>
         <td>
           <input className={`eingabe zelle ${auskunft?.zweiOrteMoeglich ? 'warnfarbe' : ''}`} aria-label="Ort" value={auflage.ort} onChange={(e) => setze({ ort: e.target.value, ortBestaetigt: false })} />

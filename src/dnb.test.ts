@@ -110,6 +110,19 @@ describe('trefferAusMarc', () => {
   })
 })
 
+describe('Ort der DNB', () => {
+  it.each([
+    ['[S.l.] @', ''],
+    ['[S.l.]', ''],
+    ['o.O.', ''],
+    ['[Dornach]', 'Dornach'],
+    ['Reinbek bei Hamburg', 'Reinbek bei Hamburg'],
+  ])('macht aus „%s“ „%s“', (roh, erwartet) => {
+    const xml = kopf + ohneOrt.replace('<subfield code="a">[S.l.]</subfield>', `<subfield code="a">${roh}</subfield>`) + fuss
+    expect(trefferAusMarc(leseMarc(xml)[0])!.auflage.ort).toBe(erwartet)
+  })
+})
+
 describe('Untertitel der DNB', () => {
   it('glättet Doppelpunkt-Trenner und Klammern', () => {
     const xml = kopf + gedruckt.replace('Grundzüge einer modernen Weltanschauung ; seelische', 'Grundzüge einer modernen Weltanschauung : (seelische').replace('naturwissenschaftlicher Methode</subfield>', 'naturwissenschaftlicher Methode)</subfield>') + fuss
