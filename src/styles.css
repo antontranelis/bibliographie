@@ -23,8 +23,8 @@
   --ocker-rand: #e3cc92;
   --warn-bg: #fbf3e1;
   --rot: #b5584a;
-  --serif: 'Source Serif 4', Cambria, Georgia, serif;
-  --sans: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
+  --serif: 'Source Serif 4 Variable', 'Source Serif 4', Cambria, Georgia, serif;
+  --sans: 'Source Sans 3 Variable', 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
   --schatten: 0 1px 0 var(--linie), 0 10px 24px -14px rgba(60, 48, 30, 0.35);
   color-scheme: light;
 }
