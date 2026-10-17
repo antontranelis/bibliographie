@@ -15,6 +15,7 @@ export const INHALTSFELDER = [
   'auflagen',
   'erschienenIn',
   'kommentar',
+  'anmerkung',
   'schlagwoerter',
 ] as const satisfies readonly (keyof Werk)[]
 

@@ -13,7 +13,8 @@ import {
 } from './model'
 import { anzeigeName, findeExakt, nameFuerJahr, ortFuerJahr, ortName, ortsAbweichung, ortswechselEintragen, planeVerlage, type VerlagsGruppe } from './verlag'
 import { auflageLeer } from './entwurf'
-import { druckzeile } from './format'
+import { Druckzeile } from './Druckzeile'
+import { druckzeileTeile } from './format'
 import { VerlagFeld } from './VerlagFeld'
 import { type Treffer, type WerkVorschlag } from './lobid'
 import { sucheImKatalog } from './katalog'
@@ -341,9 +342,20 @@ export function Karteikarte(props: Props) {
             fixiert={fixiert.schlagwoerter?.map((s) => s.begriff) ?? []}
           />
 
+          <label className="feld">
+            <span className="lab">Anmerkung für den Druck</span>
+            <textarea
+              className="eingabe serif"
+              rows={2}
+              value={werk.anmerkung}
+              placeholder="Erscheint in der Liste kursiv als (Anm.: …); *Titel* darin steht aufrecht"
+              onChange={(e) => setze({ anmerkung: e.target.value })}
+            />
+          </label>
+
           <div className="vorschau">
             <span className="lab">So steht die Karte in der Liste</span>
-            <p>{werk.titel.trim() ? druckzeile(werk) : <span className="leise">Erscheint, sobald ein Titel da ist.</span>}</p>
+            <p>{werk.titel.trim() ? <Druckzeile teile={druckzeileTeile(werk)} /> : <span className="leise">Erscheint, sobald ein Titel da ist.</span>}</p>
           </div>
         </div>
 
@@ -768,6 +780,15 @@ function ErschienenInFeld({ wert, onAendern, nadel }: { wert: ErschienenIn; onAe
             </label>
           </>
         )}
+        <label className="breit">
+          <span className="lab">{wert.art === 'sammelband' ? 'Weitere Angaben' : 'Ausgabe, wie gedruckt'}</span>
+          <input
+            className="eingabe serif"
+            value={wert.ausgabe}
+            placeholder={wert.art === 'sammelband' ? ', hrsg. von …, Ort Jahr' : 'statt Jahrgang und Heft, etwa 44/1927'}
+            onChange={(e) => onAendern({ ausgabe: e.target.value })}
+          />
+        </label>
         <label>
           <span className="lab">Seite von</span>
           <input className="eingabe" value={wert.seitenVon} onChange={(e) => onAendern({ seitenVon: e.target.value })} />

@@ -28,7 +28,7 @@ describe('weichtAb', () => {
     ['nur ein Schlagwort', (w) => w.schlagwoerter.push({ begriff: 'Ethik', primaer: true })],
     ['nur die Reihe', (w) => (w.reihe = 'Gesamtausgabe')],
     ['nur die Art', (w) => (w.art = 'aufsatz')],
-    ['nur Erschienen in', (w) => (w.erschienenIn = { art: 'zeitschrift', titel: 'Das Goetheanum', jahrgang: '', jahr: '', heft: '', seitenVon: '', seitenBis: '' })],
+    ['nur Erschienen in', (w) => (w.erschienenIn = { art: 'zeitschrift', titel: 'Das Goetheanum', jahrgang: '', jahr: '', heft: '', ausgabe: '', seitenVon: '', seitenBis: '' })],
     ['eine zweite Person', (w) => w.personen.push({ vorname: '', nachname: 'B', rolle: 'autor' })],
   ])('zählt %s als eigene Angabe', (_, aendern) => {
     const w = leeresWerk()
