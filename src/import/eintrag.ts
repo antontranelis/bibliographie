@@ -266,7 +266,6 @@ export function zerlegeEintrag(laeufe: Lauf[]): ImportErgebnis {
     const jahre = [...ausgabe.matchAll(JAHR)].map((m) => m[1])
     werk.art = 'aufsatz'
     werk.untertitel = untertitel
-    werk.ausgaben = []
     werk.erschienenIn = {
       ...leeresErschienenIn(),
       art: sammelband ? 'sammelband' : 'zeitschrift',

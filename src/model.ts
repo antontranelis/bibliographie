@@ -115,7 +115,10 @@ export interface Mitwirkung {
   abAuflage: string
 }
 
-/** Eine Ausgabe des Werks mit ihren Auflagen. Die erste Ausgabe ist die, nach der das Werk in der Liste steht. */
+/**
+ * Eine Ausgabe des Werks mit ihren Auflagen. Die erste Ausgabe ist die, nach der das Werk in der Liste steht.
+ * Jedes Werk hat mindestens eine, auch ein Aufsatz, damit er sich in ein Buch umstellen lässt.
+ */
 export interface Ausgabe {
   id: string
   art: AusgabeArt

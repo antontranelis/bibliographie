@@ -52,7 +52,8 @@ export function migriere(d: Datenstamm): Datenstamm {
   }
   const werke = d.werke.map((w): Werk => {
     const { auflagen, ...rest } = w as Werk & { auflagen?: Auflage[] }
-    const ausgaben: Ausgabe[] = rest.ausgaben ?? [{ ...leereAusgabe(), auflagen: auflagen ?? [] }]
+    const bisher: Ausgabe[] = rest.ausgaben ?? [{ ...leereAusgabe(), auflagen: auflagen ?? [] }]
+    const ausgaben = bisher.length ? bisher : [leereAusgabe()]
     return {
       ...rest,
       anmerkung: rest.anmerkung ?? '',

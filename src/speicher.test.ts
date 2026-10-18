@@ -64,6 +64,12 @@ describe('Version 1 übersetzen', () => {
     expect(w.ersterscheinung).toBe('')
     expect('auflagen' in w).toBe(false)
   })
+  it('gibt jedem Werk mindestens eine Ausgabe', () => {
+    const v3 = { format: 'bibliographie-datenstamm', version: 3, verlage: [], werke: [{ ...leeresWerk(), art: 'aufsatz', ausgaben: [] }] }
+    const w = importiere(JSON.stringify(v3)).werke[0]
+    expect(w.ausgaben).toHaveLength(1)
+    expect(w.ausgaben[0].auflagen).toHaveLength(1)
+  })
   it('lässt Daten der Version 3 unverändert', () => {
     const d = importiere(JSON.stringify(alt))
     expect(migriere(d)).toEqual(d)

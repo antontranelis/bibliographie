@@ -27,6 +27,8 @@ describe('zerlegeEintrag', () => {
     const e = zerlegeEintrag(laeufe)
     expect(e.status).toBe('erkannt')
     expect(e.werk?.erschienenIn).toMatchObject({ titel: 'Gegenwart', ausgabe: '1/2004', jahr: '2004' })
+    // Auch ein Beitrag behält eine erste Ausgabe, damit er sich in ein Buch umstellen lässt
+    expect(e.werk?.ausgaben).toHaveLength(1)
     expect(rueckprobe(e.werk!, laeufe).ergebnis).toBe('gleich')
   })
   it('aufrechte Titel in der Anmerkung werden markiert (Nr. 1406)', () => {

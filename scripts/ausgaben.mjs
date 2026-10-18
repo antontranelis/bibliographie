@@ -77,6 +77,20 @@ if (aus) await page.screenshot({ path: `${aus}/ausgaben.png`, fullPage: true })
 await page.getByLabel('Ersterscheinung').fill('1984')
 pruefe('Ersterscheinung von Hand gespeichert', (await daten()).werke[0].ersterscheinung === '1984')
 
+// Aufsatz ohne Ausgabe aus alten Daten lässt sich in ein Buch umstellen (#8)
+{
+  const aufsatz = { ...(await daten()).werke[0], id: 'aufsatz', titel: 'Ein Beitrag', art: 'aufsatz', ausgaben: [], erschienenIn: { art: 'zeitschrift', titel: 'Gegenwart', jahrgang: '', jahr: '2004', heft: '1', ausgabe: '', seitenVon: '', seitenBis: '' } }
+  await page.evaluate((w) => localStorage.setItem('bibliographie:datenstamm:v1', JSON.stringify({ werke: [w], verlage: [] })), aufsatz)
+  await page.reload()
+  await page.locator('.reiter button', { hasText: 'Kartei' }).click()
+  await page.locator('.kartei-karte', { hasText: 'Ein Beitrag' }).dblclick()
+  await page.getByRole('radio', { name: 'Buch', exact: true }).click()
+  await page.getByRole('button', { name: '+ Auflage' }).click()
+  await page.getByLabel('Jahr', { exact: true }).last().fill('2010')
+  const w3 = (await daten()).werke.find((x) => x.id === 'aufsatz')
+  pruefe('Aufsatz ohne Ausgabe wird Buch mit Auflage', w3?.art === 'buch' && w3.ausgaben.length === 1 && w3.ausgaben[0].auflagen.some((a) => a.jahr === '2010'), JSON.stringify(w3?.ausgaben.map((x) => x.auflagen.map((a) => a.jahr))))
+}
+
 await browser.close()
 for (const e of ergebnisse) console.log(`${e.ok ? 'ok  ' : 'FEHL'} ${e.name}${e.info ? ` (${e.info})` : ''}`)
 if (fehler.length) console.log('Seitenfehler:', fehler)

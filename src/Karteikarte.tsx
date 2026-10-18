@@ -152,7 +152,7 @@ export function Karteikarte(props: Props) {
 
   const uebernimmAusgaben = (auswahl: Treffer[]) => {
     // Neue Auflagen aus dem Katalog kommen zur ersten Ausgabe; von dort lassen sie sich einer anderen zuordnen
-    const [erste, ...weitere] = werk.ausgaben
+    const [erste, ...weitere] = mitAusgabe(werk.ausgaben)
     const neu = [...erste.auflagen.filter((a) => !istLeer(a)), ...auswahl.map((t) => ({ ...t.auflage, id: neueId() }))]
     neu.sort((a, b) => jahrZahl(a) - jahrZahl(b))
     setze({ ausgaben: [{ ...erste, auflagen: neu }, ...weitere] })
@@ -457,7 +457,7 @@ function AusgabenFeld({
   onVerlagAendern: (v: Verlag) => void
 }) {
   const [neuId, setNeuId] = useState<string | null>(null)
-  const ausgaben = werk.ausgaben
+  const ausgaben = useMemo(() => mitAusgabe(werk.ausgaben), [werk.ausgaben])
   const gefuellt = alleAuflagen(werk).filter((a) => !istLeer(a))
   const mehrere = ausgaben.length > 1
   const setzeAusgaben = (neu: Ausgabe[]) => onAendern({ ausgaben: neu })
@@ -626,6 +626,9 @@ function MitwirkendeFeld({ ausgabe, onAendern }: { ausgabe: Ausgabe; onAendern: 
     </div>
   )
 }
+
+/** Jedes Werk hat eine erste Ausgabe; fehlt sie in alten oder fremden Daten, wird sie hier ergänzt. */
+const mitAusgabe = (ausgaben: Ausgabe[]): Ausgabe[] => (ausgaben.length ? ausgaben : [leereAusgabe()])
 
 /** Name einer Ausgabe für Überschriften und Auswahl. */
 function ausgabeName(a: Ausgabe): string {

@@ -153,6 +153,14 @@ describe('weitere Auflagen und Ausgaben', () => {
     })
     expect(druckzeile(ada)).toBe('Ada, Cambridge/MA 1985; deutsche Ausgabe: Ada. Die Braut der Wissenschaft, Berlin 1999; 2. Aufl. als: Ada Augusta Lovelace, 2. Aufl. 2004')
   })
+  it('„nur erste“ druckt die erste Auflage, auch wenn sie abgewählt ist', () => {
+    const w = werk({ titel: 'T', auflagen: [auflage({ ort: 'Basel', jahr: '1990', inListe: false }), auflage({ nummer: '2', ort: 'Basel', jahr: '2000', inListe: true })] })
+    expect(druckzeile(w, { ...STANDARD_STIL, auflagen: 'erste' })).toBe('T, Basel 1990')
+  })
+  it('ohne jeden Haken behält die erste Ausgabe ihr Impressum', () => {
+    const w = werk({ titel: 'T', auflagen: [auflage({ ort: 'Basel', jahr: '1990', inListe: false }), auflage({ nummer: '2', ort: 'Basel', jahr: '2000', inListe: false })] })
+    expect(druckzeile(w)).toBe('T, Basel 1990')
+  })
   it('leere Ausgaben und Auflagen erscheinen nicht', () => {
     const w = werk({ titel: 'T', ausgaben: [ausgabe({ auflagen: [auflage({ ort: 'Basel', jahr: '1990' }), auflage({})] }), ausgabe({ art: 'neuausgabe' })] })
     expect(druckzeile(w)).toBe('T, Basel 1990')

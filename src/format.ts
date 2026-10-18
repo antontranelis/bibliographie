@@ -133,10 +133,13 @@ function folgeauflage(a: Auflage, stil: Stil, ort: string): string {
 /** Ob eine Auflage in der Liste genannt wird, solange nichts anderes markiert ist. */
 export const nennen = (a: Auflage, erste: boolean): boolean => a.inListe ?? (erste || Boolean(a.bearbeitung.trim()))
 
-function gedruckteAuflagen(ausgabe: Ausgabe, stil: Stil): Auflage[] {
+/** Auflagen einer Ausgabe in der Druckzeile. Die erste Ausgabe behält immer ein Impressum. */
+function gedruckteAuflagen(ausgabe: Ausgabe, stil: Stil, ersteAusgabe: boolean): Auflage[] {
   const auflagen = ausgabe.auflagen.filter(gefuellt)
   if (stil.auflagen === 'alle') return auflagen
-  return auflagen.filter((a, i) => nennen(a, i === 0))
+  if (stil.auflagen === 'erste') return auflagen.slice(0, 1)
+  const genannt = auflagen.filter((a, i) => nennen(a, i === 0))
+  return genannt.length === 0 && ersteAusgabe ? auflagen.slice(0, 1) : genannt
 }
 
 /** Wie eine weitere Ausgabe eingeleitet wird: eigene Bezeichnung oder nach Art und Sprache. */
@@ -155,7 +158,7 @@ function ausgabenTeile(werk: Werk, stil: Stil): Teil[] {
   let letzterOrt = ''
   werk.ausgaben.forEach((ausgabe, i) => {
     if (stil.auflagen === 'erste' && i > 0) return
-    const auflagen = gedruckteAuflagen(ausgabe, stil)
+    const auflagen = gedruckteAuflagen(ausgabe, stil, i === 0)
     if (auflagen.length === 0) return
     const ortWenn = (a: Auflage) => {
       const ort = ortsangabe(a, stil)
@@ -163,7 +166,7 @@ function ausgabenTeile(werk: Werk, stil: Stil): Teil[] {
       if (ort) letzterOrt = ort
       return neu
     }
-    const [erste, ...weitere] = stil.auflagen === 'erste' ? auflagen.slice(0, 1) : auflagen
+    const [erste, ...weitere] = auflagen
     if (i === 0) {
       const imp = impressum(erste, stil, ortWenn(erste))
       if (imp) teile.push(klar(stil.muster === 'verlag' ? `. ${imp}` : `, ${imp}`))
