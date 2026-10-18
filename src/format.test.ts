@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { druckzeile, druckzeileTeile, sortiere, STANDARD_STIL, type Stil } from './format'
-import { leereAuflage, leeresErschienenIn, leeresWerk, type Werk } from './model'
+import { druckzeile, druckzeileTeile, ersterscheinung, sortiere, STANDARD_STIL, type Stil } from './format'
+import { leereAuflage, leereAusgabe, leeresErschienenIn, leeresWerk, type Auflage, type Ausgabe, type Werk } from './model'
 
-function werk(teil: Partial<Werk>): Werk {
-  return { ...leeresWerk(), ...teil }
+/** Werk mit einer Ausgabe aus `auflagen` oder mit eigenen `ausgaben`. */
+function werk({ auflagen, ...teil }: Partial<Werk> & { auflagen?: Auflage[] }): Werk {
+  const w = { ...leeresWerk(), ...teil }
+  return auflagen ? { ...w, ausgaben: [{ ...leereAusgabe(), auflagen }] } : w
 }
+const auflage = (teil: Partial<Auflage>): Auflage => ({ ...leereAuflage(), ...teil })
+const ausgabe = (teil: Partial<Ausgabe>): Ausgabe => ({ ...leereAusgabe(), ...teil })
 const person = (vorname: string, nachname: string, rolle: 'autor' | 'hrsg' = 'autor') => ({ vorname, nachname, rolle })
 const steiner = person('Rudolf', 'Steiner')
 const SKIZZE: Stil = { ...STANDARD_STIL, titelAuszeichnung: 'keine', personenTrenner: ' / ', beitragsform: 'komma', schlusspunkt: true }
@@ -77,6 +81,84 @@ describe('Listenformat', () => {
   })
 })
 
+describe('weitere Auflagen und Ausgaben', () => {
+  it('bearbeitete Auflagen, Ort nur bei Wechsel (Nr. 102)', () => {
+    const w = werk({
+      personen: [person('Ernst', 'Iros')],
+      titel: 'Wesen und Dramaturgie des Films',
+      auflagen: [auflage({ ort: 'Zürich/Leipzig', jahr: '1938' }), auflage({ nummer: '2', bearbeitung: 'erw.', ort: 'Zürich', jahr: '1957' }), auflage({ nummer: '3', ort: 'Zürich', jahr: '1962', inListe: true })],
+    })
+    expect(druckzeile(w)).toBe('Ernst Iros: Wesen und Dramaturgie des Films, Zürich/Leipzig 1938; 2. erw. Aufl. Zürich 1957; 3. Aufl. 1962')
+  })
+  it('Auswahl: erste und bearbeitete Auflagen, sonst nur mit Haken', () => {
+    const w = werk({ titel: 'T', auflagen: [auflage({ ort: 'Basel', jahr: '1990' }), auflage({ nummer: '2', ort: 'Basel', jahr: '1992' }), auflage({ nummer: '3', bearbeitung: 'erw.', ort: 'Basel', jahr: '1995' }), auflage({ nummer: '4', ort: 'Basel', jahr: '1999', inListe: false })] })
+    expect(druckzeile(w)).toBe('T, Basel 1990; 3. erw. Aufl. 1995')
+    expect(druckzeile(w, { ...STANDARD_STIL, auflagen: 'alle' })).toBe('T, Basel 1990; 2. Aufl. 1992; 3. erw. Aufl. 1995; 4. Aufl. 1999')
+    expect(druckzeile(w, { ...STANDARD_STIL, auflagen: 'erste' })).toBe('T, Basel 1990')
+  })
+  it('Übersetzung mit eigenem Titel fett (Nr. 510)', () => {
+    const w = werk({
+      personen: [person('Neil', 'Postman')],
+      titel: 'Amusing Ourselves to Death',
+      untertitel: 'Public Discourse in the Age of Show Business',
+      ausgaben: [
+        ausgabe({ auflagen: [auflage({ ort: 'New York', jahr: '1985' })] }),
+        ausgabe({ art: 'uebersetzung', sprache: 'deutsch', titel: 'Wir amüsieren uns zu Tode', untertitel: 'Urteilsbildung im Zeitalter der Unterhaltungsindustrie', auflagen: [auflage({ ort: 'Frankfurt a.M.', jahr: '1985' })] }),
+      ],
+    })
+    expect(druckzeileTeile(w)).toEqual([
+      { text: 'Neil Postman: ' },
+      { text: 'Amusing Ourselves to Death', auszeichnung: 'fett' },
+      { text: '. Public Discourse in the Age of Show Business, New York 1985; deutsche Ausgabe: ' },
+      { text: 'Wir amüsieren uns zu Tode', auszeichnung: 'fett' },
+      { text: '. Urteilsbildung im Zeitalter der Unterhaltungsindustrie, Frankfurt a.M. 1985' },
+    ])
+  })
+  it('Ausgabe ohne eigenen Titel, gleicher Ort entfällt (Nr. 689)', () => {
+    const w = werk({
+      personen: [person('Walter', 'Wüllenweber')],
+      titel: 'Wir Fernsehkinder',
+      ausgaben: [ausgabe({ auflagen: [auflage({ ort: 'Reinbek bei Hamburg', jahr: '1994' })] }), ausgabe({ art: 'taschenbuch', auflagen: [auflage({ ort: 'Reinbek bei Hamburg', jahr: '1996' })] })],
+    })
+    expect(druckzeile(w)).toBe('Walter Wüllenweber: Wir Fernsehkinder, Reinbek bei Hamburg 1994; als Taschenbuch 1996')
+  })
+  it('Zusatz nach dem Impressum (Nr. 867)', () => {
+    const w = werk({
+      personen: [person('Rainer', 'Patzlaff')],
+      titel: 'Der gefrorene Blick',
+      ausgaben: [
+        ausgabe({ auflagen: [auflage({ ort: 'Stuttgart', jahr: '2000' }), auflage({ nummer: '7', ort: 'Stuttgart', jahr: '2009', inListe: true })] }),
+        ausgabe({ art: 'neuausgabe', zusatz: '(=8. Aufl.) mit Untertitel: Bildschirmmedien und die Entwicklung des Kindes', auflagen: [auflage({ ort: 'Stuttgart', jahr: '2013' })] }),
+      ],
+    })
+    expect(druckzeile(w)).toBe('Rainer Patzlaff: Der gefrorene Blick, Stuttgart 2000; 7. Aufl. 2009; Neuausgabe 2013 (=8. Aufl.) mit Untertitel: Bildschirmmedien und die Entwicklung des Kindes')
+  })
+  it('Titeländerung über die Bezeichnung (Nr. 1576, 1756)', () => {
+    const w = werk({
+      personen: [person('Brant', 'Houston')],
+      titel: 'Computer-Assisted Reporting',
+      ausgaben: [
+        ausgabe({ auflagen: [auflage({ ort: 'New York', jahr: '1996' }), auflage({ nummer: '2', bearbeitung: 'erw.', ort: 'New York', jahr: '1999' })] }),
+        ausgabe({ art: 'neuausgabe', bezeichnung: 'ab 5. Aufl. als', titel: 'Data for Journalists', auflagen: [auflage({ nummer: '5', bearbeitung: 'erw.', ort: 'New York', jahr: '2018' })] }),
+      ],
+    })
+    expect(druckzeile(w)).toBe('Brant Houston: Computer-Assisted Reporting, New York 1996; 2. erw. Aufl. 1999; ab 5. Aufl. als: Data for Journalists, 5. erw. Aufl. 2018')
+    const ada = werk({
+      titel: 'Ada',
+      ausgaben: [
+        ausgabe({ auflagen: [auflage({ ort: 'Cambridge/MA', jahr: '1985' })] }),
+        ausgabe({ art: 'uebersetzung', sprache: 'deutsch', titel: 'Ada. Die Braut der Wissenschaft', auflagen: [auflage({ ort: 'Berlin', jahr: '1999' })] }),
+        ausgabe({ art: 'uebersetzung', sprache: 'deutsch', bezeichnung: '2. Aufl. als', titel: 'Ada Augusta Lovelace', auflagen: [auflage({ nummer: '2', ort: 'Berlin', jahr: '2004' })] }),
+      ],
+    })
+    expect(druckzeile(ada)).toBe('Ada, Cambridge/MA 1985; deutsche Ausgabe: Ada. Die Braut der Wissenschaft, Berlin 1999; 2. Aufl. als: Ada Augusta Lovelace, 2. Aufl. 2004')
+  })
+  it('leere Ausgaben und Auflagen erscheinen nicht', () => {
+    const w = werk({ titel: 'T', ausgaben: [ausgabe({ auflagen: [auflage({ ort: 'Basel', jahr: '1990' }), auflage({})] }), ausgabe({ art: 'neuausgabe' })] })
+    expect(druckzeile(w)).toBe('T, Basel 1990')
+  })
+})
+
 describe('Muster der Skizze als Variante', () => {
   const pdf = werk({
     personen: [steiner],
@@ -97,7 +179,7 @@ describe('Muster der Skizze als Variante', () => {
   })
   it('alle Auflagen mit Zählung', () => {
     expect(druckzeile(pdf, { ...SKIZZE, auflagen: 'alle' })).toBe(
-      'Rudolf Steiner: Die Philosophie der Freiheit. Grundzüge einer modernen Weltanschauung, Berlin 1893 (im Druck: 1894); Berlin, 2. Aufl. 1918.',
+      'Rudolf Steiner: Die Philosophie der Freiheit. Grundzüge einer modernen Weltanschauung, Berlin 1893 (im Druck: 1894); 2. Aufl. 1918.',
     )
   })
   it('Name, Vorname und Gedankenstrich', () => {
@@ -118,11 +200,16 @@ describe('sortiere', () => {
   const a = werk({ personen: [person('X', 'Özdemir')], titel: 'a', auflagen: [{ ...leereAuflage(), jahr: '1950' }] })
   const b = werk({ personen: [person('Y', 'Ohm')], titel: 'b', auflagen: [{ ...leereAuflage(), jahr: '1920' }] })
   const c = werk({ personen: [person('Y', 'Ohm')], titel: 'c', auflagen: [{ ...leereAuflage(), jahr: '1910' }] })
-  const d = werk({ art: 'aufsatz', personen: [person('Z', 'Abel')], titel: 'd', auflagen: [], erschienenIn: { ...leeresErschienenIn(), titel: 'Z', jahr: '1900' } })
+  const d = werk({ art: 'aufsatz', personen: [person('Z', 'Abel')], titel: 'd', ausgaben: [], erschienenIn: { ...leeresErschienenIn(), titel: 'Z', jahr: '1900' } })
   it('nach Nachname, dann Jahr', () => {
     expect(sortiere([a, b, c], 'name').map((w) => w.titel)).toEqual(['c', 'b', 'a'])
   })
   it('chronologisch, auch mit dem Jahr eines Aufsatzes', () => {
     expect(sortiere([a, b, c, d], 'jahr').map((w) => w.titel)).toEqual(['d', 'c', 'b', 'a'])
+  })
+  it('Ersterscheinung: älteste Ausgabe ohne Manuskript, von Hand überschreibbar', () => {
+    const e = werk({ titel: 'e', ausgaben: [ausgabe({ auflagen: [auflage({ jahr: '1930' })] }), ausgabe({ art: 'manuskript', auflagen: [auflage({ jahr: '1890' })] }), ausgabe({ art: 'aufsatz', auflagen: [auflage({ jahr: '1925' })] })] })
+    expect(ersterscheinung(e)).toBe(1925)
+    expect(ersterscheinung({ ...e, ersterscheinung: '1905' })).toBe(1905)
   })
 })

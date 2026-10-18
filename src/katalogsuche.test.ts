@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { karteiTreffer } from './Katalogsuche'
-import { leereAuflage, leeresWerk } from './model'
+import { leereAuflage, leereAusgabe, leeresWerk } from './model'
 
 describe('karteiTreffer', () => {
-  const w = { ...leeresWerk(), titel: 'Die Philosophie der Freiheit', personen: [{ vorname: 'Rudolf', nachname: 'Steiner', rolle: 'autor' as const }], auflagen: [{ ...leereAuflage(), isbn: '978-3-7274-0040-6' }] }
+  const w = { ...leeresWerk(), titel: 'Die Philosophie der Freiheit', personen: [{ vorname: 'Rudolf', nachname: 'Steiner', rolle: 'autor' as const }], ausgaben: [{ ...leereAusgabe(), auflagen: [{ ...leereAuflage(), isbn: '978-3-7274-0040-6' }] }] }
   it('findet über Autor und Titelwörter', () => {
     expect(karteiTreffer([w], 'x', 'Stei', 'Freiheit')).toEqual([w])
   })

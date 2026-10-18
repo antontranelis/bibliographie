@@ -216,8 +216,9 @@ export function Liste({ werke, vorgabe }: { werke: Werk[]; vorgabe: ListenVorgab
             label="Auflagen"
             wert={stil.auflagen}
             optionen={[
-              ['erste', 'nur die erste'],
+              ['auswahl', 'ausgewählte'],
               ['alle', 'alle'],
+              ['erste', 'nur erste'],
             ]}
             onWahl={(auflagen) => setStil({ ...stil, auflagen })}
           />

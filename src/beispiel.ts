@@ -1,4 +1,4 @@
-import { leereAuflage, neueId, type Datenstamm, type Verlag, type Werk } from './model'
+import { leereAuflage, leereAusgabe, neueId, type Datenstamm, type Verlag, type Werk } from './model'
 import { migriere } from './speicher'
 
 const jetzt = () => new Date().toISOString()
@@ -13,7 +13,8 @@ function werk(teil: Partial<Werk>): Werk {
     untertitel: '',
     reihe: '',
     reiheBand: '',
-    auflagen: [],
+    ausgaben: [],
+    ersterscheinung: '',
     kommentar: '',
     anmerkung: '',
     schlagwoerter: [],
@@ -47,10 +48,15 @@ export function beispielDaten(): Datenstamm {
         untertitel: 'Grundzüge einer modernen Weltanschauung. Seelische Beobachtungsresultate nach naturwissenschaftlicher Methode',
         reihe: 'Rudolf Steiner Gesamtausgabe',
         reiheBand: '4',
-        auflagen: [
-          { ...leereAuflage(), jahr: '1893', gedrucktesJahr: '1894', verlag: 'Emil Felber', ort: 'Berlin' },
-          { ...leereAuflage(), nummer: '2', jahr: '1918', verlag: 'Philosophisch-Anthroposophischer Verlag', ort: 'Berlin', seiten: '282' },
-          { ...leereAuflage(), jahr: '1929', verlag: 'Verlag am Goetheanum', ort: 'Dornach', seiten: '345', vermerk: '20.–25. Tsd.' },
+        ausgaben: [
+          {
+            ...leereAusgabe(),
+            auflagen: [
+              { ...leereAuflage(), jahr: '1893', gedrucktesJahr: '1894', verlag: 'Emil Felber', ort: 'Berlin' },
+              { ...leereAuflage(), nummer: '2', jahr: '1918', verlag: 'Philosophisch-Anthroposophischer Verlag', ort: 'Berlin', seiten: '282' },
+              { ...leereAuflage(), jahr: '1929', verlag: 'Verlag am Goetheanum', ort: 'Dornach', seiten: '345', vermerk: '20.–25. Tsd.' },
+            ],
+          },
         ],
         kommentar: 'Beispielkarte. Erschien schon Ende 1893, im Buch steht 1894.',
         schlagwoerter: [

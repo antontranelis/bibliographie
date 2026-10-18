@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { exportiere, exportiereCsl, importiere, migriere, zusammenfuehren } from './speicher'
-import { leereAuflage, leeresWerk } from './model'
+import { leereAuflage, leereAusgabe, leeresWerk } from './model'
 
 describe('Import und Export', () => {
   const w = { ...leeresWerk(), titel: 'Wahrheit und Wissenschaft' }
@@ -22,30 +22,49 @@ describe('Import und Export', () => {
     const buch = {
       ...w,
       personen: [{ vorname: 'Rudolf', nachname: 'Steiner', rolle: 'autor' as const }],
-      auflagen: [
-        { ...leereAuflage(), jahr: '1892', ort: 'Weimar', verlag: 'Weißbach' },
-        { ...leereAuflage(), nummer: '2', jahr: '1925', ort: 'Dornach', verlag: 'Philosophisch-Anthroposophischer Verlag' },
+      ausgaben: [
+        {
+          ...leereAusgabe(),
+          auflagen: [
+            { ...leereAuflage(), jahr: '1892', ort: 'Weimar', verlag: 'Weißbach' },
+            { ...leereAuflage(), nummer: '2', jahr: '1925', ort: 'Dornach', verlag: 'Philosophisch-Anthroposophischer Verlag' },
+          ],
+        },
+        { ...leereAusgabe('uebersetzung'), titel: 'The Philosophy of Freedom', auflagen: [{ ...leereAuflage(), jahr: '1964', ort: 'London' }] },
       ],
     }
     const csl = JSON.parse(exportiereCsl([buch]))
-    expect(csl).toHaveLength(2)
+    expect(csl).toHaveLength(3)
+    expect(csl[2]).toMatchObject({ title: 'The Philosophy of Freedom', 'publisher-place': 'London' })
     expect(csl[1]).toMatchObject({ type: 'book', 'publisher-place': 'Dornach', edition: '2', author: [{ family: 'Steiner', given: 'Rudolf' }] })
   })
 })
+
+// Werk im Stand bis Version 2: Auflagen direkt am Werk, keine Ausgaben
+const { ausgaben: _ausgaben, ersterscheinung: _ersterscheinung, ...werkV2 } = leeresWerk()
 
 describe('Version 1 übersetzen', () => {
   const alt = {
     format: 'bibliographie-datenstamm',
     version: 1,
     verlage: [{ id: 'v', name: 'Verlag am Goetheanum', kuerzel: 'goe', orte: [{ abJahr: '1923', ort: 'Dornach', wechselImJahr: false }] }],
-    werke: [{ ...leeresWerk(), auflagen: [{ id: 'a', nummer: '', jahr: '1950', gedrucktesJahr: '', erscheinungstag: '', verlag: 'Verlag am Goetheanum', ort: 'Dornach', seiten: '', seitenRoemisch: '', vermerk: '' }] }],
+    werke: [{ ...werkV2, auflagen: [{ id: 'a', nummer: '', jahr: '1950', gedrucktesJahr: '', erscheinungstag: '', verlag: 'Verlag am Goetheanum', ort: 'Dornach', seiten: '', seitenRoemisch: '', vermerk: '' }] }],
   }
   it('liest eine Datei der Version 1 und verknüpft Auflagen über den Namen', () => {
     const d = importiere(JSON.stringify(alt))
     expect(d.verlage[0]).toEqual({ id: 'v', kuerzel: 'goe', namen: [{ abJahr: '', name: 'Verlag am Goetheanum' }], orte: alt.verlage[0].orte, schreibweisen: [] })
-    expect(d.werke[0].auflagen[0]).toMatchObject({ verlagId: 'v', isbn: '' })
+    expect(d.werke[0].ausgaben[0].auflagen[0]).toMatchObject({ verlagId: 'v', isbn: '', bearbeitung: '' })
   })
-  it('lässt Daten der Version 2 unverändert', () => {
+  it('macht aus den Auflagen der Version 2 die erste Ausgabe', () => {
+    const v2 = { format: 'bibliographie-datenstamm', version: 2, verlage: [], werke: [{ ...werkV2, auflagen: [{ ...leereAuflage(), jahr: '1950' }, { ...leereAuflage(), jahr: '1960' }] }] }
+    const w = importiere(JSON.stringify(v2)).werke[0]
+    expect(w.ausgaben).toHaveLength(1)
+    expect(w.ausgaben[0]).toMatchObject({ art: 'erstausgabe', bezeichnung: '', mitwirkende: [] })
+    expect(w.ausgaben[0].auflagen.map((a) => a.jahr)).toEqual(['1950', '1960'])
+    expect(w.ersterscheinung).toBe('')
+    expect('auflagen' in w).toBe(false)
+  })
+  it('lässt Daten der Version 3 unverändert', () => {
     const d = importiere(JSON.stringify(alt))
     expect(migriere(d)).toEqual(d)
   })
@@ -56,7 +75,7 @@ describe('Version 1 übersetzen', () => {
 
 describe('ISBN im CSL-Export', () => {
   it('gibt die ISBN der Auflage mit', () => {
-    const buch = { ...leeresWerk(), titel: 'T', auflagen: [{ ...leereAuflage(), jahr: '1990', isbn: '3-7274-0040-5' }] }
+    const buch = { ...leeresWerk(), titel: 'T', ausgaben: [{ ...leereAusgabe(), auflagen: [{ ...leereAuflage(), jahr: '1990', isbn: '3-7274-0040-5' }] }] }
     expect(JSON.parse(exportiereCsl([buch]))[0].ISBN).toBe('3-7274-0040-5')
   })
 })

@@ -1,5 +1,6 @@
-import { useMemo, useRef, useState } from 'react'
-import { TEXT_ARTEN, type Werk } from './model'
+import { Fragment, useMemo, useRef, useState } from 'react'
+import { TEXT_ARTEN, alleAuflagen, type Werk } from './model'
+import { ausgabeBezeichnung } from './format'
 import { jahrspanne, namenListe } from './Katalogsuche'
 import { StatusMarke } from './Karteikarte'
 import { Lupe, StatusPunkt } from './Symbole'
@@ -51,7 +52,7 @@ const vgl = (a: string, b: string) => a.localeCompare(b, 'de', { sensitivity: 'b
 
 function jahreVon(w: Werk): string[] {
   if (w.art === 'aufsatz') return w.erschienenIn?.jahr ? [w.erschienenIn.jahr] : []
-  return w.auflagen.map((a) => a.jahr).filter(Boolean)
+  return alleAuflagen(w).map((a) => a.jahr).filter(Boolean)
 }
 const ersteJahr = (w: Werk) => Math.min(9999, ...jahreVon(w).map((j) => parseInt(j, 10)).filter((j) => !Number.isNaN(j)))
 
@@ -112,7 +113,7 @@ export function Kartei({ werke, sicht, onSicht, onBearbeiten, onListe, onBeispie
             w.erschienenIn?.titel ?? '',
             ...w.personen.map((p) => `${p.vorname} ${p.nachname}`),
             ...w.schlagwoerter.map((x) => x.begriff),
-            ...w.auflagen.map((a) => `${a.verlag} ${a.ort} ${a.jahr}`),
+            ...alleAuflagen(w).map((a) => `${a.verlag} ${a.ort} ${a.jahr}`),
           ]
             .join(' ')
             .toLowerCase()
@@ -304,9 +305,18 @@ export function Kartei({ werke, sicht, onSicht, onBearbeiten, onListe, onBeispie
 
 function KarteLesen({ werk, onBearbeiten }: { werk: Werk; onBearbeiten: (id: string, nachholen?: boolean) => void }) {
   const [seite, setSeite] = useState<'vorne' | 'hinten'>('vorne')
-  const [alleAuflagen, setAlleAuflagen] = useState(false)
-  const auflagen = werk.auflagen.filter((a) => a.jahr || a.verlag || a.ort)
-  const gezeigt = alleAuflagen ? auflagen : auflagen.slice(0, 4)
+  const [alleZeigen, setAlleZeigen] = useState(false)
+  // Weitere Ausgaben bekommen eine Kopfzeile, die erste nur, wenn es mehrere gibt
+  const ausgaben = werk.ausgaben
+    .map((x) => ({ ausgabe: x, auflagen: x.auflagen.filter((a) => a.jahr || a.verlag || a.ort) }))
+    .filter((x) => x.auflagen.length > 0)
+  const auflagen = ausgaben.flatMap((x) => x.auflagen)
+  const gezeigt = alleZeigen ? auflagen : auflagen.slice(0, 4)
+  const kopfVor = new Map(
+    ausgaben
+      .filter((_, i) => i > 0 || ausgaben.length > 1)
+      .map((x) => [x.auflagen[0].id, [ausgabeBezeichnung(x.ausgabe) || 'Erstausgabe', x.ausgabe.titel].filter(Boolean).join(': ')]),
+  )
   const personen = werk.personen.map((p) => [p.vorname, p.nachname].filter(Boolean).join(' ')).filter(Boolean)
   const hrsg = werk.personen.length > 0 && werk.personen.every((p) => p.rolle === 'hrsg')
   const ei = werk.erschienenIn
@@ -360,22 +370,32 @@ function KarteLesen({ werk, onBearbeiten }: { werk: Werk; onBearbeiten: (id: str
                 </caption>
                 <tbody>
                   {gezeigt.map((a) => (
-                    <tr key={a.id}>
-                      <td className="sp-nr">{a.nummer ? `${a.nummer}.` : '–'}</td>
-                      <td className="sp-jahr">
-                        {a.jahr}
-                        {a.gedrucktesJahr && a.gedrucktesJahr !== a.jahr && <span className="leise klein"> ({a.gedrucktesJahr})</span>}
-                      </td>
-                      <td>
-                        {[a.verlag, a.ort].filter(Boolean).join(', ')}
-                        {a.vermerk && <span className="leise klein"> {a.vermerk}</span>}
-                      </td>
-                    </tr>
+                    <Fragment key={a.id}>
+                      {kopfVor.has(a.id) && (
+                        <tr className="lesen-ausgabe">
+                          <td colSpan={3}>{kopfVor.get(a.id)}</td>
+                        </tr>
+                      )}
+                      <tr>
+                        <td className="sp-nr">
+                          {a.nummer ? `${a.nummer}.` : '–'}
+                          {a.bearbeitung && <span className="leise klein"> {a.bearbeitung}</span>}
+                        </td>
+                        <td className="sp-jahr">
+                          {a.jahr}
+                          {a.gedrucktesJahr && a.gedrucktesJahr !== a.jahr && <span className="leise klein"> ({a.gedrucktesJahr})</span>}
+                        </td>
+                        <td>
+                          {[a.verlag, a.ort].filter(Boolean).join(', ')}
+                          {a.vermerk && <span className="leise klein"> {a.vermerk}</span>}
+                        </td>
+                      </tr>
+                    </Fragment>
                   ))}
-                  {auflagen.length > 4 && !alleAuflagen && (
+                  {auflagen.length > 4 && !alleZeigen && (
                     <tr>
                       <td colSpan={3}>
-                        <button type="button" className="textknopf" onClick={() => setAlleAuflagen(true)}>
+                        <button type="button" className="textknopf" onClick={() => setAlleZeigen(true)}>
                           alle {auflagen.length} Auflagen
                         </button>
                       </td>

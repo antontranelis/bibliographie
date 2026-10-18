@@ -41,7 +41,7 @@ async function karte(page, { autor, titel, jahr, verlag, ort }) {
   await page.keyboard.press('Control+Enter')
   const d = await daten(page)
   pruefe('Neuer Verlag ist nach dem Festanlegen gemerkt', d.verlage.length === 1 && name(d.verlage[0]) === 'Mein Verlag' && d.verlage[0].orte[0].ort === 'Basel')
-  pruefe('Auflage ist mit dem Verlag verknüpft', d.werke[0].auflagen[0].verlagId === d.verlage[0].id)
+  pruefe('Auflage ist mit dem Verlag verknüpft', d.werke[0].ausgaben[0].auflagen[0].verlagId === d.verlage[0].id)
 
   // 2. Exakter Name verknüpft sofort, Ort kommt mit; abweichender Ort wird als Wechsel gelernt
   await karte(page, { autor: 'Muster', titel: 'Zweites Buch', jahr: '1960', verlag: 'mein verlag' })
@@ -108,7 +108,7 @@ async function karte(page, { autor, titel, jahr, verlag, ort }) {
   await page.getByRole('button', { name: 'Ja, derselbe Verlag' }).click()
   const d = await daten(page)
   const pav = d.verlage.find((v) => name(v) === 'Philosophisch-Anthroposophischer Verlag')
-  const a = d.werke.find((w) => w.titel === 'Viertes Buch').auflagen[0]
+  const a = d.werke.find((w) => w.titel === 'Viertes Buch').ausgaben[0].auflagen[0]
   pruefe('Schreibweise gemerkt und verknüpft', pav.schreibweisen.includes('Philos.-Anthroposophischer Verl.') && a.verlagId === pav.id)
   pruefe('Ortswarnung im Wechseljahr greift über die Schreibweise', (await page.locator('[role=alert]').count()) === 1)
   if (aus) {
@@ -139,8 +139,8 @@ async function karte(page, { autor, titel, jahr, verlag, ort }) {
   await page.keyboard.press('Control+Enter')
   await page.waitForTimeout(300)
   const d = await daten(page)
-  const w = d.werke.find((x) => x.status === 'fest' && x.auflagen.length > 5)
-  pruefe('Nach Katalogimport und Festanlegen sind alle Auflagen verknüpft', w && w.auflagen.every((a) => !a.verlag || a.verlagId), `${w?.auflagen.length} Auflagen`)
+  const w = d.werke.find((x) => x.status === 'fest' && x.ausgaben[0].auflagen.length > 5)
+  pruefe('Nach Katalogimport und Festanlegen sind alle Auflagen verknüpft', w && w.ausgaben[0].auflagen.every((a) => !a.verlag || a.verlagId), `${w?.ausgaben[0].auflagen.length} Auflagen`)
   pruefe('Eine Frage pro ähnlichem Verlag, nicht pro Auflage', dialoge.length <= zeilen.filter((z) => z.includes('vermutlich')).length, `${dialoge.length} Fragen, ${zeilen.length} Abgleichzeilen, ${d.verlage.length - vorher} neue Verlage`)
   console.log('Abgleich:\n  ' + zeilen.join('\n  '))
   await page.close()

@@ -1,4 +1,4 @@
-// Datenmodell: ein Werk durch alle Auflagen und Ausgaben hindurch.
+// Datenmodell: ein Werk durch alle Ausgaben und deren Auflagen hindurch.
 
 export type Status = 'vorlaeufig' | 'fest'
 
@@ -56,9 +56,80 @@ export interface Auflage {
   ortBestaetigt?: boolean
   seiten: string
   seitenRoemisch: string
+  /** Bearbeitung, gedruckt vor „Aufl.“: „erw.“, „überarb. und erw.“ */
+  bearbeitung: string
+  /** Druckvermerk, nicht gedruckt: „20.–25. Tsd.“ */
   vermerk: string
+  /** In der Literaturliste nennen; leer = erste Auflage der Ausgabe oder bearbeitete Auflage */
+  inListe?: boolean
   isbn: string
   quelle?: { katalog: 'lobid' | 'dnb'; id: string }
+}
+
+export type AusgabeArt =
+  | 'erstausgabe'
+  | 'neuausgabe'
+  | 'lizenzausgabe'
+  | 'taschenbuch'
+  | 'nachdruck'
+  | 'weitere'
+  | 'uebersetzung'
+  | 'fassung'
+  | 'gekuerzt'
+  | 'hochschulschrift'
+  | 'aufsatz'
+  | 'manuskript'
+
+/** Art der Ausgabe und wie sie in der Liste eingeleitet wird, solange keine eigene Bezeichnung gesetzt ist. */
+export const AUSGABE_ARTEN: { value: AusgabeArt; label: string; druck: string }[] = [
+  { value: 'erstausgabe', label: 'Erstausgabe', druck: '' },
+  { value: 'neuausgabe', label: 'Neuausgabe', druck: 'Neuausgabe' },
+  { value: 'lizenzausgabe', label: 'Lizenzausgabe', druck: 'Lizenzausgabe' },
+  { value: 'taschenbuch', label: 'Taschenbuch / Paperback', druck: 'als Taschenbuch' },
+  { value: 'nachdruck', label: 'Nachdruck', druck: 'Nachdruck' },
+  { value: 'weitere', label: 'Weitere Ausgabe', druck: 'auch' },
+  { value: 'uebersetzung', label: 'Übersetzung', druck: 'Übersetzung' },
+  { value: 'fassung', label: 'Veränderte Fassung', druck: 'veränderte Fassung' },
+  { value: 'gekuerzt', label: 'Gekürzte Fassung', druck: 'gekürzte Fassung' },
+  { value: 'hochschulschrift', label: 'Hochschulschrift', druck: 'Dissertation' },
+  { value: 'aufsatz', label: 'Zuerst als Aufsatz', druck: 'zuerst' },
+  { value: 'manuskript', label: 'Manuskript / Typoskript', druck: 'Manuskript' },
+]
+
+export type MitwirkungsRolle = 'hrsg' | 'vorwort' | 'einleitung' | 'nachwort' | 'anhang' | 'uebersetzung'
+
+export const MITWIRKUNGS_ROLLEN: { value: MitwirkungsRolle; label: string }[] = [
+  { value: 'hrsg', label: 'Herausgabe' },
+  { value: 'vorwort', label: 'Vorwort' },
+  { value: 'einleitung', label: 'Einleitung' },
+  { value: 'nachwort', label: 'Nachwort' },
+  { value: 'anhang', label: 'Anhang' },
+  { value: 'uebersetzung', label: 'Übersetzung' },
+]
+
+export interface Mitwirkung {
+  vorname: string
+  nachname: string
+  rolle: MitwirkungsRolle
+  /** Ab welcher Auflage, leer = von Anfang an */
+  abAuflage: string
+}
+
+/** Eine Ausgabe des Werks mit ihren Auflagen. Die erste Ausgabe ist die, nach der das Werk in der Liste steht. */
+export interface Ausgabe {
+  id: string
+  art: AusgabeArt
+  /** Sprache als Adjektiv, etwa „deutsch“ oder „englisch“; bei Übersetzungen ergibt sie „deutsche Ausgabe“ */
+  sprache: string
+  /** Eigene Einleitung in der Liste, etwa „erste Ausgabe in Englisch“ oder „2. Aufl. als“; leer = nach der Art */
+  bezeichnung: string
+  /** Eigener Titel dieser Ausgabe, leer = Titel des Werks */
+  titel: string
+  untertitel: string
+  /** Wird nach dem Impressum gedruckt: „mit Untertitel: …“, „(=8. Aufl.)“, „, hrsg. von …“ */
+  zusatz: string
+  mitwirkende: Mitwirkung[]
+  auflagen: Auflage[]
 }
 
 export interface ErschienenIn {
@@ -90,7 +161,9 @@ export interface Werk {
   untertitel: string
   reihe: string
   reiheBand: string
-  auflagen: Auflage[]
+  ausgaben: Ausgabe[]
+  /** Jahr der Ersterscheinung von Hand; leer = älteste Ausgabe außer Manuskripten */
+  ersterscheinung: string
   erschienenIn?: ErschienenIn
   kommentar: string
   /** Anmerkung, die in der Liste kursiv mitgedruckt wird: „(Anm.: …)“; *Titel* darin steht aufrecht */
@@ -142,10 +215,24 @@ export function leereAuflage(): Auflage {
     ort: '',
     seiten: '',
     seitenRoemisch: '',
+    bearbeitung: '',
     vermerk: '',
     isbn: '',
   }
 }
+
+export function leereAusgabe(art: AusgabeArt = 'erstausgabe'): Ausgabe {
+  return { id: neueId(), art, sprache: '', bezeichnung: '', titel: '', untertitel: '', zusatz: '', mitwirkende: [], auflagen: [leereAuflage()] }
+}
+
+/** Alle Auflagen aller Ausgaben in ihrer Reihenfolge. */
+export const alleAuflagen = (werk: Werk): Auflage[] => werk.ausgaben.flatMap((a) => a.auflagen)
+
+/** Jede Auflage aller Ausgaben umformen. */
+export const mitAuflagen = (werk: Werk, f: (a: Auflage) => Auflage): Werk => ({
+  ...werk,
+  ausgaben: werk.ausgaben.map((x) => ({ ...x, auflagen: x.auflagen.map(f) })),
+})
 
 export function leeresWerk(): Werk {
   const jetzt = new Date().toISOString()
@@ -158,7 +245,8 @@ export function leeresWerk(): Werk {
     untertitel: '',
     reihe: '',
     reiheBand: '',
-    auflagen: [leereAuflage()],
+    ausgaben: [leereAusgabe()],
+    ersterscheinung: '',
     kommentar: '',
     anmerkung: '',
     schlagwoerter: [],
