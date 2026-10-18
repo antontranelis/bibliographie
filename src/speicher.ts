@@ -1,7 +1,8 @@
+import { STANDARD_STIL } from './format'
 import { leereAusgabe, neueId, type Auflage, type Ausgabe, type Datenstamm, type Verlag, type Werk } from './model'
 
 export const FORMAT = 'bibliographie-datenstamm'
-export const VERSION = 3
+export const VERSION = 4
 
 export interface Exportdatei extends Datenstamm {
   format: typeof FORMAT
@@ -25,13 +26,13 @@ export function importiere(text: string): Datenstamm {
   if (d.format !== FORMAT) throw new Error('Die Datei stammt nicht aus diesem Programm.')
   if (typeof d.version !== 'number' || d.version > VERSION)
     throw new Error('Die Datei stammt aus einer neueren Programmversion.')
-  return migriere({ werke: d.werke ?? [], verlage: d.verlage ?? [] })
+  return migriere({ werke: d.werke ?? [], verlage: d.verlage ?? [], listen: d.listen ?? [] })
 }
 
 /**
- * Bringt Daten auf den Stand von Version 3. Version 1 kannte pro Verlag nur einen Namen,
+ * Bringt Daten auf den Stand von Version 4. Version 1 kannte pro Verlag nur einen Namen,
  * und Auflagen verwiesen über den Namenstext auf ihn. Bis Version 2 hingen die Auflagen direkt am Werk;
- * sie werden zur ersten Ausgabe.
+ * sie werden zur ersten Ausgabe. Seit Version 4 gibt es gespeicherte Listen.
  */
 export function migriere(d: Datenstamm): Datenstamm {
   const verlage: Verlag[] = d.verlage.map((v) => {
@@ -62,7 +63,8 @@ export function migriere(d: Datenstamm): Datenstamm {
       ausgaben: ausgaben.map((a) => ({ ...leereAusgabe(), ...a, auflagen: a.auflagen.map(auflage) })),
     }
   })
-  return { werke, verlage }
+  const listen = (d.listen ?? []).map((l) => ({ ...l, stil: { ...STANDARD_STIL, ...l.stil } }))
+  return { werke, verlage, listen }
 }
 
 /** Führt importierte Daten mit dem Bestand zusammen. Gleiche ID: die neuere Fassung gewinnt. */
@@ -74,7 +76,12 @@ export function zusammenfuehren(bestand: Datenstamm, neu: Datenstamm): Datenstam
   }
   const verlage = new Map(bestand.verlage.map((v) => [v.id, v]))
   for (const v of neu.verlage) verlage.set(v.id, v)
-  return { werke: [...werke.values()], verlage: [...verlage.values()] }
+  const listen = new Map(bestand.listen.map((l) => [l.id, l]))
+  for (const l of neu.listen) {
+    const alt = listen.get(l.id)
+    if (!alt || l.geaendert > alt.geaendert) listen.set(l.id, l)
+  }
+  return { werke: [...werke.values()], verlage: [...verlage.values()], listen: [...listen.values()] }
 }
 
 /** CSL-JSON für Zotero, Pandoc und Co. Eine Zeile pro Auflage, weil CSL kein Werk mit Ausgaben und Auflagen kennt. */

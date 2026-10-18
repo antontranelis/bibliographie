@@ -1,5 +1,7 @@
 // Datenmodell: ein Werk durch alle Ausgaben und deren Auflagen hindurch.
 
+import type { Stil } from './format'
+
 export type Status = 'vorlaeufig' | 'fest'
 
 export type TextArt =
@@ -199,10 +201,54 @@ export interface Verlag {
   schreibweisen: string[]
 }
 
+/** Welche Karten eine Liste von selbst aufnimmt. Leere Person und leeres Schlagwort heißen: alle. */
+export interface ListenRegel {
+  /** Schlüssel „Nachname|Vorname“ */
+  person: string
+  schlagwort: string
+  nurPrimaer: boolean
+  nurFest: boolean
+}
+
+export interface Kapitel {
+  id: string
+  titel: string
+  ebene: 1 | 2
+}
+
+/** Eine von Hand aufgenommene oder in ein Kapitel gelegte Karte. */
+export interface ListenEintrag {
+  werkId: string
+  /** Leer = vor dem ersten Kapitel */
+  kapitelId: string
+}
+
+/** Gespeicherte Literaturliste. Sie verweist auf Karten und druckt immer deren aktuellen Stand. */
+export interface Literaturliste {
+  id: string
+  name: string
+  /** Null = nur von Hand aufgenommene Karten */
+  regel: ListenRegel | null
+  kapitel: Kapitel[]
+  /** Reihenfolge zählt bei der Sortierung „von Hand“ */
+  eintraege: ListenEintrag[]
+  /** Karten, die nicht gedruckt werden, obwohl Regel oder Eintrag sie aufnehmen */
+  ausgenommen: string[]
+  stil: Stil
+  sortierung: 'name' | 'jahr' | 'hand'
+  /** Ein Werk erscheint unter jeder seiner Personen, nicht nur unter der ersten */
+  jedePerson: boolean
+  angelegt: string
+  geaendert: string
+}
+
 export interface Datenstamm {
   werke: Werk[]
   verlage: Verlag[]
+  listen: Literaturliste[]
 }
+
+export const personSchluessel = (p: { nachname: string; vorname: string }) => `${p.nachname.trim()}|${p.vorname.trim()}`
 
 export const neueId = () =>
   Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)

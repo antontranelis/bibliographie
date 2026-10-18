@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Druckzeile } from './Druckzeile'
-import { druckzeileTeile, sortiere, STANDARD_STIL, type Stil, type Teil } from './format'
-import type { Werk } from './model'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Druckzeile, kopiereZeile } from './Druckzeile'
+import { druckzeileTeile, type Stil, type Teil } from './format'
+import { ALLE, abschnitte, entferne, kapitelEntfernen, rueckeUm, umschalten, verschiebe, type Abschnitt } from './listen'
+import { neueId, personSchluessel, type Kapitel, type Literaturliste, type Werk } from './model'
 import { herunterladen } from './herunterladen'
-import { personSchluessel, type ListenVorgabe } from './Kartei'
 import { Blatt } from './Symbole'
 
 const personLabel = (schluessel: string) => {
@@ -11,6 +11,14 @@ const personLabel = (schluessel: string) => {
   return v ? `${n}, ${v}` : n
 }
 const ERSTE_ZEILEN = 60
+
+/** Ein Abschnitt, wie er aufs Papier kommt: Überschrift mit Nummer und die gedruckten Zeilen. */
+export interface Druckabschnitt {
+  ueberschrift: string
+  /** 0 = vor dem ersten Kapitel, ohne Überschrift */
+  ebene: 0 | 1 | 2
+  zeilen: Teil[][]
+}
 
 function Wahl<T extends string>({ label, wert, optionen, onWahl }: { label: string; wert: T; optionen: [T, string][]; onWahl: (w: T) => void }) {
   return (
@@ -27,23 +35,31 @@ function Wahl<T extends string>({ label, wert, optionen, onWahl }: { label: stri
   )
 }
 
-export function Liste({ werke, vorgabe }: { werke: Werk[]; vorgabe: ListenVorgabe }) {
-  const [stil, setStil] = useState<Stil>(STANDARD_STIL)
-  const [sortierung, setSortierung] = useState<'name' | 'jahr'>('name')
-  const [person, setPerson] = useState(vorgabe.person ?? '')
-  const [schlagwort, setSchlagwort] = useState(vorgabe.schlagwort ?? '')
-  const [nurPrimaer, setNurPrimaer] = useState(false)
-  const [nurFest, setNurFest] = useState(false)
-  const [ausgenommen, setAusgenommen] = useState<Set<string>>(new Set())
+export function Liste({
+  werke,
+  listen,
+  liste,
+  onAendern,
+  onWaehlen,
+  onNeu,
+  onLoeschen,
+}: {
+  werke: Werk[]
+  listen: Literaturliste[]
+  liste: Literaturliste
+  onAendern: (l: Literaturliste) => void
+  onWaehlen: (id: string) => void
+  onNeu: () => void
+  onLoeschen: (id: string) => void
+}) {
   const [alleZeigen, setAlleZeigen] = useState(false)
   const [vorschau, setVorschau] = useState(false)
-  const [ueberschrift, setUeberschrift] = useState(() => {
-    if (vorgabe.person) {
-      const [n, v] = vorgabe.person.split('|')
-      return [v, n].filter(Boolean).join(' ')
-    }
-    return vorgabe.schlagwort ?? 'Literaturliste'
-  })
+  const [kopiert, setKopiert] = useState('')
+  const aendere = (teil: Partial<Literaturliste>) => onAendern({ ...liste, ...teil, geaendert: new Date().toISOString() })
+  const stil = liste.stil
+  const setStil = (s: Stil) => aendere({ stil: s })
+  const regel = liste.regel
+  const setzeRegel = (teil: Partial<typeof ALLE>) => aendere({ regel: { ...(regel ?? ALLE), ...teil } })
 
   const personen = useMemo(
     () =>
@@ -57,107 +73,183 @@ export function Liste({ werke, vorgabe }: { werke: Werk[]; vorgabe: ListenVorgab
     [werke],
   )
 
-  const passend = useMemo(
-    () =>
-      sortiere(
-        werke.filter(
-          (w) =>
-            (!nurFest || w.status === 'fest') &&
-            (!person || w.personen.some((p) => personSchluessel(p) === person)) &&
-            (!schlagwort || w.schlagwoerter.some((s) => s.begriff === schlagwort && (!nurPrimaer || s.primaer))),
-        ),
-        sortierung,
-      ),
-    [werke, nurFest, person, schlagwort, nurPrimaer, sortierung],
-  )
-  const aufgenommen = passend.filter((w) => !ausgenommen.has(w.id))
-  const zeilen = aufgenommen.map((w) => druckzeileTeile(w, stil))
-  const herausgenommen = passend.length - aufgenommen.length
-  const vorlaeufig = aufgenommen.filter((w) => w.status === 'vorlaeufig').length
-  const gezeigt = alleZeigen ? passend : passend.slice(0, ERSTE_ZEILEN)
+  const teile = useMemo(() => abschnitte(liste, werke), [liste, werke])
+  const alleZeilen = teile.flatMap((a) => a.zeilen)
+  const gedruckt = alleZeilen.filter((z) => z.drin)
+  const herausgenommen = alleZeilen.length - gedruckt.length
+  const vorlaeufig = gedruckt.filter((z) => z.werk.status === 'vorlaeufig').length
+  const druck: Druckabschnitt[] = teile
+    .map((a) => ({
+      ueberschrift: a.kapitel ? `${a.nummer} ${a.kapitel.titel}`.trim() : '',
+      ebene: (a.kapitel?.ebene ?? 0) as Druckabschnitt['ebene'],
+      zeilen: a.zeilen.filter((z) => z.drin).map((z) => druckzeileTeile(z.werk, stil)),
+    }))
+    .filter((a) => a.ueberschrift || a.zeilen.length)
+  const anzahl = gedruckt.length
 
-  const umschalten = (id: string) => {
-    const neu = new Set(ausgenommen)
-    if (neu.has(id)) neu.delete(id)
-    else neu.add(id)
-    setAusgenommen(neu)
-  }
   const speichern = async () => {
     const { wordDatei } = await import('./word')
-    herunterladen(await wordDatei(ueberschrift, zeilen), `${ueberschrift.trim() || 'Literaturliste'}.docx`)
+    herunterladen(await wordDatei(liste.name, druck), `${liste.name.trim() || 'Literaturliste'}.docx`)
   }
+  const neuesKapitel = (ebene: 1 | 2) => aendere({ kapitel: [...liste.kapitel, { id: neueId(), titel: '', ebene }] })
+  const setzeKapitel = (id: string, teil: Partial<Kapitel>) => aendere({ kapitel: liste.kapitel.map((k) => (k.id === id ? { ...k, ...teil } : k)) })
+  const kopiere = async (schluessel: string, z: Teil[]) => {
+    await kopiereZeile(z)
+    setKopiert(schluessel)
+    setTimeout(() => setKopiert((k) => (k === schluessel ? '' : k)), 2000)
+  }
+
+  // Lange Listen: zuerst nur die ersten Zeilen zeigen, Kapitelüberschriften immer
+  let gezeigt = 0
+  const zeigen = () => alleZeigen || gezeigt++ < ERSTE_ZEILEN
 
   return (
     <div className="liste">
       <section className="liste-haupt" aria-label="Auswahl">
+        <div className="listen-wahl">
+          <label className="bedingung gesetzt">
+            <span>Liste</span>
+            <select value={liste.id} onChange={(e) => onWaehlen(e.target.value)}>
+              {listen.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name.trim() || 'ohne Namen'}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="textknopf" onClick={onNeu}>
+            + Neue Liste
+          </button>
+          <button
+            type="button"
+            className="textknopf leise rechts"
+            onClick={() => confirm(`Liste „${liste.name || 'ohne Namen'}“ löschen? Die Karten bleiben erhalten.`) && onLoeschen(liste.id)}
+          >
+            Liste löschen
+          </button>
+        </div>
         <label className="unsichtbar" htmlFor="listen-name">
           Überschrift der Liste
         </label>
-        <input id="listen-name" className="listen-name" value={ueberschrift} onChange={(e) => setUeberschrift(e.target.value)} />
+        <input id="listen-name" className="listen-name" value={liste.name} placeholder="Überschrift der Liste" onChange={(e) => aendere({ name: e.target.value })} />
 
         <div className="papier bedingungen-kasten">
           <span className="lab">Welche Karten</span>
-          <div className="bedingungen">
-            <label className={`bedingung ${person ? 'gesetzt' : ''}`}>
-              <span>Person</span>
-              <select value={person} onChange={(e) => setPerson(e.target.value)}>
-                <option value="">alle Personen</option>
-                {personen.map((p) => (
-                  <option key={p} value={p}>
-                    {personLabel(p)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <span className="leise">und</span>
-            <label className={`bedingung ${schlagwort ? 'gesetzt' : ''}`}>
-              <span>Schlagwort</span>
-              <select value={schlagwort} onChange={(e) => setSchlagwort(e.target.value)}>
-                <option value="">alle Schlagwörter</option>
-                {schlagwoerter.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            </label>
-            {schlagwort && (
-              <label className="pille">
-                <input type="checkbox" checked={nurPrimaer} onChange={(e) => setNurPrimaer(e.target.checked)} /> nur primär
+          <label className="haken">
+            <input type="checkbox" checked={regel !== null} onChange={(e) => aendere({ regel: e.target.checked ? { ...ALLE } : null })} /> Karten nach Person oder Schlagwort von
+            selbst aufnehmen
+          </label>
+          {regel && (
+            <div className="bedingungen">
+              <label className={`bedingung ${regel.person ? 'gesetzt' : ''}`}>
+                <span>Person</span>
+                <select value={regel.person} onChange={(e) => setzeRegel({ person: e.target.value })}>
+                  <option value="">alle Personen</option>
+                  {personen.map((p) => (
+                    <option key={p} value={p}>
+                      {personLabel(p)}
+                    </option>
+                  ))}
+                </select>
               </label>
-            )}
-            <label className="pille">
-              <input type="checkbox" checked={nurFest} onChange={(e) => setNurFest(e.target.checked)} /> nur fest angelegte
-            </label>
-          </div>
+              <span className="leise">und</span>
+              <label className={`bedingung ${regel.schlagwort ? 'gesetzt' : ''}`}>
+                <span>Schlagwort</span>
+                <select value={regel.schlagwort} onChange={(e) => setzeRegel({ schlagwort: e.target.value })}>
+                  <option value="">alle Schlagwörter</option>
+                  {schlagwoerter.map((s) => (
+                    <option key={s}>{s}</option>
+                  ))}
+                </select>
+              </label>
+              {regel.schlagwort && (
+                <label className="pille">
+                  <input type="checkbox" checked={regel.nurPrimaer} onChange={(e) => setzeRegel({ nurPrimaer: e.target.checked })} /> nur primär
+                </label>
+              )}
+              <label className="pille">
+                <input type="checkbox" checked={regel.nurFest} onChange={(e) => setzeRegel({ nurFest: e.target.checked })} /> nur fest angelegte
+              </label>
+            </div>
+          )}
           <p className="zaehler">
-            {passend.length} {passend.length === 1 ? 'Karte passt' : 'Karten passen'}
-            {herausgenommen > 0 && ` · ${herausgenommen} von Hand herausgenommen`}
+            {alleZeilen.length} {alleZeilen.length === 1 ? 'Eintrag' : 'Einträge'}
+            {herausgenommen > 0 && ` · ${herausgenommen} herausgenommen`}
             {vorlaeufig > 0 && <span className="warnfarbe"> · {vorlaeufig} noch vorläufig</span>}
+            {!regel && ' · Karten kommen über „In Liste aufnehmen“ auf der Karte hinzu'}
           </p>
         </div>
 
         <div className="papier eintraege">
           <div className="eintraege-kopf">
             <span className="lab">Einträge, wie sie gedruckt werden</span>
-            <span className="leise klein rechts">Haken entfernen = nicht in die Liste</span>
+            <span className="leise klein rechts">Haken entfernen = nicht drucken</span>
           </div>
-          {passend.length === 0 && <p className="leise">Keine Karte passt zur Auswahl.</p>}
-          {gezeigt.map((w) => {
-            const drin = !ausgenommen.has(w.id)
-            return (
-              <label key={w.id} className={`eintrag ${drin ? '' : 'heraus'}`}>
-                <input type="checkbox" checked={drin} onChange={() => umschalten(w.id)} />
-                <span>
-                  <Druckzeile teile={druckzeileTeile(w, stil)} />
-                  {w.status === 'vorlaeufig' && <span className="marke-vorlaeufig">vorläufig</span>}
-                </span>
-              </label>
-            )
-          })}
-          {!alleZeigen && passend.length > ERSTE_ZEILEN && (
+          {teile.map((a) => (
+            <Fragment key={a.kapitel?.id ?? 'vorn'}>
+              {a.kapitel && <KapitelKopf abschnitt={a} onAendern={(teil) => setzeKapitel(a.kapitel!.id, teil)} onEntfernen={() => onAendern(kapitelEntfernen(liste, a.kapitel!.id))} />}
+              {a.zeilen.length === 0 && !a.kapitel && liste.kapitel.length === 0 && <p className="leise">Noch keine Karte in dieser Liste.</p>}
+              {a.zeilen.filter(zeigen).map((z) => {
+                const zeile = druckzeileTeile(z.werk, stil)
+                return (
+                  <div key={z.schluessel} className={`eintrag ${z.drin ? '' : 'heraus'}`}>
+                    <input type="checkbox" checked={z.drin} aria-label={`${z.werk.titel || 'ohne Titel'} drucken`} onChange={() => onAendern(umschalten(liste, z.werk.id))} />
+                    <span>
+                      <Druckzeile teile={zeile} />
+                      {z.werk.status === 'vorlaeufig' && <span className="marke-vorlaeufig">vorläufig</span>}
+                    </span>
+                    <span className="eintrag-knoepfe">
+                      {liste.kapitel.length > 0 && (
+                        <select aria-label="Kapitel" value={a.kapitel?.id ?? ''} onChange={(e) => onAendern(verschiebe(liste, z.werk.id, e.target.value))}>
+                          <option value="">vor den Kapiteln</option>
+                          {teile
+                            .filter((x) => x.kapitel)
+                            .map((x) => (
+                              <option key={x.kapitel!.id} value={x.kapitel!.id}>
+                                {x.nummer} {x.kapitel!.titel}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                      {liste.sortierung === 'hand' && z.vonHand && (
+                        <>
+                          <button type="button" className="klein-knopf" aria-label="nach oben" onClick={() => onAendern(rueckeUm(liste, z.werk.id, -1))}>
+                            ↑
+                          </button>
+                          <button type="button" className="klein-knopf" aria-label="nach unten" onClick={() => onAendern(rueckeUm(liste, z.werk.id, 1))}>
+                            ↓
+                          </button>
+                        </>
+                      )}
+                      <button type="button" className="klein-knopf" onClick={() => kopiere(z.schluessel, zeile)}>
+                        {kopiert === z.schluessel ? 'kopiert' : 'kopieren'}
+                      </button>
+                      {z.vonHand && (
+                        <button type="button" className="klein-knopf" aria-label="aus der Liste nehmen" title="Von Hand aufgenommen: aus der Liste nehmen" onClick={() => onAendern(entferne(liste, z.werk.id))}>
+                          ×
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                )
+              })}
+            </Fragment>
+          ))}
+          {!alleZeigen && alleZeilen.length > ERSTE_ZEILEN && (
             <button type="button" className="textknopf" onClick={() => setAlleZeigen(true)}>
-              {passend.length - ERSTE_ZEILEN} weitere Einträge
+              {alleZeilen.length - ERSTE_ZEILEN} weitere Einträge
             </button>
           )}
+          <div className="knopfreihe kapitel-knoepfe">
+            <button type="button" className="textknopf" onClick={() => neuesKapitel(1)}>
+              + Kapitel
+            </button>
+            {liste.kapitel.length > 0 && (
+              <button type="button" className="textknopf" onClick={() => neuesKapitel(2)}>
+                + Unterkapitel
+              </button>
+            )}
+          </div>
         </div>
       </section>
 
@@ -237,47 +329,83 @@ export function Liste({ werke, vorgabe }: { werke: Werk[]; vorgabe: ListenVorgab
           <div className="trennlinie" />
           <Wahl
             label="Sortieren nach"
-            wert={sortierung}
+            wert={liste.sortierung}
             optionen={[
-              ['name', 'Name, dann Jahr'],
-              ['jahr', 'Jahr, dann Name'],
+              ['name', 'Name, Jahr'],
+              ['jahr', 'Jahr, Name'],
+              ['hand', 'von Hand'],
             ]}
-            onWahl={setSortierung}
+            onWahl={(sortierung) => aendere({ sortierung })}
           />
+          {liste.sortierung !== 'hand' && (
+            <label className="haken">
+              <input type="checkbox" checked={liste.jedePerson} onChange={(e) => aendere({ jedePerson: e.target.checked })} /> Werk bei jeder seiner Personen nennen
+            </label>
+          )}
         </div>
 
         <div className="papier kasten-innen">
           <h2>Fertig?</h2>
-          <button type="button" className="knopf" disabled={zeilen.length === 0} onClick={() => setVorschau(true)}>
+          <button type="button" className="knopf" disabled={anzahl === 0} onClick={() => setVorschau(true)}>
             <Blatt /> Blattvorschau ansehen
           </button>
-          <button type="button" className="knopf haupt" disabled={zeilen.length === 0} onClick={speichern}>
+          <button type="button" className="knopf haupt" disabled={anzahl === 0} onClick={speichern}>
             Als Word-Datei speichern
           </button>
-          <button type="button" className="knopf" disabled={zeilen.length === 0} onClick={() => window.print()}>
+          <button type="button" className="knopf" disabled={anzahl === 0} onClick={() => window.print()}>
             Drucken
           </button>
           <span className="leise klein">
-            {zeilen.length} {zeilen.length === 1 ? 'Eintrag' : 'Einträge'}
+            {anzahl} {anzahl === 1 ? 'Eintrag' : 'Einträge'}
           </span>
         </div>
       </aside>
 
-      {vorschau && <Blattvorschau ueberschrift={ueberschrift} zeilen={zeilen} onSpeichern={speichern} onSchliessen={() => setVorschau(false)} />}
+      {vorschau && <Blattvorschau ueberschrift={liste.name} druck={druck} onSpeichern={speichern} onSchliessen={() => setVorschau(false)} />}
 
       <div className="druckblatt" aria-hidden="true">
-        <h1>{ueberschrift}</h1>
-        {zeilen.map((z, i) => (
-          <p key={i}>
-            <Druckzeile teile={z} />
-          </p>
-        ))}
+        <Blattinhalt ueberschrift={liste.name} druck={druck} />
       </div>
     </div>
   )
 }
 
-function Blattvorschau({ ueberschrift, zeilen, onSpeichern, onSchliessen }: { ueberschrift: string; zeilen: Teil[][]; onSpeichern: () => void; onSchliessen: () => void }) {
+function KapitelKopf({ abschnitt, onAendern, onEntfernen }: { abschnitt: Abschnitt; onAendern: (t: Partial<Kapitel>) => void; onEntfernen: () => void }) {
+  const k = abschnitt.kapitel!
+  return (
+    <div className={`kapitel-kopf ebene-${k.ebene}`}>
+      <span className="kapitel-nr">{abschnitt.nummer}</span>
+      <input className="eingabe serif" aria-label={`Kapitel ${abschnitt.nummer}`} value={k.titel} placeholder="Kapitelüberschrift" onChange={(e) => onAendern({ titel: e.target.value })} />
+      <button type="button" className="klein-knopf" onClick={() => onAendern({ ebene: k.ebene === 1 ? 2 : 1 })}>
+        {k.ebene === 1 ? 'als Unterkapitel' : 'als Kapitel'}
+      </button>
+      <button type="button" className="klein-knopf" onClick={onEntfernen}>
+        Kapitel entfernen
+      </button>
+    </div>
+  )
+}
+
+function Blattinhalt({ ueberschrift, druck }: { ueberschrift: string; druck: Druckabschnitt[] }) {
+  return (
+    <>
+      <h1>{ueberschrift}</h1>
+      {druck.map((a, i) => (
+        <Fragment key={i}>
+          {a.ebene === 1 && <h2>{a.ueberschrift}</h2>}
+          {a.ebene === 2 && <h3>{a.ueberschrift}</h3>}
+          {a.zeilen.map((z, j) => (
+            <p key={j}>
+              <Druckzeile teile={z} />
+            </p>
+          ))}
+        </Fragment>
+      ))}
+    </>
+  )
+}
+
+function Blattvorschau({ ueberschrift, druck, onSpeichern, onSchliessen }: { ueberschrift: string; druck: Druckabschnitt[]; onSpeichern: () => void; onSchliessen: () => void }) {
   const schliessen = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     schliessen.current?.focus()
@@ -303,12 +431,7 @@ function Blattvorschau({ ueberschrift, zeilen, onSpeichern, onSchliessen }: { ue
         </span>
       </div>
       <div className="blatt">
-        <h1>{ueberschrift}</h1>
-        {zeilen.map((z, i) => (
-          <p key={i}>
-            <Druckzeile teile={z} />
-          </p>
-        ))}
+        <Blattinhalt ueberschrift={ueberschrift} druck={druck} />
       </div>
     </div>
   )

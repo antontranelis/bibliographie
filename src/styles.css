@@ -416,12 +416,25 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
 .eintraege { padding: 8px 22px 14px; }
 .eintraege-kopf { display: flex; align-items: baseline; gap: 12px; padding: 10px 0 6px; border-bottom: 1px solid var(--linie); }
 .eintraege-kopf .lab { margin: 0; }
-.eintrag { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--zart); font: 400 16px/1.5 var(--serif); cursor: pointer; }
+.eintrag { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--zart); font: 400 16px/1.5 var(--serif); }
+.eintrag-knoepfe { display: flex; gap: 6px; align-items: flex-start; opacity: 0.35; transition: opacity 0.15s; }
+.eintrag:hover .eintrag-knoepfe, .eintrag:focus-within .eintrag-knoepfe { opacity: 1; }
+.eintrag-knoepfe select { font: 500 13px/1 var(--sans); max-width: 170px; border: 1px solid var(--linie2); border-radius: 5px; background: #fff; padding: 5px 4px; }
+.eintrag-knoepfe .klein-knopf { border-color: var(--linie2); padding: 5px 8px; }
+.listen-wahl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.kapitel-kopf { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 18px 0 8px; border-bottom: 1px solid var(--linie); }
+.kapitel-kopf .eingabe { flex: 1 1 260px; font-size: 19px; font-weight: 600; }
+.kapitel-kopf.ebene-2 { padding-left: 20px; }
+.kapitel-kopf.ebene-2 .eingabe { font-size: 17px; }
+.kapitel-nr { font: 600 17px/1 var(--serif); color: var(--lab); min-width: 28px; }
+.kapitel-knoepfe { padding-top: 12px; }
+.zeile-knoepfe { margin-top: 8px; }
+.klein-wahl { font: 600 13px/1 var(--sans); border: 1px solid var(--linie2); background: #fff; border-radius: 5px; padding: 6px 8px; }
 .eintrag input { margin-top: 6px; align-self: start; width: 16px; height: 16px; }
 .fett { font-weight: 700; }
 .halbfett { font-weight: 600; }
 .kursiv { font-style: italic; }
-.eintrag.heraus span { color: var(--blass); text-decoration: line-through; }
+.eintrag.heraus > span:first-of-type { color: var(--blass); text-decoration: line-through; }
 .marke-vorlaeufig { margin-left: 8px; font: 600 12px/1 var(--sans); color: var(--ocker); background: var(--ocker-hell); border-radius: 4px; padding: 3px 6px; vertical-align: 2px; text-decoration: none; display: inline-block; }
 .liste-seite { flex: 1 1 340px; max-width: 400px; display: flex; flex-direction: column; gap: 18px; }
 .liste-seite h2 { font: 600 17px/1.2 var(--sans); }
@@ -441,6 +454,8 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
   font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.4; color: #000;
 }
 .blatt h1, .druckblatt h1 { font: bold 15pt 'Times New Roman', Times, serif; text-align: center; margin: 0 0 18pt; }
+.blatt h2, .druckblatt h2 { font: bold 13pt 'Times New Roman', Times, serif; margin: 14pt 0 6pt; }
+.blatt h3, .druckblatt h3 { font: bold 12pt 'Times New Roman', Times, serif; margin: 10pt 0 6pt; }
 .blatt p, .druckblatt p { margin: 0 0 6pt; padding-left: 1cm; text-indent: -1cm; }
 .druckblatt { display: none; }
 
@@ -480,6 +495,8 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
   .detail-raster, .ei-raster { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ei-raster .breit { grid-column: span 2; }
   .mitwirkende .ausgabe-zeile { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .eintrag { grid-template-columns: 28px minmax(0, 1fr); }
+  .eintrag-knoepfe { grid-column: 2; flex-wrap: wrap; opacity: 1; }
   .erfassen-seite, .kartei-seite, .liste-seite { max-width: none; position: static; }
   .register button { width: 32px; }
   .vorschlag { flex-wrap: wrap; }
