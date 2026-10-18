@@ -1,7 +1,7 @@
-import { neueId, type Datenstamm, type Verlag, type Werk } from './model'
+import { leereAusgabe, neueId, type Auflage, type Ausgabe, type Datenstamm, type Verlag, type Werk } from './model'
 
 export const FORMAT = 'bibliographie-datenstamm'
-export const VERSION = 2
+export const VERSION = 3
 
 export interface Exportdatei extends Datenstamm {
   format: typeof FORMAT
@@ -29,8 +29,9 @@ export function importiere(text: string): Datenstamm {
 }
 
 /**
- * Bringt Daten auf den Stand von Version 2. Version 1 kannte pro Verlag nur einen Namen,
- * und Auflagen verwiesen über den Namenstext auf ihn.
+ * Bringt Daten auf den Stand von Version 3. Version 1 kannte pro Verlag nur einen Namen,
+ * und Auflagen verwiesen über den Namenstext auf ihn. Bis Version 2 hingen die Auflagen direkt am Werk;
+ * sie werden zur ersten Ausgabe.
  */
 export function migriere(d: Datenstamm): Datenstamm {
   const verlage: Verlag[] = d.verlage.map((v) => {
@@ -44,17 +45,22 @@ export function migriere(d: Datenstamm): Datenstamm {
     }
   })
   const nachName = new Map(verlage.map((v) => [v.namen[0]?.name.trim().toLowerCase(), v.id]))
-  const werke = d.werke.map((w) => ({
-    ...w,
-    anmerkung: w.anmerkung ?? '',
-    ...(w.erschienenIn ? { erschienenIn: { ...w.erschienenIn, ausgabe: w.erschienenIn.ausgabe ?? '' } } : {}),
-    auflagen: w.auflagen.map((a) => ({
-      ...a,
-      isbn: a.isbn ?? '',
-      verlagId: a.verlagId ?? nachName.get(a.verlag.trim().toLowerCase()),
-    })),
-  }))
-  for (const w of werke) for (const a of w.auflagen) if (a.verlagId === undefined) delete a.verlagId
+  const auflage = (a: Auflage): Auflage => {
+    const neu = { ...a, isbn: a.isbn ?? '', bearbeitung: a.bearbeitung ?? '', verlagId: a.verlagId ?? nachName.get(a.verlag.trim().toLowerCase()) }
+    if (neu.verlagId === undefined) delete neu.verlagId
+    return neu
+  }
+  const werke = d.werke.map((w): Werk => {
+    const { auflagen, ...rest } = w as Werk & { auflagen?: Auflage[] }
+    const ausgaben: Ausgabe[] = rest.ausgaben ?? [{ ...leereAusgabe(), auflagen: auflagen ?? [] }]
+    return {
+      ...rest,
+      anmerkung: rest.anmerkung ?? '',
+      ersterscheinung: rest.ersterscheinung ?? '',
+      ...(rest.erschienenIn ? { erschienenIn: { ...rest.erschienenIn, ausgabe: rest.erschienenIn.ausgabe ?? '' } } : {}),
+      ausgaben: ausgaben.map((a) => ({ ...leereAusgabe(), ...a, auflagen: a.auflagen.map(auflage) })),
+    }
+  })
   return { werke, verlage }
 }
 
@@ -70,7 +76,7 @@ export function zusammenfuehren(bestand: Datenstamm, neu: Datenstamm): Datenstam
   return { werke: [...werke.values()], verlage: [...verlage.values()] }
 }
 
-/** CSL-JSON für Zotero, Pandoc und Co. Eine Zeile pro Auflage, weil CSL kein Werk mit Auflagen kennt. */
+/** CSL-JSON für Zotero, Pandoc und Co. Eine Zeile pro Auflage, weil CSL kein Werk mit Ausgaben und Auflagen kennt. */
 export function exportiereCsl(werke: Werk[]): string {
   type CslItem = Record<string, unknown>
   const items = werke.flatMap((w): CslItem[] => {
@@ -95,10 +101,11 @@ export function exportiereCsl(werke: Werk[]): string {
         },
       ]
     }
-    return w.auflagen.map((a, i) => ({
-      id: w.auflagen.length > 1 ? `${w.id}-${i + 1}` : w.id,
+    const auflagen = w.ausgaben.flatMap((ausgabe) => ausgabe.auflagen.map((a) => ({ a, ausgabe })))
+    return auflagen.map(({ a, ausgabe }, i) => ({
+      id: auflagen.length > 1 ? `${w.id}-${i + 1}` : w.id,
       type: 'book',
-      title: titel,
+      title: ausgabe.titel.trim() ? (ausgabe.untertitel.trim() ? `${ausgabe.titel}. ${ausgabe.untertitel}` : ausgabe.titel) : titel,
       author: autoren.length ? autoren : undefined,
       editor: hrsg.length ? hrsg : undefined,
       publisher: a.verlag || undefined,

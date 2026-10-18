@@ -19,7 +19,7 @@ describe('zerlegeEintrag', () => {
     const e = zerlegeEintrag(laeufe)
     expect(e.status).toBe('erkannt')
     expect(e.werk?.titel).toBe('Der Künstler und die Erfüllung der Mysterien')
-    expect(e.werk?.auflagen[0]).toMatchObject({ ort: 'Dornach/Stuttgart', jahr: '1928' })
+    expect(e.werk?.ausgaben[0].auflagen[0]).toMatchObject({ ort: 'Dornach/Stuttgart', jahr: '1928' })
     expect(rueckprobe(e.werk!, laeufe).ergebnis).toBe('gleich')
   })
   it('Beitrag in einer Zeitschrift (Nr. 985)', () => {
@@ -47,7 +47,58 @@ describe('zerlegeEintrag', () => {
     expect(e.hinweis).toBe('Bitte prüfen.')
     expect(e.original).toBe('A B: T, Basel 1990')
   })
-  it('weitere Ausgaben nach Semikolon bleiben als Kette stehen', () => {
-    expect(zerlegeEintrag([n('A B: '), f('T'), n(', Basel 1990; 2. Aufl. 1995')]).status).toBe('kette')
+  it('weitere Auflagen mit Bearbeitung und Ortswechsel (Nr. 102)', () => {
+    const laeufe = [n('Ernst Iros: '), f('Wesen und Dramaturgie des Films'), n(', Zürich/Leipzig 1938; 2. erw. Aufl. Zürich 1957; 3. Aufl. ebenda 1962')]
+    const e = zerlegeEintrag(laeufe)
+    expect(e.status).toBe('erkannt')
+    expect(e.werk?.ausgaben).toHaveLength(1)
+    expect(e.werk?.ausgaben[0].auflagen.map((a) => [a.nummer, a.bearbeitung, a.ort, a.jahr, a.inListe])).toEqual([
+      ['', '', 'Zürich/Leipzig', '1938', true],
+      ['2', 'erw.', 'Zürich', '1957', true],
+      ['3', '', 'Zürich', '1962', true],
+    ])
+    expect(rueckprobe(e.werk!, laeufe).ergebnis).toBe('gleich')
+  })
+  it('Übersetzung mit fettem Titel (Nr. 510)', () => {
+    const laeufe = [
+      n('Neil Postman: '),
+      f('Amusing Ourselves to Death'),
+      n('. Public Discourse in the Age of Show Business, New York 1985; deutsche Ausgabe: '),
+      f('Wir amüsieren uns zu Tode'),
+      n('. Urteilsbildung im Zeitalter der Unterhaltungsindustrie, Frankfurt a.M. 1985'),
+    ]
+    const e = zerlegeEintrag(laeufe)
+    expect(e.status).toBe('erkannt')
+    expect(e.werk?.ausgaben[1]).toMatchObject({ art: 'uebersetzung', sprache: 'deutsch', bezeichnung: '', titel: 'Wir amüsieren uns zu Tode', untertitel: 'Urteilsbildung im Zeitalter der Unterhaltungsindustrie' })
+    expect(e.werk?.ausgaben[1].auflagen[0]).toMatchObject({ ort: 'Frankfurt a.M.', jahr: '1985' })
+    expect(rueckprobe(e.werk!, laeufe).ergebnis).toBe('gleich')
+  })
+  it('Ausgabeart ohne Titel, „ebd.“ übernimmt den Ort (Nr. 689)', () => {
+    const laeufe = [n('Walter Wüllenweber: '), f('Wir Fernsehkinder'), n('. Eine Generation ohne Programm, Reinbek bei Hamburg 1994; als Taschenbuch, ebd. 1996')]
+    const e = zerlegeEintrag(laeufe)
+    expect(e.status).toBe('erkannt')
+    expect(e.werk?.ausgaben[1]).toMatchObject({ art: 'taschenbuch', bezeichnung: '' })
+    expect(rueckprobe(e.werk!, laeufe).gedruckt).toBe('Walter Wüllenweber: Wir Fernsehkinder. Eine Generation ohne Programm, Reinbek bei Hamburg 1994; als Taschenbuch 1996')
+    expect(e.werk?.ausgaben[1].auflagen[0]).toMatchObject({ ort: 'Reinbek bei Hamburg', jahr: '1996' })
+    expect(rueckprobe(e.werk!, laeufe).ergebnis).toBe('gleich')
+  })
+  it('Titeländerung bleibt in der Bezeichnung (Nr. 1576)', () => {
+    const laeufe = [
+      n('Dorothy Stein: '),
+      f('Ada. A Life and a Legacy'),
+      n(', Cambridge/MA 1985; deutsche Ausgabe: '),
+      f('Ada. Die Braut der Wissenschaft'),
+      n(', Berlin 1999; 2. Aufl. als: '),
+      f('Ada Augusta Lovelace. Eine Frau am Anfang der Moderne'),
+      n(', ebenda 2004'),
+    ]
+    const e = zerlegeEintrag(laeufe)
+    expect(e.status).toBe('erkannt')
+    expect(e.werk?.ausgaben[2]).toMatchObject({ art: 'neuausgabe', bezeichnung: '2. Aufl. als', titel: 'Ada Augusta Lovelace. Eine Frau am Anfang der Moderne' })
+    expect(e.werk?.ausgaben[2].auflagen[0]).toMatchObject({ ort: 'Berlin', jahr: '2004' })
+    expect(rueckprobe(e.werk!, laeufe).ergebnis).toBe('gleich')
+  })
+  it('frei formulierte Kettenglieder bleiben als Kette stehen', () => {
+    expect(zerlegeEintrag([n('A B: '), f('T'), n(', Basel 1990; weitere Aufl.')]).status).toBe('kette')
   })
 })

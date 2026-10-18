@@ -1,4 +1,4 @@
-import { neueId, type Auflage, type Verlag, type Werk } from './model'
+import { alleAuflagen, mitAuflagen, neueId, type Auflage, type Verlag, type Werk } from './model'
 
 // Verlage: Namens- und Ortsgeschichte, Schreibweisen, Zuordnung von Auflagen.
 
@@ -180,7 +180,7 @@ export interface VerlagsGruppe {
 /** Ordnet die noch nicht verknüpften Verlagsnamen einer Karte: bekannt, ähnlich oder neu. */
 export function planeVerlage(werk: Werk, verlage: Verlag[]): VerlagsGruppe[] {
   const gruppen: VerlagsGruppe[] = []
-  for (const a of werk.auflagen) {
+  for (const a of alleAuflagen(werk)) {
     const text = a.verlag.trim()
     if (!text || (a.verlagId && verlage.some((v) => v.id === a.verlagId))) continue
     const exakt = findeExakt(verlage, text)
@@ -226,14 +226,14 @@ export function wendePlanAn(
       }
     }
     if (!ziel) {
-      ziel = verlagAus(g.texte, werk.auflagen.filter((a) => g.auflagen.includes(a.id)), liste)
+      ziel = verlagAus(g.texte, alleAuflagen(werk).filter((a) => g.auflagen.includes(a.id)), liste)
       liste = [...liste, ziel]
     }
     for (const id of g.auflagen) zuordnung.set(id, ziel.id)
   }
   if (zuordnung.size === 0) return { werk, verlage: liste }
   return {
-    werk: { ...werk, auflagen: werk.auflagen.map((a) => (zuordnung.has(a.id) ? { ...a, verlagId: zuordnung.get(a.id) } : a)) },
+    werk: mitAuflagen(werk, (a) => (zuordnung.has(a.id) ? { ...a, verlagId: zuordnung.get(a.id) } : a)),
     verlage: liste,
   }
 }

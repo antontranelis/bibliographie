@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { TEXT_ARTEN, leeresWerk, type Datenstamm, type ErschienenIn, type Person, type Schlagwort, type TextArt, type Verlag, type Werk } from './model'
+import { TEXT_ARTEN, alleAuflagen, leeresWerk, mitAuflagen, type Datenstamm, type ErschienenIn, type Person, type Schlagwort, type TextArt, type Verlag, type Werk } from './model'
 import { Karteikarte } from './Karteikarte'
 import { Kartei, LEERE_SICHT, type KarteiSicht, type ListenVorgabe } from './Kartei'
 import { Liste } from './Liste'
@@ -40,7 +40,7 @@ function mitFixierung(w: Werk, fixiert: Fixierung, verlage: Verlag[]): Werk {
   if (fixiert.schlagwoerter) neu.schlagwoerter = fixiert.schlagwoerter.map((s) => ({ ...s }))
   if (fixiert.verlag !== undefined) {
     const v = findeExakt(verlage, fixiert.verlag)
-    neu.auflagen = neu.auflagen.map((a) => ({
+    return mitAuflagen(neu, (a) => ({
       ...a,
       verlag: v ? nameFuerJahr(v, a.jahr) || fixiert.verlag! : fixiert.verlag ?? '',
       ...(v ? { verlagId: v.id } : {}),
@@ -61,7 +61,8 @@ const FELDNAMEN: Record<Inhaltsfeld, string> = {
   untertitel: 'Untertitel',
   reihe: 'Schriftenreihe',
   reiheBand: 'Band',
-  auflagen: 'Auflagen',
+  ausgaben: 'Ausgaben und Auflagen',
+  ersterscheinung: 'Ersterscheinung',
   erschienenIn: 'Erschienen in',
   kommentar: 'Rückseite',
   anmerkung: 'Anmerkung',
@@ -183,7 +184,7 @@ export default function App() {
     if (karte && frischId === karte.id && karte.status === 'vorlaeufig') {
       // Nur Suchangaben getippt: die Karte war bloß der Weg zum vorhandenen Werk und darf weg.
       // Alles Weitere wird nie still verworfen.
-      const weitere = vorlage?.id === karte.id ? eigeneAngaben(karte, vorlage, SUCHFELDER) : ['auflagen' as Inhaltsfeld]
+      const weitere = vorlage?.id === karte.id ? eigeneAngaben(karte, vorlage, SUCHFELDER) : ['ausgaben' as Inhaltsfeld]
       const verwerfen =
         weitere.length === 0 ||
         confirm(
@@ -217,7 +218,7 @@ export default function App() {
     const r = wendePlanAn(karte, daten.verlage, gruppen, () => derselbe)
     setDaten((d) => ({ ...d, verlage: r.verlage }))
     aendereKarte(r.werk)
-    const ziel = r.verlage.find((v) => v.id === r.werk.auflagen.find((a) => a.id === gruppen[0].auflagen[0])?.verlagId)
+    const ziel = r.verlage.find((v) => v.id === alleAuflagen(r.werk).find((a) => a.id === gruppen[0].auflagen[0])?.verlagId)
     if (gruppen.length > 1) setMeldung(`${gruppen.length} Verlage gemerkt.`)
     else if (ziel) setMeldung(derselbe ? `Schreibweise zu „${anzeigeName(ziel)}“ gemerkt.` : `Verlag „${anzeigeName(ziel)}“ gemerkt (Kürzel „${ziel.kuerzel}“).`)
   }

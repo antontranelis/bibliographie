@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { auflageLeer, eigeneAngaben, weichtAb } from './entwurf'
-import { leereAuflage, leeresWerk, type Werk } from './model'
+import { leereAuflage, leereAusgabe, leeresWerk, type Werk } from './model'
 
 function vorlageMitVerlag(): Werk {
   const w = leeresWerk()
   w.personen = [{ vorname: 'Rudolf', nachname: 'Steiner', rolle: 'autor' }]
-  w.auflagen = [{ ...leereAuflage(), verlag: 'Verlag am Goetheanum', ort: 'Dornach' }]
+  w.ausgaben[0].auflagen = [{ ...leereAuflage(), verlag: 'Verlag am Goetheanum', ort: 'Dornach' }]
   return w
 }
 
@@ -16,15 +16,18 @@ describe('weichtAb', () => {
   })
   it('ignoriert IDs und Zeitstempel', () => {
     const vorlage = vorlageMitVerlag()
-    const w = { ...structuredClone(vorlage), geaendert: '2030-01-01', auflagen: vorlage.auflagen.map((a) => ({ ...a, id: 'x' })) }
+    const w = { ...structuredClone(vorlage), geaendert: '2030-01-01', ausgaben: vorlage.ausgaben.map((x) => ({ ...x, id: 'y', auflagen: x.auflagen.map((a) => ({ ...a, id: 'x' })) })) }
     expect(weichtAb(w, vorlage)).toBe(false)
   })
   it.each<[string, (w: Werk) => void]>([
     ['nur ein Nachname', (w) => (w.personen[0].nachname = 'NurAutor')],
-    ['nur ein Verlag', (w) => (w.auflagen[0].verlag = 'Mein Verlag')],
-    ['nur ein Vermerk', (w) => (w.auflagen[0].vermerk = '20.–25. Tsd.')],
-    ['nur ein Druckjahr', (w) => (w.auflagen[0].gedrucktesJahr = '1894')],
-    ['nur eine ISBN', (w) => (w.auflagen[0].isbn = '3-7274-0040-5')],
+    ['nur ein Verlag', (w) => (w.ausgaben[0].auflagen[0].verlag = 'Mein Verlag')],
+    ['nur ein Vermerk', (w) => (w.ausgaben[0].auflagen[0].vermerk = '20.–25. Tsd.')],
+    ['nur ein Druckjahr', (w) => (w.ausgaben[0].auflagen[0].gedrucktesJahr = '1894')],
+    ['nur eine ISBN', (w) => (w.ausgaben[0].auflagen[0].isbn = '3-7274-0040-5')],
+    ['nur eine Bearbeitung', (w) => (w.ausgaben[0].auflagen[0].bearbeitung = 'erw.')],
+    ['nur eine weitere Ausgabe', (w) => w.ausgaben.push({ ...leereAusgabe('uebersetzung'), sprache: 'deutsch' })],
+    ['nur die Ersterscheinung', (w) => (w.ersterscheinung = '1890')],
     ['nur ein Schlagwort', (w) => w.schlagwoerter.push({ begriff: 'Ethik', primaer: true })],
     ['nur die Reihe', (w) => (w.reihe = 'Gesamtausgabe')],
     ['nur die Art', (w) => (w.art = 'aufsatz')],
@@ -54,8 +57,8 @@ describe('eigeneAngaben', () => {
     const vorlage = leeresWerk()
     const w = structuredClone(vorlage)
     w.titel = 'Philosophie der Freiheit'
-    w.auflagen[0].verlag = 'Mein eigens erfasster Verlag'
-    expect(eigeneAngaben(w, vorlage, ['personen', 'titel', 'untertitel'])).toEqual(['auflagen'])
+    w.ausgaben[0].auflagen[0].verlag = 'Mein eigens erfasster Verlag'
+    expect(eigeneAngaben(w, vorlage, ['personen', 'titel', 'untertitel'])).toEqual(['ausgaben'])
   })
 })
 
@@ -63,7 +66,7 @@ describe('auflageLeer', () => {
   it('ist leer ohne jede Angabe', () => {
     expect(auflageLeer(leereAuflage())).toBe(true)
   })
-  it.each(['verlag', 'ort', 'jahr', 'nummer', 'seiten', 'seitenRoemisch', 'gedrucktesJahr', 'erscheinungstag', 'vermerk', 'isbn'] as const)(
+  it.each(['verlag', 'ort', 'jahr', 'nummer', 'seiten', 'seitenRoemisch', 'gedrucktesJahr', 'erscheinungstag', 'bearbeitung', 'vermerk', 'isbn'] as const)(
     'ist nicht leer mit %s',
     (feld) => {
       expect(auflageLeer({ ...leereAuflage(), [feld]: 'x' })).toBe(false)

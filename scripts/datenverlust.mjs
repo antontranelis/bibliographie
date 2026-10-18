@@ -64,7 +64,7 @@ async function fall2(antwort) {
   await page.getByText('Zur Karte').first().click()
   await page.waitForTimeout(300)
   const nachher = await werke(page)
-  const verlagDa = nachher.some((x) => x.auflagen.some((a) => a.verlag === 'Mein eigens erfasster Verlag'))
+  const verlagDa = nachher.some((x) => x.ausgaben.flatMap((y) => y.auflagen).some((a) => a.verlag === 'Mein eigens erfasster Verlag'))
   await page.close()
   return { vorher, nachher: nachher.length, verlagDa, dialog }
 }

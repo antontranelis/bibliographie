@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { neueId, type Verlag, type Werk } from './model'
+import { alleAuflagen, neueId, type Verlag, type Werk } from './model'
 import { alleNamen, anzeigeName } from './verlag'
 
 interface Props {
@@ -15,7 +15,7 @@ export function Verlage({ verlage, werke, onAendern }: Props) {
 
   const verwendet = useMemo(() => {
     const zaehler = new Map<string, number>()
-    for (const w of werke) for (const a of w.auflagen) if (a.verlagId) zaehler.set(a.verlagId, (zaehler.get(a.verlagId) ?? 0) + 1)
+    for (const w of werke) for (const a of alleAuflagen(w)) if (a.verlagId) zaehler.set(a.verlagId, (zaehler.get(a.verlagId) ?? 0) + 1)
     return zaehler
   }, [werke])
 
