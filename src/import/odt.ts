@@ -28,14 +28,13 @@ interface Format {
 
 const attr = (tag: string, name: string) => tag.match(new RegExp(`${name}="([^"]*)"`))?.[1]
 
+const BENANNT: Record<string, string> = { lt: '<', gt: '>', quot: '"', apos: "'", amp: '&' }
+
+/** XML-Entities und Zeichenreferenzen in einem Durchgang, damit nichts doppelt dekodiert wird. */
 function dekodiere(s: string): string {
-  return s
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(parseInt(n, 10)))
-    .replace(/&amp;/g, '&')
+  return s.replace(/&(?:#x([\da-fA-F]+)|#(\d+)|(lt|gt|quot|apos|amp));/g, (_, hex?: string, dez?: string, name?: string) =>
+    name ? BENANNT[name] : String.fromCodePoint(hex ? parseInt(hex, 16) : parseInt(dez!, 10)),
+  )
 }
 
 /** Formatvorlagen aus content.xml und styles.xml: Name → Fett, Kursiv, Hintergrund. */
