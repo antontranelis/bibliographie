@@ -64,6 +64,7 @@ const FELDNAMEN: Record<Inhaltsfeld, string> = {
   auflagen: 'Auflagen',
   erschienenIn: 'Erschienen in',
   kommentar: 'Rückseite',
+  anmerkung: 'Anmerkung',
   schlagwoerter: 'Schlagwörter',
 }
 

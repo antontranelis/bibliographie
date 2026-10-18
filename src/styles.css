@@ -400,6 +400,9 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
 .eintraege-kopf .lab { margin: 0; }
 .eintrag { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--zart); font: 400 16px/1.5 var(--serif); cursor: pointer; }
 .eintrag input { margin-top: 6px; align-self: start; width: 16px; height: 16px; }
+.fett { font-weight: 700; }
+.halbfett { font-weight: 600; }
+.kursiv { font-style: italic; }
 .eintrag.heraus span { color: var(--blass); text-decoration: line-through; }
 .marke-vorlaeufig { margin-left: 8px; font: 600 12px/1 var(--sans); color: var(--ocker); background: var(--ocker-hell); border-radius: 4px; padding: 3px 6px; vertical-align: 2px; text-decoration: none; display: inline-block; }
 .liste-seite { flex: 1 1 340px; max-width: 400px; display: flex; flex-direction: column; gap: 18px; }

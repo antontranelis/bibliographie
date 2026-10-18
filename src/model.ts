@@ -67,6 +67,11 @@ export interface ErschienenIn {
   jahrgang: string
   jahr: string
   heft: string
+  /**
+   * Was nach dem Titel gedruckt wird, etwa „44/1927“, „, Bd. 62, 1957, Nr. 6“ oder „, hrsg. von …, Mainz 1996“.
+   * Beginnt sie mit Komma oder Punkt, schließt sie direkt an den Titel an, sonst mit Leerzeichen. Hat Vorrang vor Jahrgang/Heft.
+   */
+  ausgabe: string
   seitenVon: string
   seitenBis: string
 }
@@ -88,6 +93,8 @@ export interface Werk {
   auflagen: Auflage[]
   erschienenIn?: ErschienenIn
   kommentar: string
+  /** Anmerkung, die in der Liste kursiv mitgedruckt wird: „(Anm.: …)“; *Titel* darin steht aufrecht */
+  anmerkung: string
   schlagwoerter: Schlagwort[]
   angelegt: string
   geaendert: string
@@ -153,6 +160,7 @@ export function leeresWerk(): Werk {
     reiheBand: '',
     auflagen: [leereAuflage()],
     kommentar: '',
+    anmerkung: '',
     schlagwoerter: [],
     angelegt: jetzt,
     geaendert: jetzt,
@@ -160,5 +168,5 @@ export function leeresWerk(): Werk {
 }
 
 export function leeresErschienenIn(): ErschienenIn {
-  return { art: 'zeitschrift', titel: '', jahrgang: '', jahr: '', heft: '', seitenVon: '', seitenBis: '' }
+  return { art: 'zeitschrift', titel: '', jahrgang: '', jahr: '', heft: '', ausgabe: '', seitenVon: '', seitenBis: '' }
 }

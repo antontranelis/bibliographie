@@ -46,6 +46,8 @@ export function migriere(d: Datenstamm): Datenstamm {
   const nachName = new Map(verlage.map((v) => [v.namen[0]?.name.trim().toLowerCase(), v.id]))
   const werke = d.werke.map((w) => ({
     ...w,
+    anmerkung: w.anmerkung ?? '',
+    ...(w.erschienenIn ? { erschienenIn: { ...w.erschienenIn, ausgabe: w.erschienenIn.ausgabe ?? '' } } : {}),
     auflagen: w.auflagen.map((a) => ({
       ...a,
       isbn: a.isbn ?? '',

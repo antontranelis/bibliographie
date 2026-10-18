@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { druckzeile, sortiere, STANDARD_STIL, type Stil } from './format'
+import { Druckzeile } from './Druckzeile'
+import { druckzeileTeile, sortiere, STANDARD_STIL, type Stil, type Teil } from './format'
 import type { Werk } from './model'
 import { herunterladen } from './herunterladen'
 import { personSchluessel, type ListenVorgabe } from './Kartei'
@@ -70,7 +71,7 @@ export function Liste({ werke, vorgabe }: { werke: Werk[]; vorgabe: ListenVorgab
     [werke, nurFest, person, schlagwort, nurPrimaer, sortierung],
   )
   const aufgenommen = passend.filter((w) => !ausgenommen.has(w.id))
-  const zeilen = aufgenommen.map((w) => druckzeile(w, stil))
+  const zeilen = aufgenommen.map((w) => druckzeileTeile(w, stil))
   const herausgenommen = passend.length - aufgenommen.length
   const vorlaeufig = aufgenommen.filter((w) => w.status === 'vorlaeufig').length
   const gezeigt = alleZeigen ? passend : passend.slice(0, ERSTE_ZEILEN)
@@ -146,7 +147,7 @@ export function Liste({ werke, vorgabe }: { werke: Werk[]; vorgabe: ListenVorgab
               <label key={w.id} className={`eintrag ${drin ? '' : 'heraus'}`}>
                 <input type="checkbox" checked={drin} onChange={() => umschalten(w.id)} />
                 <span>
-                  {druckzeile(w, stil)}
+                  <Druckzeile teile={druckzeileTeile(w, stil)} />
                   {w.status === 'vorlaeufig' && <span className="marke-vorlaeufig">vorläufig</span>}
                 </span>
               </label>
@@ -174,6 +175,34 @@ export function Liste({ werke, vorgabe }: { werke: Werk[]; vorgabe: ListenVorgab
             onWahl={(namensfolge) => setStil({ ...stil, namensfolge })}
           />
           <Wahl
+            label="Mehrere Personen"
+            wert={stil.personenTrenner}
+            optionen={[
+              ['/', 'A/B'],
+              [' / ', 'A / B'],
+            ]}
+            onWahl={(personenTrenner) => setStil({ ...stil, personenTrenner })}
+          />
+          <Wahl
+            label="Titel"
+            wert={stil.titelAuszeichnung}
+            optionen={[
+              ['fett', 'fett'],
+              ['halbfett', 'halbfett'],
+              ['keine', 'normal'],
+            ]}
+            onWahl={(titelAuszeichnung) => setStil({ ...stil, titelAuszeichnung })}
+          />
+          <Wahl
+            label="Beiträge"
+            wert={stil.beitragsform}
+            optionen={[
+              ['klammer', '(in: …)'],
+              ['komma', ', in: …'],
+            ]}
+            onWahl={(beitragsform) => setStil({ ...stil, beitragsform })}
+          />
+          <Wahl
             label="Untertitel abtrennen mit"
             wert={stil.untertitelTrenner}
             optionen={[
@@ -197,6 +226,12 @@ export function Liste({ werke, vorgabe }: { werke: Werk[]; vorgabe: ListenVorgab
           </label>
           <label className="haken">
             <input type="checkbox" checked={stil.isbn} onChange={(e) => setStil({ ...stil, isbn: e.target.checked })} /> ISBN angeben
+          </label>
+          <label className="haken">
+            <input type="checkbox" checked={stil.anmerkungen} onChange={(e) => setStil({ ...stil, anmerkungen: e.target.checked })} /> Anmerkungen mitdrucken
+          </label>
+          <label className="haken">
+            <input type="checkbox" checked={stil.schlusspunkt} onChange={(e) => setStil({ ...stil, schlusspunkt: e.target.checked })} /> Punkt am Zeilenende
           </label>
           <div className="trennlinie" />
           <Wahl
@@ -232,14 +267,16 @@ export function Liste({ werke, vorgabe }: { werke: Werk[]; vorgabe: ListenVorgab
       <div className="druckblatt" aria-hidden="true">
         <h1>{ueberschrift}</h1>
         {zeilen.map((z, i) => (
-          <p key={i}>{z}</p>
+          <p key={i}>
+            <Druckzeile teile={z} />
+          </p>
         ))}
       </div>
     </div>
   )
 }
 
-function Blattvorschau({ ueberschrift, zeilen, onSpeichern, onSchliessen }: { ueberschrift: string; zeilen: string[]; onSpeichern: () => void; onSchliessen: () => void }) {
+function Blattvorschau({ ueberschrift, zeilen, onSpeichern, onSchliessen }: { ueberschrift: string; zeilen: Teil[][]; onSpeichern: () => void; onSchliessen: () => void }) {
   const schliessen = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     schliessen.current?.focus()
@@ -267,7 +304,9 @@ function Blattvorschau({ ueberschrift, zeilen, onSpeichern, onSchliessen }: { ue
       <div className="blatt">
         <h1>{ueberschrift}</h1>
         {zeilen.map((z, i) => (
-          <p key={i}>{z}</p>
+          <p key={i}>
+            <Druckzeile teile={z} />
+          </p>
         ))}
       </div>
     </div>

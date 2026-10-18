@@ -1,7 +1,8 @@
+import type { Teil } from './format'
 import { AlignmentType, Document, HeadingLevel, Packer, Paragraph, TextRun } from 'docx'
 
-/** Literaturliste als Word-Datei (.docx) mit hängendem Einzug. */
-export async function wordDatei(titel: string, zeilen: string[]): Promise<Blob> {
+/** Literaturliste als Word-Datei (.docx) mit hängendem Einzug; halbfett wird fett. */
+export async function wordDatei(titel: string, zeilen: Teil[][]): Promise<Blob> {
   const doc = new Document({
     styles: {
       default: { document: { run: { font: 'Times New Roman', size: 24 } } },
@@ -21,7 +22,7 @@ export async function wordDatei(titel: string, zeilen: string[]): Promise<Blob> 
                 indent: { left: 567, hanging: 567 },
                 spacing: { after: 120 },
                 alignment: AlignmentType.LEFT,
-                children: [new TextRun(z)],
+                children: z.map((t) => new TextRun({ text: t.text, bold: Boolean(t.auszeichnung), italics: t.kursiv })),
               }),
           ),
         ],

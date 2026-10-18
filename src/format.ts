@@ -1,15 +1,26 @@
-import type { Auflage, Person, Werk } from './model'
+import type { Auflage, ErschienenIn, Person, Werk } from './model'
 
 export interface Stil {
-  /** 'ort': Muster aus der Skizze; 'verlag': Variante mit Verlagsname */
+  /** 'ort': „Titel. Untertitel, Ort Jahr“; 'verlag': „Titel. Untertitel. Verlag, Ort Jahr“ */
   muster: 'ort' | 'verlag'
   namensfolge: 'vorname-name' | 'name-vorname'
   untertitelTrenner: '. ' | ' – ' | ': '
   auflagen: 'erste' | 'alle'
   seitenzahl: boolean
   isbn: boolean
+  /** Auszeichnung des Obertitels von Buch oder Aufsatz; Sammelbände folgen ihr, Zeitschriften stehen kursiv */
+  titelAuszeichnung: 'fett' | 'halbfett' | 'keine'
+  /** Zwischen mehreren Personen: „A/B“ oder „A / B“ */
+  personenTrenner: '/' | ' / '
+  /** Beiträge in Klammern „(in: …)“ oder mit Komma „, in: …“ */
+  beitragsform: 'klammer' | 'komma'
+  /** Punkt am Ende jeder Zeile */
+  schlusspunkt: boolean
+  /** Anmerkung für den Druck als „(Anm.: …)“ mitdrucken */
+  anmerkungen: boolean
 }
 
+/** Voreinstellung nach den Literaturlisten von Jens Göken. */
 export const STANDARD_STIL: Stil = {
   muster: 'ort',
   namensfolge: 'vorname-name',
@@ -17,6 +28,32 @@ export const STANDARD_STIL: Stil = {
   auflagen: 'erste',
   seitenzahl: false,
   isbn: false,
+  titelAuszeichnung: 'fett',
+  personenTrenner: '/',
+  beitragsform: 'klammer',
+  schlusspunkt: false,
+  anmerkungen: true,
+}
+
+/** Ein Stück der Druckzeile mit Auszeichnung. */
+export interface Teil {
+  text: string
+  auszeichnung?: 'fett' | 'halbfett'
+  kursiv?: boolean
+}
+
+const klar = (text: string): Teil => ({ text })
+
+/** Benachbarte Teile mit gleicher Auszeichnung zusammenfassen, leere entfernen. */
+export function verdichte(teile: Teil[]): Teil[] {
+  const aus: Teil[] = []
+  for (const t of teile) {
+    if (!t.text) continue
+    const letzter = aus[aus.length - 1]
+    if (letzter && letzter.auszeichnung === t.auszeichnung && Boolean(letzter.kursiv) === Boolean(t.kursiv)) letzter.text += t.text
+    else aus.push({ ...t })
+  }
+  return aus
 }
 
 function name(p: Person, folge: Stil['namensfolge']): string {
@@ -30,14 +67,15 @@ function name(p: Person, folge: Stil['namensfolge']): string {
 export function personen(werk: Werk, stil: Stil): string {
   const liste = werk.personen.filter((p) => p.vorname.trim() || p.nachname.trim())
   if (liste.length === 0) return ''
-  const text = liste.map((p) => name(p, stil.namensfolge)).join(' / ')
+  const text = liste.map((p) => name(p, stil.namensfolge)).join(stil.personenTrenner)
   return liste.every((p) => p.rolle === 'hrsg') ? `${text} (Hrsg.)` : text
 }
 
-function titel(werk: Werk, stil: Stil): string {
+function titelTeile(werk: Werk, stil: Stil): Teil[] {
   const t = werk.titel.trim()
   const u = werk.untertitel.trim()
-  return u ? `${t}${stil.untertitelTrenner}${u}` : t
+  const auszeichnung = stil.titelAuszeichnung === 'keine' ? undefined : stil.titelAuszeichnung
+  return [{ text: t, auszeichnung }, ...(u ? [klar(`${stil.untertitelTrenner}${u}`)] : [])]
 }
 
 function jahr(a: Auflage): string {
@@ -75,45 +113,67 @@ function impressum(a: Auflage, stil: Stil): string {
   return text
 }
 
-function erschienenIn(werk: Werk): string {
-  const e = werk.erschienenIn
-  if (!e || !e.titel.trim()) return ''
-  const teile = [`in: ${e.titel.trim()}`]
-  if (e.art === 'sammelband') {
-    // Sammelband: Titel genügt, Seiten folgen
-  } else {
-    const jg = e.jahrgang.trim() ? ` ${e.jahrgang.trim()}. Jg.` : ''
-    const j = e.jahr.trim() ? ` (${e.jahr.trim()})` : ''
-    teile[0] += `${jg}${j}`
-    if (e.heft.trim()) teile.push(`Nr. ${e.heft.trim()}`)
-  }
+/** Ausgabenangabe einer Zeitschrift: die gedruckte Fassung oder aus Jahrgang, Heft und Jahr zusammengesetzt. */
+function ausgabeText(e: ErschienenIn): string {
+  const frei = e.ausgabe.trim()
+  if (frei) return /^[,.]/.test(frei) ? frei : ` ${frei}`
+  const jg = e.jahrgang.trim()
+  const h = e.heft.trim()
+  const j = e.jahr.trim()
+  const heftJahr = h && j ? `${h}/${j}` : h || j
+  if (jg) return `, ${jg}. Jg.${heftJahr ? `, ${heftJahr}` : ''}`
+  return heftJahr ? ` ${heftJahr}` : ''
+}
+
+function erschienenInTeile(e: ErschienenIn, stil: Stil): Teil[] {
+  const sammelband = e.art === 'sammelband'
+  const auszeichnung = stil.titelAuszeichnung === 'keine' ? undefined : stil.titelAuszeichnung
+  const titel: Teil = sammelband ? { text: e.titel.trim(), auszeichnung } : { text: e.titel.trim(), kursiv: true }
   const von = e.seitenVon.trim()
   const bis = e.seitenBis.trim()
-  if (von) teile.push(bis ? `S. ${von}–${bis}` : `S. ${von}`)
-  return teile.join(', ')
+  const s = von ? `, S. ${bis ? `${von}–${bis}` : von}` : ''
+  return [klar('in: '), titel, klar(`${ausgabeText(e)}${s}`)]
 }
 
-/** Eine Zeile der Literaturliste. */
-export function druckzeile(werk: Werk, stil: Stil = STANDARD_STIL): string {
+/** Eine Zeile der Literaturliste, in Teile mit Auszeichnung zerlegt. */
+/** Die Anmerkung steht kursiv; mit *…* markierte Titel darin stehen aufrecht. */
+function anmerkungTeile(anm: string): Teil[] {
+  return `(Anm.: ${anm})`
+    .split('*')
+    .map((text, i): Teil => (i % 2 === 1 ? { text } : { text, kursiv: true }))
+    .filter((t) => t.text)
+}
+
+export function druckzeileTeile(werk: Werk, stil: Stil = STANDARD_STIL): Teil[] {
   const kopf = personen(werk, stil)
-  const t = titel(werk, stil)
-  let zeile = kopf ? `${kopf}: ${t}` : t
+  const teile: Teil[] = [...(kopf ? [klar(`${kopf}: `)] : []), ...titelTeile(werk, stil)]
 
   if (werk.art === 'aufsatz' && werk.erschienenIn?.titel.trim()) {
-    return schluss(`${zeile}, ${erschienenIn(werk)}`)
+    const ein = erschienenInTeile(werk.erschienenIn, stil)
+    if (stil.beitragsform === 'klammer') teile.push(klar(' ('), ...ein, klar(')'))
+    else teile.push(klar(', '), ...ein)
+  } else {
+    const auflagen = werk.auflagen.filter((a) => a.jahr.trim() || a.ort.trim() || a.verlag.trim())
+    const gewaehlt = stil.auflagen === 'alle' ? auflagen : auflagen.slice(0, 1)
+    const imp = gewaehlt.map((a) => impressum(a, stil)).filter(Boolean)
+    if (imp.length > 0) teile.push(klar(stil.muster === 'verlag' ? `. ${imp.join('; ')}` : `, ${imp.join('; ')}`))
   }
 
-  const auflagen = werk.auflagen.filter((a) => a.jahr.trim() || a.ort.trim() || a.verlag.trim())
-  const gewaehlt = stil.auflagen === 'alle' ? auflagen : auflagen.slice(0, 1)
-  const imp = gewaehlt.map((a) => impressum(a, stil)).filter(Boolean)
-  if (imp.length > 0) {
-    zeile += stil.muster === 'verlag' ? `. ${imp.join('; ')}` : `, ${imp.join('; ')}`
+  const anm = werk.anmerkung?.trim()
+  if (stil.anmerkungen && anm) teile.push(klar(' '), ...anmerkungTeile(anm))
+
+  if (stil.schlusspunkt) {
+    const text = teile.map((t) => t.text).join('')
+    if (!text.endsWith('.')) teile.push(klar('.'))
   }
-  return schluss(zeile)
+  return verdichte(teile)
 }
 
-function schluss(zeile: string): string {
-  return zeile.endsWith('.') ? zeile : `${zeile}.`
+/** Eine Zeile der Literaturliste als reiner Text. */
+export function druckzeile(werk: Werk, stil: Stil = STANDARD_STIL): string {
+  return druckzeileTeile(werk, stil)
+    .map((t) => t.text)
+    .join('')
 }
 
 function sortierName(werk: Werk): string {
@@ -122,7 +182,9 @@ function sortierName(werk: Werk): string {
 }
 
 function ersteJahr(werk: Werk): number {
-  const jahre = werk.auflagen.map((a) => parseInt(a.jahr, 10)).filter((j) => !Number.isNaN(j))
+  const jahre = [...werk.auflagen.map((a) => a.jahr), werk.erschienenIn?.jahr ?? '']
+    .map((j) => parseInt(j, 10))
+    .filter((j) => !Number.isNaN(j))
   return jahre.length ? Math.min(...jahre) : 9999
 }
 
