@@ -12,7 +12,8 @@ export const INHALTSFELDER = [
   'untertitel',
   'reihe',
   'reiheBand',
-  'auflagen',
+  'ausgaben',
+  'ersterscheinung',
   'erschienenIn',
   'kommentar',
   'anmerkung',
@@ -30,6 +31,7 @@ const AUFLAGEFELDER = [
   'ort',
   'seiten',
   'seitenRoemisch',
+  'bearbeitung',
   'vermerk',
   'isbn',
 ] as const satisfies readonly (keyof Auflage)[]

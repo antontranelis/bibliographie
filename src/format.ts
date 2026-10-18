@@ -1,11 +1,12 @@
-import type { Auflage, ErschienenIn, Person, Werk } from './model'
+import { AUSGABE_ARTEN, type Auflage, type Ausgabe, type ErschienenIn, type Person, type Werk } from './model'
 
 export interface Stil {
   /** 'ort': „Titel. Untertitel, Ort Jahr“; 'verlag': „Titel. Untertitel. Verlag, Ort Jahr“ */
   muster: 'ort' | 'verlag'
   namensfolge: 'vorname-name' | 'name-vorname'
   untertitelTrenner: '. ' | ' – ' | ': '
-  auflagen: 'erste' | 'alle'
+  /** 'auswahl': die zum Nennen markierten Auflagen und alle Ausgaben; 'alle': jede Auflage; 'erste': nur die erste Auflage */
+  auflagen: 'auswahl' | 'alle' | 'erste'
   seitenzahl: boolean
   isbn: boolean
   /** Auszeichnung des Obertitels von Buch oder Aufsatz; Sammelbände folgen ihr, Zeitschriften stehen kursiv */
@@ -25,7 +26,7 @@ export const STANDARD_STIL: Stil = {
   muster: 'ort',
   namensfolge: 'vorname-name',
   untertitelTrenner: '. ',
-  auflagen: 'erste',
+  auflagen: 'auswahl',
   seitenzahl: false,
   isbn: false,
   titelAuszeichnung: 'fett',
@@ -71,9 +72,9 @@ export function personen(werk: Werk, stil: Stil): string {
   return liste.every((p) => p.rolle === 'hrsg') ? `${text} (Hrsg.)` : text
 }
 
-function titelTeile(werk: Werk, stil: Stil): Teil[] {
-  const t = werk.titel.trim()
-  const u = werk.untertitel.trim()
+function titelTeile(titel: string, untertitel: string, stil: Stil): Teil[] {
+  const t = titel.trim()
+  const u = untertitel.trim()
   const auszeichnung = stil.titelAuszeichnung === 'keine' ? undefined : stil.titelAuszeichnung
   return [{ text: t, auszeichnung }, ...(u ? [klar(`${stil.untertitelTrenner}${u}`)] : [])]
 }
@@ -96,21 +97,98 @@ function seiten(a: Auflage): string {
 
 function auflagenNummer(a: Auflage): string {
   const n = a.nummer.trim()
-  return n && n !== '1' ? `${n}. Aufl.` : ''
+  const b = a.bearbeitung.trim()
+  if (!b) return n && n !== '1' ? `${n}. Aufl.` : ''
+  return `${n ? `${n}. ` : ''}${b} Aufl.`
 }
 
-function impressum(a: Auflage, stil: Stil): string {
+const gefuellt = (a: Auflage) => Boolean(a.jahr.trim() || a.ort.trim() || a.verlag.trim())
+
+/** Ort, im Muster „verlag“ mit Verlag davor. */
+function ortsangabe(a: Auflage, stil: Stil): string {
   const ort = a.ort.trim()
-  const verlag = a.verlag.trim()
-  const kopf = stil.muster === 'verlag' ? [verlag, ort].filter(Boolean).join(', ') : ort
-  const zaehlung = auflagenNummer(a)
-  const ende = [zaehlung, jahr(a)].filter(Boolean).join(' ')
-  let text: string
-  if (kopf && zaehlung) text = `${kopf}, ${ende}`
-  else text = [kopf, ende].filter(Boolean).join(' ')
+  return stil.muster === 'verlag' ? [a.verlag.trim(), ort].filter(Boolean).join(', ') : ort
+}
+
+function anhang(a: Auflage, stil: Stil): string {
+  let text = ''
   if (stil.seitenzahl && seiten(a)) text += `, ${seiten(a)}`
   if (stil.isbn && a.isbn.trim()) text += `, ISBN ${a.isbn.trim()}`
   return text
+}
+
+/** Erste Auflage einer Ausgabe: „Ort, 2. erw. Aufl. Jahr“; der Ort entfällt, wenn er gleich bleibt. */
+function impressum(a: Auflage, stil: Stil, ort: string): string {
+  const zaehlung = auflagenNummer(a)
+  const ende = [zaehlung, jahr(a)].filter(Boolean).join(' ')
+  const text = ort && zaehlung ? `${ort}, ${ende}` : [ort, ende].filter(Boolean).join(' ')
+  return text + anhang(a, stil)
+}
+
+/** Weitere Auflage derselben Ausgabe: „2. erw. Aufl. Ort Jahr“. */
+function folgeauflage(a: Auflage, stil: Stil, ort: string): string {
+  return [auflagenNummer(a), ort, jahr(a)].filter(Boolean).join(' ') + anhang(a, stil)
+}
+
+/** Ob eine Auflage in der Liste genannt wird, solange nichts anderes markiert ist. */
+export const nennen = (a: Auflage, erste: boolean): boolean => a.inListe ?? (erste || Boolean(a.bearbeitung.trim()))
+
+/** Auflagen einer Ausgabe in der Druckzeile. Die erste Ausgabe behält immer ein Impressum. */
+function gedruckteAuflagen(ausgabe: Ausgabe, stil: Stil, ersteAusgabe: boolean): Auflage[] {
+  const auflagen = ausgabe.auflagen.filter(gefuellt)
+  if (stil.auflagen === 'alle') return auflagen
+  if (stil.auflagen === 'erste') return auflagen.slice(0, 1)
+  const genannt = auflagen.filter((a, i) => nennen(a, i === 0))
+  return genannt.length === 0 && ersteAusgabe ? auflagen.slice(0, 1) : genannt
+}
+
+/** Wie eine weitere Ausgabe eingeleitet wird: eigene Bezeichnung oder nach Art und Sprache. */
+export function ausgabeBezeichnung(a: Ausgabe): string {
+  const eigene = a.bezeichnung.trim()
+  if (eigene) return eigene
+  if (a.art === 'uebersetzung' && a.sprache.trim()) return `${a.sprache.trim()}e Ausgabe`
+  return AUSGABE_ARTEN.find((x) => x.value === a.art)?.druck ?? ''
+}
+
+const anschluss = (text: string) => (/^[,.;]/.test(text) ? text : ` ${text}`)
+
+/** Impressum, weitere Auflagen und weitere Ausgaben eines Buchs. */
+function ausgabenTeile(werk: Werk, stil: Stil): Teil[] {
+  const teile: Teil[] = []
+  let letzterOrt = ''
+  werk.ausgaben.forEach((ausgabe, i) => {
+    if (stil.auflagen === 'erste' && i > 0) return
+    const auflagen = gedruckteAuflagen(ausgabe, stil, i === 0)
+    if (auflagen.length === 0) return
+    const ortWenn = (a: Auflage) => {
+      const ort = ortsangabe(a, stil)
+      const neu = ort && ort !== letzterOrt ? ort : ''
+      if (ort) letzterOrt = ort
+      return neu
+    }
+    const [erste, ...weitere] = auflagen
+    if (i === 0) {
+      const imp = impressum(erste, stil, ortWenn(erste))
+      if (imp) teile.push(klar(stil.muster === 'verlag' ? `. ${imp}` : `, ${imp}`))
+    } else {
+      const bez = ausgabeBezeichnung(ausgabe)
+      const eigenerTitel = ausgabe.titel.trim()
+      teile.push(klar('; '))
+      if (eigenerTitel) {
+        if (bez) teile.push(klar(`${bez}: `))
+        teile.push(...titelTeile(ausgabe.titel, ausgabe.untertitel, stil))
+        const imp = impressum(erste, stil, ortWenn(erste))
+        if (imp) teile.push(klar(`, ${imp}`))
+      } else {
+        const imp = impressum(erste, stil, ortWenn(erste))
+        teile.push(klar([bez, imp].filter(Boolean).join(' ')))
+      }
+    }
+    const zusatz = ausgabe.zusatz.trim()
+    if (zusatz) teile.push(klar(anschluss(zusatz)))
+    for (const a of weitere) teile.push(klar(`; ${folgeauflage(a, stil, ortWenn(a))}`))
+  })
+  return teile
 }
 
 /** Ausgabenangabe einer Zeitschrift: die gedruckte Fassung oder aus Jahrgang, Heft und Jahr zusammengesetzt. */
@@ -135,7 +213,6 @@ function erschienenInTeile(e: ErschienenIn, stil: Stil): Teil[] {
   return [klar('in: '), titel, klar(`${ausgabeText(e)}${s}`)]
 }
 
-/** Eine Zeile der Literaturliste, in Teile mit Auszeichnung zerlegt. */
 /** Die Anmerkung steht kursiv; mit *…* markierte Titel darin stehen aufrecht. */
 function anmerkungTeile(anm: string): Teil[] {
   return `(Anm.: ${anm})`
@@ -144,20 +221,16 @@ function anmerkungTeile(anm: string): Teil[] {
     .filter((t) => t.text)
 }
 
+/** Eine Zeile der Literaturliste, in Teile mit Auszeichnung zerlegt. */
 export function druckzeileTeile(werk: Werk, stil: Stil = STANDARD_STIL): Teil[] {
   const kopf = personen(werk, stil)
-  const teile: Teil[] = [...(kopf ? [klar(`${kopf}: `)] : []), ...titelTeile(werk, stil)]
+  const teile: Teil[] = [...(kopf ? [klar(`${kopf}: `)] : []), ...titelTeile(werk.titel, werk.untertitel, stil)]
 
   if (werk.art === 'aufsatz' && werk.erschienenIn?.titel.trim()) {
     const ein = erschienenInTeile(werk.erschienenIn, stil)
     if (stil.beitragsform === 'klammer') teile.push(klar(' ('), ...ein, klar(')'))
     else teile.push(klar(', '), ...ein)
-  } else {
-    const auflagen = werk.auflagen.filter((a) => a.jahr.trim() || a.ort.trim() || a.verlag.trim())
-    const gewaehlt = stil.auflagen === 'alle' ? auflagen : auflagen.slice(0, 1)
-    const imp = gewaehlt.map((a) => impressum(a, stil)).filter(Boolean)
-    if (imp.length > 0) teile.push(klar(stil.muster === 'verlag' ? `. ${imp.join('; ')}` : `, ${imp.join('; ')}`))
-  }
+  } else teile.push(...ausgabenTeile(werk, stil))
 
   const anm = werk.anmerkung?.trim()
   if (stil.anmerkungen && anm) teile.push(klar(' '), ...anmerkungTeile(anm))
@@ -181,8 +254,11 @@ function sortierName(werk: Werk): string {
   return p ? `${p.nachname.trim()} ${p.vorname.trim()}` : werk.titel.trim()
 }
 
-function ersteJahr(werk: Werk): number {
-  const jahre = [...werk.auflagen.map((a) => a.jahr), werk.erschienenIn?.jahr ?? '']
+/** Jahr der Ersterscheinung: von Hand gesetzt oder die älteste Ausgabe, Manuskripte ausgenommen. */
+export function ersterscheinung(werk: Werk): number {
+  const hand = parseInt(werk.ersterscheinung, 10)
+  if (!Number.isNaN(hand)) return hand
+  const jahre = [...werk.ausgaben.filter((a) => a.art !== 'manuskript').flatMap((a) => a.auflagen.map((x) => x.jahr)), werk.erschienenIn?.jahr ?? '']
     .map((j) => parseInt(j, 10))
     .filter((j) => !Number.isNaN(j))
   return jahre.length ? Math.min(...jahre) : 9999
@@ -192,7 +268,7 @@ function ersteJahr(werk: Werk): number {
 export function sortiere(werke: Werk[], nach: 'name' | 'jahr'): Werk[] {
   const vgl = (a: string, b: string) => a.localeCompare(b, 'de', { sensitivity: 'base' })
   return [...werke].sort((a, b) => {
-    if (nach === 'jahr') return ersteJahr(a) - ersteJahr(b) || vgl(sortierName(a), sortierName(b))
-    return vgl(sortierName(a), sortierName(b)) || ersteJahr(a) - ersteJahr(b) || vgl(a.titel, b.titel)
+    if (nach === 'jahr') return ersterscheinung(a) - ersterscheinung(b) || vgl(sortierName(a), sortierName(b))
+    return vgl(sortierName(a), sortierName(b)) || ersterscheinung(a) - ersterscheinung(b) || vgl(a.titel, b.titel)
   })
 }

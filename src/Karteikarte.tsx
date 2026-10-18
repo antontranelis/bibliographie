@@ -1,11 +1,19 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
+  AUSGABE_ARTEN,
+  MITWIRKUNGS_ROLLEN,
   TEXT_ARTEN,
+  alleAuflagen,
   leereAuflage,
+  leereAusgabe,
   leeresErschienenIn,
   neueId,
   type Auflage,
+  type Ausgabe,
+  type AusgabeArt,
   type ErschienenIn,
+  type Mitwirkung,
+  type MitwirkungsRolle,
   type Person,
   type TextArt,
   type Verlag,
@@ -14,7 +22,7 @@ import {
 import { anzeigeName, findeExakt, nameFuerJahr, ortFuerJahr, ortName, ortsAbweichung, ortswechselEintragen, planeVerlage, type VerlagsGruppe } from './verlag'
 import { auflageLeer } from './entwurf'
 import { Druckzeile } from './Druckzeile'
-import { druckzeileTeile } from './format'
+import { ausgabeBezeichnung, druckzeileTeile, ersterscheinung, nennen } from './format'
 import { VerlagFeld } from './VerlagFeld'
 import { type Treffer, type WerkVorschlag } from './lobid'
 import { sucheImKatalog } from './katalog'
@@ -143,9 +151,11 @@ export function Karteikarte(props: Props) {
   }
 
   const uebernimmAusgaben = (auswahl: Treffer[]) => {
-    const neu = [...werk.auflagen.filter((a) => !istLeer(a)), ...auswahl.map((t) => ({ ...t.auflage, id: neueId() }))]
+    // Neue Auflagen aus dem Katalog kommen zur ersten Ausgabe; von dort lassen sie sich einer anderen zuordnen
+    const [erste, ...weitere] = mitAusgabe(werk.ausgaben)
+    const neu = [...erste.auflagen.filter((a) => !istLeer(a)), ...auswahl.map((t) => ({ ...t.auflage, id: neueId() }))]
     neu.sort((a, b) => jahrZahl(a) - jahrZahl(b))
-    setze({ auflagen: neu })
+    setze({ ausgaben: [{ ...erste, auflagen: neu }, ...weitere] })
     setAusgaben(null)
   }
 
@@ -292,7 +302,7 @@ export function Karteikarte(props: Props) {
             <AusgabenWahl
               key={ausgaben.schluessel}
               vorschlag={ausgaben}
-              vorhandeneJahre={new Set(werk.auflagen.map((a) => a.jahr).filter(Boolean))}
+              vorhandeneJahre={new Set(alleAuflagen(werk).map((a) => a.jahr).filter(Boolean))}
               onUebernehmen={uebernimmAusgaben}
               onVerwerfen={() => setAusgaben(null)}
             />
@@ -312,12 +322,12 @@ export function Karteikarte(props: Props) {
               }
             />
           ) : (
-            <Auflagen
+            <AusgabenFeld
               werk={werk}
               verlage={verlage}
               fixiert={fixiert}
               nachholStand={nachholStand}
-              onAendern={(auflagen) => setze({ auflagen })}
+              onAendern={setze}
               onFixieren={onFixieren}
               onNachholen={holeNach}
               onVerlagsAbgleich={onVerlagsAbgleich}
@@ -425,7 +435,7 @@ export function StatusMarke({ status }: { status: Werk['status'] }) {
   )
 }
 
-function Auflagen({
+function AusgabenFeld({
   werk,
   verlage,
   fixiert,
@@ -440,27 +450,47 @@ function Auflagen({
   verlage: Verlag[]
   fixiert: Fixierung
   nachholStand: 'ruhe' | 'laedt' | 'nichts' | 'fehler'
-  onAendern: (a: Auflage[]) => void
+  onAendern: (t: Partial<Werk>) => void
   onFixieren: (f: Fixierung) => void
   onNachholen: () => void
   onVerlagsAbgleich: (g: VerlagsGruppe[], derselbe: boolean) => void
   onVerlagAendern: (v: Verlag) => void
 }) {
   const [neuId, setNeuId] = useState<string | null>(null)
-  const auflagen = werk.auflagen
-  const gefuellt = auflagen.filter((a) => !istLeer(a))
+  const ausgaben = useMemo(() => mitAusgabe(werk.ausgaben), [werk.ausgaben])
+  const gefuellt = alleAuflagen(werk).filter((a) => !istLeer(a))
+  const mehrere = ausgaben.length > 1
+  const setzeAusgaben = (neu: Ausgabe[]) => onAendern({ ausgaben: neu })
+  const setzeAusgabe = (i: number, teil: Partial<Ausgabe>) => setzeAusgaben(ausgaben.map((x, j) => (j === i ? { ...x, ...teil } : x)))
 
-  const neueAuflage = () => {
+  const neueAuflage = (i: number) => {
+    const auflagen = ausgaben[i].auflagen
     const letzte = auflagen[auflagen.length - 1]
     const a = { ...leereAuflage(), verlag: letzte?.verlag ?? '', ort: letzte?.ort ?? '', ...(letzte?.verlagId ? { verlagId: letzte.verlagId } : {}) }
     setNeuId(a.id)
-    onAendern([...auflagen, a])
+    setzeAusgabe(i, { auflagen: [...auflagen, a] })
   }
+  const neueAusgabe = () => {
+    const a = leereAusgabe('neuausgabe')
+    setNeuId(a.auflagen[0].id)
+    setzeAusgaben([...ausgaben, a])
+  }
+  /** Auflage in eine andere Ausgabe verschieben, dort nach Jahr einsortiert. */
+  const verschiebe = (von: number, auflage: Auflage, nachId: string) =>
+    setzeAusgaben(
+      ausgaben.map((x, j) => {
+        if (j === von) return { ...x, auflagen: x.auflagen.filter((a) => a.id !== auflage.id) }
+        if (x.id === nachId) return { ...x, auflagen: [...x.auflagen.filter((a) => !istLeer(a)), auflage].sort((a, b) => jahrZahl(a) - jahrZahl(b)) }
+        return x
+      }),
+    )
+  const wahl = ausgaben.map((x, j) => ({ id: x.id, label: `${j + 1}. ${ausgabeName(x)}` }))
+  const berechnet = ersterscheinung({ ...werk, ersterscheinung: '' })
 
   return (
     <div className="feld">
       <div className="feld-kopf">
-        <span className="lab">Auflagen</span>
+        <span className="lab">{mehrere ? 'Ausgaben und Auflagen' : 'Auflagen'}</span>
         {gefuellt.length > 0 && (
           <span className="leise klein">
             {gefuellt.length} · {jahrspanne(gefuellt.map((a) => a.jahr))}
@@ -469,12 +499,17 @@ function Auflagen({
         <NadelKnopf
           was="Verlag"
           aktiv={fixiert.verlag !== undefined}
-          an={() => onFixieren({ ...fixiert, verlag: auflagen[0]?.verlag ?? '' })}
+          an={() => onFixieren({ ...fixiert, verlag: ausgaben[0]?.auflagen[0]?.verlag ?? '' })}
           aus={() => onFixieren({ ...fixiert, verlag: undefined })}
         />
         <span className="rechts knopfreihe">
-          <button type="button" className="textknopf" onClick={neueAuflage}>
-            + Auflage
+          {!mehrere && (
+            <button type="button" className="textknopf" onClick={() => neueAuflage(0)}>
+              + Auflage
+            </button>
+          )}
+          <button type="button" className="textknopf" onClick={neueAusgabe}>
+            + Ausgabe
           </button>
           <button type="button" className="textknopf" disabled={!werk.titel.trim() || nachholStand === 'laedt'} onClick={onNachholen}>
             {nachholStand === 'laedt' ? 'Katalog wird gefragt …' : 'Weitere aus dem Katalog holen'}
@@ -483,51 +518,220 @@ function Auflagen({
       </div>
       {nachholStand === 'nichts' && <p className="hinweis">Im Katalog ist zu diesem Titel nichts zu finden.</p>}
       {nachholStand === 'fehler' && <p className="hinweis">Der Katalog ist gerade nicht erreichbar. Von Hand geht es weiter.</p>}
-      <div className="tabelle-rahmen">
-        <table className="tabelle auflagen">
-          <thead>
-            <tr>
-              <th className="sp-nr">Aufl.</th>
-              <th className="sp-jahr">Jahr</th>
-              <th>Verlag</th>
-              <th className="sp-ort">Ort</th>
-              <th className="sp-seiten">Seiten</th>
-              <th className="sp-mehr">
-                <span className="unsichtbar">Weitere Angaben</span>
-              </th>
-            </tr>
-          </thead>
-          {auflagen.map((a, i) => (
-            <AuflageZeile
-              key={a.id}
-              auflage={a}
-              verlage={verlage}
-              autoFokus={a.id === neuId}
-              onAendern={(neu) => onAendern(auflagen.map((x, j) => (j === i ? neu : x)))}
-              onEntfernen={auflagen.length > 1 ? () => onAendern(auflagen.filter((_, j) => j !== i)) : undefined}
-              onVerlagAendern={onVerlagAendern}
+      {ausgaben.map((ausgabe, i) => (
+        <section key={ausgabe.id} className={mehrere ? 'ausgabe-block' : undefined} aria-label={mehrere ? `Ausgabe ${i + 1}: ${ausgabeName(ausgabe)}` : undefined}>
+          {mehrere && (
+            <AusgabeKopf
+              ausgabe={ausgabe}
+              nummer={i + 1}
+              werkTitel={werk.titel}
+              onAendern={(teil) => setzeAusgabe(i, teil)}
+              onNeueAuflage={() => neueAuflage(i)}
+              onEntfernen={i > 0 ? () => setzeAusgaben(ausgaben.filter((_, j) => j !== i)) : undefined}
             />
-          ))}
-        </table>
-      </div>
+          )}
+          <div className="tabelle-rahmen">
+            <table className="tabelle auflagen">
+              <thead>
+                <tr>
+                  <th className="sp-liste" title="In der Liste nennen">
+                    Liste
+                  </th>
+                  <th className="sp-nr">Aufl.</th>
+                  <th className="sp-jahr">Jahr</th>
+                  <th>Verlag</th>
+                  <th className="sp-ort">Ort</th>
+                  <th className="sp-seiten">Seiten</th>
+                  <th className="sp-mehr">
+                    <span className="unsichtbar">Weitere Angaben</span>
+                  </th>
+                </tr>
+              </thead>
+              {ausgabe.auflagen.map((a, k) => (
+                <AuflageZeile
+                  key={a.id}
+                  auflage={a}
+                  erste={k === ausgabe.auflagen.findIndex((x) => !istLeer(x))}
+                  verlage={verlage}
+                  autoFokus={a.id === neuId}
+                  ausgaben={mehrere ? wahl : []}
+                  ausgabeId={ausgabe.id}
+                  onAendern={(neu) => setzeAusgabe(i, { auflagen: ausgabe.auflagen.map((x, j) => (j === k ? neu : x)) })}
+                  onEntfernen={ausgabe.auflagen.length > 1 ? () => setzeAusgabe(i, { auflagen: ausgabe.auflagen.filter((_, j) => j !== k) }) : undefined}
+                  onVerschieben={(nachId) => verschiebe(i, a, nachId)}
+                  onVerlagAendern={onVerlagAendern}
+                />
+              ))}
+            </table>
+          </div>
+          <MitwirkendeFeld ausgabe={ausgabe} onAendern={(teil) => setzeAusgabe(i, teil)} />
+        </section>
+      ))}
       <VerlagsAbgleich werk={werk} verlage={verlage} onAbgleich={onVerlagsAbgleich} />
+      {mehrere && (
+        <label className="ersterscheinung">
+          <span className="lab">Ersterscheinung</span>
+          <input
+            className="eingabe zelle"
+            value={werk.ersterscheinung}
+            maxLength={4}
+            inputMode="numeric"
+            placeholder={berechnet < 9999 ? String(berechnet) : 'Jahr'}
+            onChange={(e) => onAendern({ ersterscheinung: e.target.value })}
+          />
+          <span className="leise klein">leer = älteste Ausgabe, Manuskripte zählen nicht</span>
+        </label>
+      )}
+    </div>
+  )
+}
+
+/** Vorwort, Nachwort, Übersetzung und Ähnliches einer Ausgabe; normal nicht gedruckt. */
+function MitwirkendeFeld({ ausgabe, onAendern }: { ausgabe: Ausgabe; onAendern: (t: Partial<Ausgabe>) => void }) {
+  const [offen, setOffen] = useState(ausgabe.mitwirkende.length > 0)
+  const setzeMitwirkung = (i: number, teil: Partial<Mitwirkung>) => onAendern({ mitwirkende: ausgabe.mitwirkende.map((m, j) => (j === i ? { ...m, ...teil } : m)) })
+  return (
+    <div className="mitwirkende-feld">
+      <button type="button" className="aufklapp" aria-expanded={offen} onClick={() => setOffen(!offen)}>
+        <Winkel offen={offen} /> Mitwirkende {!offen && <span className="leise">· {ausgabe.mitwirkende.length || 'keine'}</span>}
+      </button>
+      {offen && (
+        <div className="mitwirkende">
+          {ausgabe.mitwirkende.map((m, i) => (
+            <div key={i} className="ausgabe-zeile">
+              <select className="eingabe" aria-label="Mitwirkung" value={m.rolle} onChange={(e) => setzeMitwirkung(i, { rolle: e.target.value as MitwirkungsRolle })}>
+                {MITWIRKUNGS_ROLLEN.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+              <input className="eingabe" aria-label="Vorname" placeholder="Vorname" value={m.vorname} onChange={(e) => setzeMitwirkung(i, { vorname: e.target.value })} />
+              <input className="eingabe" aria-label="Nachname" placeholder="Nachname" value={m.nachname} onChange={(e) => setzeMitwirkung(i, { nachname: e.target.value })} />
+              <input className="eingabe zelle schmal" aria-label="ab Auflage" placeholder="ab Aufl." value={m.abAuflage} maxLength={3} onChange={(e) => setzeMitwirkung(i, { abAuflage: e.target.value })} />
+              <button type="button" className="textknopf leise" onClick={() => onAendern({ mitwirkende: ausgabe.mitwirkende.filter((_, j) => j !== i) })}>
+                entfernen
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="textknopf"
+            onClick={() => onAendern({ mitwirkende: [...ausgabe.mitwirkende, { vorname: '', nachname: '', rolle: 'vorwort', abAuflage: '' }] })}
+          >
+            + Mitwirkende
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Jedes Werk hat eine erste Ausgabe; fehlt sie in alten oder fremden Daten, wird sie hier ergänzt. */
+const mitAusgabe = (ausgaben: Ausgabe[]): Ausgabe[] => (ausgaben.length ? ausgaben : [leereAusgabe()])
+
+/** Name einer Ausgabe für Überschriften und Auswahl. */
+function ausgabeName(a: Ausgabe): string {
+  const art = AUSGABE_ARTEN.find((x) => x.value === a.art)?.label ?? ''
+  return [a.art === 'uebersetzung' && a.sprache.trim() ? `${a.sprache.trim()}e Ausgabe` : art, a.titel.trim()].filter(Boolean).join(': ')
+}
+
+function AusgabeKopf({
+  ausgabe,
+  nummer,
+  werkTitel,
+  onAendern,
+  onNeueAuflage,
+  onEntfernen,
+}: {
+  ausgabe: Ausgabe
+  nummer: number
+  werkTitel: string
+  onAendern: (t: Partial<Ausgabe>) => void
+  onNeueAuflage: () => void
+  onEntfernen?: () => void
+}) {
+  const vorgabe = ausgabeBezeichnung({ ...ausgabe, bezeichnung: '' })
+  return (
+    <div className="ausgabe-kopf">
+      <div className="ausgabe-zeile">
+        <span className="ausgabe-nr">{nummer}.</span>
+        <label>
+          <span className="lab">Art</span>
+          <select className="eingabe" value={ausgabe.art} onChange={(e) => onAendern({ art: e.target.value as AusgabeArt })}>
+            {AUSGABE_ARTEN.map((a) => (
+              <option key={a.value} value={a.value}>
+                {a.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {ausgabe.art === 'uebersetzung' && (
+          <label className="schmal">
+            <span className="lab">Sprache</span>
+            <input className="eingabe" value={ausgabe.sprache} placeholder="deutsch" onChange={(e) => onAendern({ sprache: e.target.value })} />
+          </label>
+        )}
+        {nummer > 1 && (
+          <label>
+            <span className="lab">In der Liste eingeleitet mit</span>
+            <input className="eingabe serif" value={ausgabe.bezeichnung} placeholder={vorgabe || 'ohne Einleitung'} onChange={(e) => onAendern({ bezeichnung: e.target.value })} />
+          </label>
+        )}
+        <span className="rechts knopfreihe">
+          <button type="button" className="textknopf" onClick={onNeueAuflage}>
+            + Auflage
+          </button>
+          {onEntfernen && (
+            <button type="button" className="textknopf leise" onClick={onEntfernen}>
+              Ausgabe entfernen
+            </button>
+          )}
+        </span>
+      </div>
+      {nummer > 1 && (
+        <div className="ausgabe-zeile">
+          <label className="breit">
+            <span className="lab">Eigener Titel</span>
+            <input className="eingabe serif" value={ausgabe.titel} placeholder={werkTitel ? `wie das Werk: ${werkTitel}` : 'wie das Werk'} onChange={(e) => onAendern({ titel: e.target.value })} />
+          </label>
+          <label className="breit">
+            <span className="lab">Untertitel</span>
+            <input className="eingabe serif" value={ausgabe.untertitel} onChange={(e) => onAendern({ untertitel: e.target.value })} />
+          </label>
+          <label className="breit">
+            <span className="lab">Zusatz nach dem Jahr</span>
+            <input className="eingabe serif" value={ausgabe.zusatz} placeholder="etwa: mit Untertitel: …" onChange={(e) => onAendern({ zusatz: e.target.value })} />
+          </label>
+        </div>
+      )}
     </div>
   )
 }
 
 function AuflageZeile({
   auflage,
+  erste,
   verlage,
   autoFokus,
+  ausgaben,
+  ausgabeId,
   onAendern,
   onEntfernen,
+  onVerschieben,
   onVerlagAendern,
 }: {
   auflage: Auflage
+  /** Erste Auflage ihrer Ausgabe: wird in der Liste genannt, solange nichts anderes markiert ist */
+  erste: boolean
   verlage: Verlag[]
   autoFokus: boolean
+  /** Ausgaben, denen die Auflage zugeordnet werden kann; leer bei nur einer Ausgabe */
+  ausgaben: { id: string; label: string }[]
+  ausgabeId: string
   onAendern: (a: Auflage) => void
   onEntfernen?: () => void
+  onVerschieben: (ausgabeId: string) => void
   onVerlagAendern: (v: Verlag) => void
 }) {
   const [mehr, setMehr] = useState(false)
@@ -535,7 +739,8 @@ function AuflageZeile({
   const bekannt = verlage.find((v) => v.id === auflage.verlagId) ?? findeExakt(verlage, auflage.verlag)
   const auskunft = bekannt ? ortFuerJahr(bekannt, auflage.jahr) : null
   const abweichung = bekannt && !auskunft?.zweiOrteMoeglich ? ortsAbweichung(bekannt, auflage) : null
-  const hatMehr = Boolean(auflage.gedrucktesJahr || auflage.erscheinungstag || auflage.vermerk || auflage.seitenRoemisch || auflage.isbn)
+  const hatMehr = Boolean(auflage.gedrucktesJahr || auflage.erscheinungstag || auflage.bearbeitung || auflage.vermerk || auflage.seitenRoemisch || auflage.isbn)
+  const genannt = nennen(auflage, erste)
 
   const waehle = (v: Verlag) => {
     const a = ortFuerJahr(v, auflage.jahr)
@@ -561,6 +766,15 @@ function AuflageZeile({
   return (
     <tbody className={auskunft?.zweiOrteMoeglich ? 'mit-warnung' : ''}>
       <tr>
+        <td className="sp-liste">
+          <input
+            type="checkbox"
+            aria-label={`Auflage ${auflage.jahr} in der Liste nennen`}
+            title={auflage.inListe === undefined ? 'Nach Regel: erste und bearbeitete Auflagen' : 'Von Hand gesetzt'}
+            checked={genannt}
+            onChange={(e) => setze({ inListe: e.target.checked === (erste || Boolean(auflage.bearbeitung.trim())) ? undefined : e.target.checked })}
+          />
+        </td>
         <td>
           <input className="eingabe zelle" aria-label="Auflage" value={auflage.nummer} maxLength={3} inputMode="numeric" onChange={(e) => setze({ nummer: e.target.value })} />
         </td>
@@ -592,7 +806,7 @@ function AuflageZeile({
             className={`mehr-knopf ${hatMehr ? 'hat-mehr' : ''}`}
             aria-expanded={mehr}
             aria-label={`Weitere Angaben zur Auflage ${auflage.jahr}`}
-            title="Druckjahr, Seiten röm., Vermerk, Erscheinungstag, ISBN"
+            title="Bearbeitung, Druckjahr, Seiten röm., Vermerk, Erscheinungstag, ISBN"
             onClick={() => setMehr(!mehr)}
           >
             ⋯
@@ -601,7 +815,7 @@ function AuflageZeile({
       </tr>
       {auskunft?.zweiOrteMoeglich && (
         <tr className="warnzeile">
-          <td colSpan={6}>
+          <td colSpan={7}>
             <div role="alert" className="warnung">
               <Warnung />
               <span>
@@ -620,7 +834,7 @@ function AuflageZeile({
       )}
       {abweichung && bekannt && (
         <tr className="warnzeile">
-          <td colSpan={6}>
+          <td colSpan={7}>
             <div className="warnung leise-warnung">
               <Warnung />
               <span>
@@ -642,8 +856,12 @@ function AuflageZeile({
       )}
       {mehr && (
         <tr className="detailzeile">
-          <td colSpan={6}>
+          <td colSpan={7}>
             <div className="detail-raster">
+              <label>
+                <span className="lab">Bearbeitung</span>
+                <input className="eingabe" value={auflage.bearbeitung} placeholder="z. B. erw." onChange={(e) => setze({ bearbeitung: e.target.value })} />
+              </label>
               <label>
                 <span className="lab">Im Druck steht</span>
                 <input className="eingabe" value={auflage.gedrucktesJahr} maxLength={4} placeholder="Jahr" onChange={(e) => setze({ gedrucktesJahr: e.target.value })} />
@@ -667,6 +885,18 @@ function AuflageZeile({
             </div>
             <div className="knopfreihe">
               {auflage.quelle && <span className="leise klein">aus dem Katalog übernommen</span>}
+              {ausgaben.length > 1 && (
+                <label className="pille">
+                  gehört zu
+                  <select value={ausgabeId} onChange={(e) => onVerschieben(e.target.value)}>
+                    {ausgaben.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               {onEntfernen && (
                 <button type="button" className="textknopf leise rechts" onClick={onEntfernen}>
                   Auflage entfernen

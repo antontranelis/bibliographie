@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { istIsbn, vorauswahl, type Treffer, type WerkVorschlag } from './lobid'
 import { sucheImKatalog } from './katalog'
-import type { Werk } from './model'
+import { alleAuflagen, type Werk } from './model'
 import { Bibliothek, Kasten } from './Symbole'
 
 // Katalogsuche als Autovervollständigung in der Karte:
@@ -50,7 +50,7 @@ const normal = (s: string) =>
 /** Werke der eigenen Kartei, die zu Autor und Titel passen. */
 export function karteiTreffer(werke: Werk[], selbst: string, autor: string, titel: string, hoechstens = 4): Werk[] {
   const isbn = istIsbn(titel)
-  if (isbn) return werke.filter((w) => w.id !== selbst && w.auflagen.some((a) => istIsbn(a.isbn) === isbn)).slice(0, hoechstens)
+  if (isbn) return werke.filter((w) => w.id !== selbst && alleAuflagen(w).some((a) => istIsbn(a.isbn) === isbn)).slice(0, hoechstens)
   const woerter = normal(titel).split(' ').filter(Boolean)
   if (woerter.join('').length < 2) return []
   const a = normal(autor)
@@ -121,7 +121,7 @@ export function Vorschlagsliste({
     }
     if (o.art === 'eigen') {
       const w = o.werk
-      const jahre = w.auflagen.map((a) => a.jahr).filter(Boolean)
+      const jahre = alleAuflagen(w).map((a) => a.jahr).filter(Boolean)
       const zusatz = [
         w.untertitel,
         jahre.length ? `${jahre.length} ${jahre.length === 1 ? 'Auflage' : 'Auflagen'}, ${jahrspanne(jahre)}` : '',

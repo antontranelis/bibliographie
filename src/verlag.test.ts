@@ -16,7 +16,7 @@ import {
   verlagVorschlaege,
   wendePlanAn,
 } from './verlag'
-import { leereAuflage, leeresWerk, type Auflage, type Verlag, type Werk } from './model'
+import { alleAuflagen, leereAuflage, leereAusgabe, leeresWerk, type Auflage, type Verlag, type Werk } from './model'
 
 const pav: Verlag = {
   id: 'v1',
@@ -39,7 +39,7 @@ const goe: Verlag = {
   schreibweisen: ['Verl. am Goetheanum'],
 }
 const auflage = (teil: Partial<Auflage>): Auflage => ({ ...leereAuflage(), ...teil })
-const werk = (auflagen: Auflage[]): Werk => ({ ...leeresWerk(), titel: 'T', auflagen })
+const werk = (auflagen: Auflage[]): Werk => ({ ...leeresWerk(), titel: 'T', ausgaben: [{ ...leereAusgabe(), auflagen }] })
 
 describe('Orts- und Namensgeschichte', () => {
   it('nimmt den ersten Ort vor dem ersten Wechsel', () => {
@@ -165,8 +165,8 @@ describe('Abgleich einer Karte', () => {
     const w = werk([auflage({ verlag: 'Philos.-Anthroposophischer Verl.', jahr: '1918', ort: 'Berlin' })])
     const plan = planeVerlage(w, [pav])
     const r = wendePlanAn(w, [pav], plan, () => true)
-    expect(r.werk.auflagen[0].verlagId).toBe('v1')
-    expect(r.werk.auflagen[0].verlag).toBe('Philos.-Anthroposophischer Verl.')
+    expect(alleAuflagen(r.werk)[0].verlagId).toBe('v1')
+    expect(alleAuflagen(r.werk)[0].verlag).toBe('Philos.-Anthroposophischer Verl.')
     expect(r.verlage[0].schreibweisen).toEqual(['Philos.-Anthroposophischer Verl.'])
   })
   it('legt bei „anderer Verlag“ und bei Neuen einen Verlag an', () => {
@@ -176,14 +176,14 @@ describe('Abgleich einer Karte', () => {
     ])
     const r = wendePlanAn(w, [pav], planeVerlage(w, [pav]), () => false)
     expect(r.verlage).toHaveLength(3)
-    expect(r.werk.auflagen.every((a) => a.verlagId && a.verlagId !== 'v1')).toBe(true)
+    expect(alleAuflagen(r.werk).every((a) => a.verlagId && a.verlagId !== 'v1')).toBe(true)
     const felber = r.verlage.find((v) => anzeigeName(v) === 'Emil Felber')
     expect(felber?.orte).toEqual([{ abJahr: '', ort: 'Berlin', wechselImJahr: false }])
   })
   it('lässt eine ähnliche Gruppe offen, wenn die Antwort fehlt', () => {
     const w = werk([auflage({ verlag: 'Philos.-Anthroposophischer Verl.' })])
     const r = wendePlanAn(w, [pav], planeVerlage(w, [pav]), () => undefined)
-    expect(r.werk.auflagen[0].verlagId).toBeUndefined()
+    expect(alleAuflagen(r.werk)[0].verlagId).toBeUndefined()
     expect(r.verlage).toEqual([pav])
   })
 })
