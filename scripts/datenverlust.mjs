@@ -16,7 +16,12 @@ async function frischeSeite() {
   await page.reload()
   return page
 }
-const werke = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('bibliographie:datenstamm:v1') ?? '{"werke":[]}').werke)
+// Die App speichert 400 ms verzögert
+const warte = (page) => page.waitForTimeout(500)
+const werke = async (page) => {
+  await warte(page)
+  return page.evaluate(() => JSON.parse(localStorage.getItem('bibliographie:datenstamm:v1') ?? '{"werke":[]}').werke)
+}
 
 // Fall 1: nur ein Nachname, dann „Vorläufig lassen, nächste Karte“
 {

@@ -1,5 +1,6 @@
 // Prüft gespeicherte Listen im Browser. Aufruf: node scripts/listen.mjs <url> [ausgabeordner]
 import { chromium } from 'playwright-core'
+import { spieleEin } from './einspielen.mjs'
 
 const [url = 'http://localhost:4321/', aus] = process.argv.slice(2)
 const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN })
@@ -16,7 +17,12 @@ await page.route('https://services.dnb.de/**', (r) => r.abort())
 await page.goto(url)
 await page.evaluate(() => localStorage.clear())
 await page.reload()
-const daten = () => page.evaluate(() => JSON.parse(localStorage.getItem('bibliographie:datenstamm:v1') ?? '{"werke":[],"verlage":[],"listen":[]}'))
+// Die App speichert 400 ms verzögert
+const warte = (page) => page.waitForTimeout(500)
+const daten = async () => {
+  await warte(page)
+  return page.evaluate(() => JSON.parse(localStorage.getItem('bibliographie:datenstamm:v1') ?? '{"werke":[],"verlage":[],"listen":[]}'))
+}
 const reiter = (name) => page.locator('.reiter button', { hasText: name })
 const eintraege = () => page.locator('.eintraege .eintrag').allInnerTexts()
 
@@ -87,8 +93,7 @@ pruefe('Liste gelöscht, Karten bleiben', (await daten()).listen.length === 2 &&
   const p = (vorname, nachname) => ({ vorname, nachname, rolle: 'autor' })
   const liste = { ...(await daten()).listen[0], id: 'personen', name: 'Personen', regel: { person: '', schlagwort: '', nurPrimaer: false, nurFest: false }, kapitel: [], eintraege: [], ausgenommen: [], sortierung: 'name', jedePerson: true }
   const neu = { werke: [werk('Gemeinschaftswerk', [p('Anna', 'Adler'), p('Zoe', 'Zebra')]), werk('Mittelwerk', [p('Max', 'Mitte')])], verlage: [], listen: [liste] }
-  await page.evaluate((d) => localStorage.setItem('bibliographie:datenstamm:v1', JSON.stringify(d)), neu)
-  await page.reload()
+  await spieleEin(page, neu)
   await reiter('Liste').click()
   const zeilen = (await page.locator('.eintraege .eintrag > span:first-of-type').allInnerTexts()).map((t) => t.split(',')[0])
   pruefe('Liste: Einordnungsperson vorn', zeilen.join(' | ') === 'Anna Adler/Zoe Zebra: Gemeinschaftswerk | Max Mitte: Mittelwerk | Zoe Zebra/Anna Adler: Gemeinschaftswerk', zeilen.join(' | '))

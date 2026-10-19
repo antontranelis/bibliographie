@@ -2,7 +2,7 @@ import { STANDARD_STIL } from './format'
 import { leereAusgabe, neueId, type Auflage, type Ausgabe, type Datenstamm, type Verlag, type Werk } from './model'
 
 export const FORMAT = 'bibliographie-datenstamm'
-export const VERSION = 4
+export const VERSION = 5
 
 export interface Exportdatei extends Datenstamm {
   format: typeof FORMAT
@@ -32,7 +32,7 @@ export function importiere(text: string): Datenstamm {
 /**
  * Bringt Daten auf den Stand von Version 4. Version 1 kannte pro Verlag nur einen Namen,
  * und Auflagen verwiesen über den Namenstext auf ihn. Bis Version 2 hingen die Auflagen direkt am Werk;
- * sie werden zur ersten Ausgabe. Seit Version 4 gibt es gespeicherte Listen.
+ * sie werden zur ersten Ausgabe. Seit Version 4 gibt es gespeicherte Listen, seit Version 5 die Vorlage aus dem Import.
  */
 export function migriere(d: Datenstamm): Datenstamm {
   const verlage: Verlag[] = d.verlage.map((v) => {
@@ -58,6 +58,7 @@ export function migriere(d: Datenstamm): Datenstamm {
     return {
       ...rest,
       anmerkung: rest.anmerkung ?? '',
+      vorlage: rest.vorlage ?? '',
       ersterscheinung: rest.ersterscheinung ?? '',
       ...(rest.erschienenIn ? { erschienenIn: { ...rest.erschienenIn, ausgabe: rest.erschienenIn.ausgabe ?? '' } } : {}),
       ausgaben: ausgaben.map((a) => ({ ...leereAusgabe(), ...a, auflagen: a.auflagen.map(auflage) })),
@@ -141,11 +142,13 @@ export function ladeLokal(): Datenstamm | null {
   }
 }
 
-export function speichereLokal(d: Datenstamm): void {
+/** Speichert im Browser. Falsch, wenn der Speicher voll oder gesperrt ist: dann bleibt nur die Exportdatei. */
+export function speichereLokal(d: Datenstamm): boolean {
   try {
     localStorage.setItem(SCHLUESSEL, JSON.stringify(d))
+    return true
   } catch {
-    // Speicher voll oder gesperrt: die Exportdatei bleibt der sichere Weg.
+    return false
   }
 }
 

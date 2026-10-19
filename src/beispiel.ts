@@ -18,6 +18,7 @@ function werk(teil: Partial<Werk>): Werk {
     ersterscheinung: '',
     kommentar: '',
     anmerkung: '',
+    vorlage: '',
     schlagwoerter: [],
     angelegt: jetzt(),
     geaendert: jetzt(),

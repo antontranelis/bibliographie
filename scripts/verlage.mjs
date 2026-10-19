@@ -19,7 +19,12 @@ async function seite({ katalog = false } = {}) {
   await page.reload()
   return page
 }
-const daten = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('bibliographie:datenstamm:v1') ?? '{"werke":[],"verlage":[]}'))
+// Die App speichert 400 ms verzögert
+const warte = (page) => page.waitForTimeout(500)
+const daten = async (page) => {
+  await warte(page)
+  return page.evaluate(() => JSON.parse(localStorage.getItem('bibliographie:datenstamm:v1') ?? '{"werke":[],"verlage":[]}'))
+}
 const name = (v) => [...v.namen].sort((a, b) => (parseInt(a.abJahr) || -1e9) - (parseInt(b.abJahr) || -1e9)).at(-1).name
 async function karte(page, { autor, titel, jahr, verlag, ort }) {
   await page.getByLabel('Nachname, Person 1').fill(autor)

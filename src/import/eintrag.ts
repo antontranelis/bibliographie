@@ -62,7 +62,7 @@ export function zerlegeName(name: string): { vorname: string; nachname: string }
   return { vorname: woerter.slice(0, i).join(' '), nachname: [woerter.slice(i).join(' '), ...zusatz].join(', ') }
 }
 
-function zerlegePersonen(text: string): Person[] | null {
+export function zerlegePersonen(text: string): Person[] | null {
   let t = text.trim()
   if (!t) return []
   if (/[[\]]/.test(t)) return null
@@ -288,7 +288,7 @@ export function zerlegeEintrag(laeufe: Lauf[]): ImportErgebnis {
   let ort = erste.auflagen[0].ort
   for (const g of glieder) {
     const teil = zerlegeGlied(g, werk, ort)
-    if (!teil) return { status: 'kette', original, hinweis, grund: 'weitere Ausgaben frei formuliert' }
+    if (!teil) return { status: 'kette', werk, original, hinweis, grund: 'weitere Ausgaben frei formuliert' }
     if (teil.ausgabe) werk.ausgaben.push({ ...teil.ausgabe, auflagen: [teil.auflage] })
     else werk.ausgaben[werk.ausgaben.length - 1].auflagen.push(teil.auflage)
     ort = teil.auflage.ort

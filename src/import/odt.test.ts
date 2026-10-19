@@ -1,15 +1,17 @@
 import { strToU8, zipSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
 import { zerlegeEintrag } from './eintrag'
-import { leseOdt } from './odt'
+import { leseOdt, leseOdtDokument } from './odt'
 
-const odt = (eintrag: string) =>
+const odt = (eintrag: string) => dokument(`<text:list><text:list-item><text:p>${eintrag}</text:p></text:list-item></text:list>`)
+
+const dokument = (inhalt: string) =>
   zipSync({
     'content.xml': strToU8(`<?xml version="1.0" encoding="UTF-8"?>
 <office:document-content><office:automatic-styles>
 <style:style style:name="T1" style:family="text"><style:text-properties fo:font-weight="bold"/></style:style>
 </office:automatic-styles><office:body><office:text>
-<text:list><text:list-item><text:p>${eintrag}</text:p></text:list-item></text:list>
+${inhalt}
 </office:text></office:body></office:document-content>`),
   })
 
@@ -22,5 +24,30 @@ describe('leseOdt', () => {
   it('dekodiert nicht doppelt', () => {
     const [e] = leseOdt(odt('&amp;#x41; &amp;lt; &amp;amp;'))
     expect(e.laeufe.map((l) => l.text).join('')).toBe('&#x41; &lt; &amp;')
+  })
+})
+
+describe('leseOdtDokument', () => {
+  it('Absätze außerhalb der Listen sind Abschnitte, auch ohne Überschriftenformat', () => {
+    const d = leseOdtDokument(
+      dokument(
+        '<text:p>V. Medien</text:p><text:p><text:span>a) Manipulation</text:span>:</text:p>' +
+          '<text:list><text:list-item><text:p>A B: <text:span text:style-name="T1">Eins</text:span>, Basel 1990</text:p></text:list-item>' +
+          '<text:list-item><text:p>C D: <text:span text:style-name="T1">Zwei</text:span>, Bern 1991</text:p></text:list-item></text:list>' +
+          '<text:p/><text:h>b) Netzwerke</text:h>' +
+          '<text:list><text:list-item><text:p>E F: <text:span text:style-name="T1">Drei</text:span>, Wien 1992</text:p></text:list-item></text:list>',
+      ),
+    )
+    expect(d.abschnitte).toEqual(['V. Medien', 'a) Manipulation:', 'b) Netzwerke'])
+    expect(d.eintraege.map((e) => [e.abschnittNr, e.abschnitt])).toEqual([
+      [1, 'a) Manipulation:'],
+      [1, 'a) Manipulation:'],
+      [2, 'b) Netzwerke'],
+    ])
+  })
+  it('Einträge vor dem ersten Absatz gehören zu keinem Abschnitt', () => {
+    const d = leseOdtDokument(dokument('<text:list><text:list-item><text:p>Erster</text:p></text:list-item></text:list>'))
+    expect(d.abschnitte).toEqual([])
+    expect(d.eintraege[0].abschnittNr).toBe(-1)
   })
 })

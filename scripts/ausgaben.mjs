@@ -1,5 +1,6 @@
 // Prüft Ausgaben, Auflagenauswahl und Mitwirkende im Browser. Aufruf: node scripts/ausgaben.mjs <url> [ausgabeordner]
 import { chromium } from 'playwright-core'
+import { spieleEin } from './einspielen.mjs'
 
 const [url = 'http://localhost:4321/', aus] = process.argv.slice(2)
 const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN })
@@ -14,7 +15,12 @@ await page.route('https://services.dnb.de/**', (r) => r.abort())
 await page.goto(url)
 await page.evaluate(() => localStorage.clear())
 await page.reload()
-const daten = () => page.evaluate(() => JSON.parse(localStorage.getItem('bibliographie:datenstamm:v1') ?? '{"werke":[],"verlage":[]}'))
+// Die App speichert 400 ms verzögert
+const warte = (page) => page.waitForTimeout(500)
+const daten = async () => {
+  await warte(page)
+  return page.evaluate(() => JSON.parse(localStorage.getItem('bibliographie:datenstamm:v1') ?? '{"werke":[],"verlage":[]}'))
+}
 const vorschau = () => page.locator('.vorschau p').innerText()
 
 // Erste Ausgabe mit zwei Auflagen
@@ -80,8 +86,7 @@ pruefe('Ersterscheinung von Hand gespeichert', (await daten()).werke[0].erstersc
 // Aufsatz ohne Ausgabe aus alten Daten lässt sich in ein Buch umstellen (#8)
 {
   const aufsatz = { ...(await daten()).werke[0], id: 'aufsatz', titel: 'Ein Beitrag', art: 'aufsatz', ausgaben: [], erschienenIn: { art: 'zeitschrift', titel: 'Gegenwart', jahrgang: '', jahr: '2004', heft: '1', ausgabe: '', seitenVon: '', seitenBis: '' } }
-  await page.evaluate((w) => localStorage.setItem('bibliographie:datenstamm:v1', JSON.stringify({ werke: [w], verlage: [] })), aufsatz)
-  await page.reload()
+  await spieleEin(page, { werke: [aufsatz], verlage: [], listen: [] })
   await page.locator('.reiter button', { hasText: 'Kartei' }).click()
   await page.locator('.kartei-karte', { hasText: 'Ein Beitrag' }).dblclick()
   await page.getByRole('radio', { name: 'Buch', exact: true }).click()

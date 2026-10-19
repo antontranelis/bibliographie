@@ -23,7 +23,7 @@ import {
 import { anzeigeName, findeExakt, nameFuerJahr, ortFuerJahr, ortName, ortsAbweichung, ortswechselEintragen, planeVerlage, type VerlagsGruppe } from './verlag'
 import { auflageLeer } from './entwurf'
 import { Druckzeile } from './Druckzeile'
-import { ausgabeBezeichnung, druckzeileTeile, ersterscheinung, nennen } from './format'
+import { ausgabeBezeichnung, druckzeile, druckzeileTeile, ersterscheinung, nennen } from './format'
 import { VerlagFeld } from './VerlagFeld'
 import { ZeileKnoepfe } from './ZeileKnoepfe'
 import { type Treffer, type WerkVorschlag } from './lobid'
@@ -372,6 +372,8 @@ export function Karteikarte(props: Props) {
             <p>{werk.titel.trim() ? <Druckzeile teile={druckzeileTeile(werk)} /> : <span className="leise">Erscheint, sobald ein Titel da ist.</span>}</p>
             <ZeileKnoepfe werk={werk} teile={druckzeileTeile(werk)} listen={listen} onInListe={onInListe} />
           </div>
+
+          {werk.vorlage && <Vorlage werk={werk} />}
         </div>
 
         <footer className="karte-fuss">
@@ -628,6 +630,21 @@ function MitwirkendeFeld({ ausgabe, onAendern }: { ausgabe: Ausgabe; onAendern: 
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Zeile aus der eingelesenen Liste zum Vergleich, bis die Karte fest angelegt ist. */
+function Vorlage({ werk }: { werk: Werk }) {
+  const normal = (t: string) => t.replace(/\s+/g, ' ').trim()
+  const gleich = normal(druckzeile(werk)) === normal(werk.vorlage)
+  return (
+    <div className="vorlage">
+      <span className="lab">Vorlage aus dem Import</span>
+      <p>{werk.vorlage}</p>
+      <span className={`klein ${gleich ? 'leise' : 'warnfarbe'}`}>
+        {gleich ? 'Die Karte druckt genau diese Zeile.' : 'Die Karte druckt noch etwas anderes. Beim Festanlegen verschwindet die Vorlage.'}
+      </span>
     </div>
   )
 }

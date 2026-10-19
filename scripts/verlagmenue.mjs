@@ -1,5 +1,6 @@
 // Prüft Lage und Tastaturbedienung der Verlagsvorschläge. Aufruf: node scripts/verlagmenue.mjs <url> [ausgabeordner]
 import { chromium } from 'playwright-core'
+import { spieleEin } from './einspielen.mjs'
 
 const [url = 'http://localhost:4321/', aus] = process.argv.slice(2)
 const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN })
@@ -17,8 +18,7 @@ for (const [breite, hoehe] of [[1360, 900], [390, 844], [1024, 560]]) {
   await page.route('https://lobid.org/**', (r) => r.abort())
   await page.route('https://services.dnb.de/**', (r) => r.abort())
   await page.goto(url)
-  await page.evaluate((v) => localStorage.setItem('bibliographie:datenstamm:v1', JSON.stringify({ werke: [], verlage: v })), verlage)
-  await page.reload()
+  await spieleEin(page, { werke: [], verlage, listen: [] })
   const feld = page.getByLabel('Verlag', { exact: true }).first()
   // Feld an den unteren Fensterrand scrollen
   await feld.evaluate((el) => window.scrollBy(0, el.getBoundingClientRect().bottom - window.innerHeight + 40))

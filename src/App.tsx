@@ -3,6 +3,8 @@ import { TEXT_ARTEN, alleAuflagen, leeresWerk, mitAuflagen, type Datenstamm, typ
 import { Karteikarte } from './Karteikarte'
 import { Kartei, LEERE_SICHT, type KarteiSicht, type ListenVorgabe } from './Kartei'
 import { Liste } from './Liste'
+import { ImportDialog } from './ImportDialog'
+import type { ImportPlan } from './import/einlesen'
 import { ALLE, hinzufuegen, neueListe } from './listen'
 import { Verlage } from './Verlage'
 import { beispielDaten } from './beispiel'
@@ -93,8 +95,22 @@ export default function App() {
   const [listenId, setListenId] = useState<string | null>(null)
   const [meldung, setMeldung] = useState('')
   const dateiEingabe = useRef<HTMLInputElement>(null)
+  const listenEingabe = useRef<HTMLInputElement>(null)
+  const [einlesen, setEinlesen] = useState<{ dateiname: string; plan: ImportPlan } | null>(null)
 
-  useEffect(() => speichereLokal(daten), [daten])
+  // Kurz verzögert speichern: bei tausenden Karten ist jeder Durchgang einige Megabyte groß
+  const [speicherVoll, setSpeicherVoll] = useState(false)
+  const zuSpeichern = useRef(daten)
+  zuSpeichern.current = daten
+  useEffect(() => {
+    const t = setTimeout(() => setSpeicherVoll(!speichereLokal(daten)), 400)
+    return () => clearTimeout(t)
+  }, [daten])
+  useEffect(() => {
+    const sofort = () => speichereLokal(zuSpeichern.current)
+    window.addEventListener('pagehide', sofort)
+    return () => window.removeEventListener('pagehide', sofort)
+  }, [])
   useEffect(() => {
     try {
       localStorage.setItem(FIX_SCHLUESSEL, JSON.stringify(fixiert))
@@ -164,7 +180,7 @@ export default function App() {
     )
     const neueVerlage = r.verlage.length - daten.verlage.length
     if (r.verlage !== daten.verlage) setDaten((d) => ({ ...d, verlage: r.verlage }))
-    aendereKarte({ ...r.werk, status: 'fest' })
+    aendereKarte({ ...r.werk, status: 'fest', vorlage: '' })
     setMeldung(
       `„${karte.titel.trim()}“ ist fest angelegt.` +
         (neueVerlage > 0 ? ` ${neueVerlage === 1 ? 'Ein neuer Verlag ist' : `${neueVerlage} neue Verlage sind`} gemerkt.` : '') +
@@ -282,6 +298,35 @@ export default function App() {
     }
   }
 
+  const listeEinlesen = async (datei: File) => {
+    try {
+      const [{ leseOdtDokument }, { planeImport }] = await Promise.all([import('./import/odt'), import('./import/einlesen')])
+      const dok = leseOdtDokument(new Uint8Array(await datei.arrayBuffer()))
+      if (dok.eintraege.length === 0) {
+        setMeldung('In der Datei steht keine Aufzählung, aus der sich Einträge lesen lassen.')
+        return
+      }
+      setEinlesen({ dateiname: datei.name, plan: planeImport(dok, daten.werke) })
+    } catch {
+      setMeldung('Die Datei ließ sich nicht als ODT-Datei lesen.')
+    }
+  }
+  const einlesenUebernehmen = async (auswahl: Set<number>, listenName: string | null) => {
+    if (!einlesen) return
+    const { uebernimm } = await import('./import/einlesen')
+    const r = uebernimm(einlesen.plan, auswahl, listenName)
+    setDaten((d) => ({ ...d, werke: [...d.werke, ...r.werke], listen: r.liste ? [...d.listen, r.liste] : d.listen }))
+    setEinlesen(null)
+    setMeldung(`${r.werke.length} Karten vorläufig angelegt${r.liste ? `, Liste „${r.liste.name}“ steht unter Liste` : ''}.`)
+    if (r.liste) {
+      setListenId(r.liste.id)
+      setAnsicht('liste')
+    } else {
+      setKarteiSicht({ ...karteiSicht, nurVorlage: true, buchstabe: null })
+      setAnsicht('kartei')
+    }
+  }
+
   // Tastatur für die Serienerfassung
   const tastenRef = useRef<(e: KeyboardEvent) => void>(() => {})
   tastenRef.current = (e: KeyboardEvent) => {
@@ -344,8 +389,21 @@ export default function App() {
               karteiLeer={daten.werke.length === 0}
               onSichern={exportJson}
               onEinlesen={() => dateiEingabe.current?.click()}
+              onListeEinlesen={() => listenEingabe.current?.click()}
               onCsl={exportCsl}
               onBeispiele={beispieleLaden}
+            />
+            <input
+              ref={listenEingabe}
+              type="file"
+              accept="application/vnd.oasis.opendocument.text,.odt"
+              hidden
+              aria-label="Literaturliste als ODT-Datei"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) listeEinlesen(f)
+                e.target.value = ''
+              }}
             />
             <input
               ref={dateiEingabe}
@@ -362,6 +420,12 @@ export default function App() {
         </div>
       </header>
 
+      {speicherVoll && (
+        <div className="speicher-warnung" role="alert">
+          Der Speicher des Browsers ist voll, die letzten Änderungen sind nur in diesem Fenster. Bitte über „Ablage“ → „Sichern“ eine Datei speichern.
+        </div>
+      )}
+      {einlesen && <ImportDialog dateiname={einlesen.dateiname} plan={einlesen.plan} onUebernehmen={einlesenUebernehmen} onAbbrechen={() => setEinlesen(null)} />}
       {meldung && (
         <div className="meldung" role="status">
           {meldung}
@@ -449,12 +513,14 @@ function Ablage({
   karteiLeer,
   onSichern,
   onEinlesen,
+  onListeEinlesen,
   onCsl,
   onBeispiele,
 }: {
   karteiLeer: boolean
   onSichern: () => void
   onEinlesen: () => void
+  onListeEinlesen: () => void
   onCsl: () => void
   onBeispiele: () => void
 }) {
@@ -487,6 +553,9 @@ function Ablage({
           </button>
           <button type="button" role="menuitem" onClick={tu(onEinlesen)}>
             Einlesen <span>gesicherte Datei zurückholen</span>
+          </button>
+          <button type="button" role="menuitem" onClick={tu(onListeEinlesen)}>
+            Liste einlesen <span>Literaturliste als ODT-Datei</span>
           </button>
           <div className="menue-linie" />
           <button type="button" role="menuitem" onClick={tu(onCsl)}>
