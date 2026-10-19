@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { abschnitte, entferne, hinzufuegen, kapitelEntfernen, neueListe, nummern, rueckeUm, umschalten, verschiebe } from './listen'
+import { abschnitte, druckWerk, entferne, hinzufuegen, kapitelEntfernen, neueListe, nummern, rueckeUm, umschalten, verschiebe } from './listen'
+import { druckzeile } from './format'
 import { leereAuflage, leereAusgabe, leeresWerk, type Kapitel, type Literaturliste, type Werk } from './model'
 
 const p = (vorname: string, nachname: string) => ({ vorname, nachname, rolle: 'autor' as const })
@@ -67,6 +68,17 @@ describe('abschnitte', () => {
   it('bei jeder Person: ein Werk erscheint unter jeder seiner Personen', () => {
     const a = abschnitte({ ...neueListe('Personen'), jedePerson: true }, werke)
     expect(a[0].zeilen.map((z) => `${z.werk.id}@${z.person?.vorname ?? ''}`)).toEqual(['film@Rudolf', 'briefe@Marie', 'pdf@Rudolf', 'briefe@Rudolf'])
+  })
+  it('bei jeder Person: die Einordnungsperson steht in der Zeile vorn, die Karte bleibt unverändert', () => {
+    const gemeinsam = werk('gemeinsam', [p('Anna', 'Adler'), p('Zoe', 'Zebra')], '1990')
+    const mitte = werk('mitte', [p('Max', 'Mitte')], '1990')
+    const a = abschnitte({ ...neueListe('Personen'), jedePerson: true }, [gemeinsam, mitte])
+    expect(a[0].zeilen.map((z) => druckzeile(druckWerk(z)))).toEqual([
+      'Anna Adler/Zoe Zebra: gemeinsam, Basel 1990',
+      'Max Mitte: mitte, Basel 1990',
+      'Zoe Zebra/Anna Adler: gemeinsam, Basel 1990',
+    ])
+    expect(gemeinsam.personen.map((x) => x.nachname)).toEqual(['Adler', 'Zebra'])
   })
   it('übergeht Einträge gelöschter Karten', () => {
     const l = hinzufuegen({ ...neueListe('Hand'), regel: null }, 'weg')

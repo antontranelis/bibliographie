@@ -80,6 +80,26 @@ if (await daraus.count()) {
 await page.getByRole('button', { name: 'Liste löschen' }).click()
 pruefe('Liste gelöscht, Karten bleiben', (await daten()).listen.length === 2 && (await daten()).werke.length === 2)
 
+// Bei jeder Person: die Einordnungsperson steht in der gedruckten Zeile vorn (#11)
+{
+  const vorlage = (await daten()).werke[0]
+  const werk = (id, personen) => ({ ...vorlage, id, titel: id, untertitel: '', status: 'fest', personen, schlagwoerter: [], ausgaben: [{ ...vorlage.ausgaben[0], auflagen: [{ ...vorlage.ausgaben[0].auflagen[0], jahr: '1990', ort: 'Basel', gedrucktesJahr: '' }] }] })
+  const p = (vorname, nachname) => ({ vorname, nachname, rolle: 'autor' })
+  const liste = { ...(await daten()).listen[0], id: 'personen', name: 'Personen', regel: { person: '', schlagwort: '', nurPrimaer: false, nurFest: false }, kapitel: [], eintraege: [], ausgenommen: [], sortierung: 'name', jedePerson: true }
+  const neu = { werke: [werk('Gemeinschaftswerk', [p('Anna', 'Adler'), p('Zoe', 'Zebra')]), werk('Mittelwerk', [p('Max', 'Mitte')])], verlage: [], listen: [liste] }
+  await page.evaluate((d) => localStorage.setItem('bibliographie:datenstamm:v1', JSON.stringify(d)), neu)
+  await page.reload()
+  await reiter('Liste').click()
+  const zeilen = (await page.locator('.eintraege .eintrag > span:first-of-type').allInnerTexts()).map((t) => t.split(',')[0])
+  pruefe('Liste: Einordnungsperson vorn', zeilen.join(' | ') === 'Anna Adler/Zoe Zebra: Gemeinschaftswerk | Max Mitte: Mittelwerk | Zoe Zebra/Anna Adler: Gemeinschaftswerk', zeilen.join(' | '))
+  await page.getByRole('button', { name: 'Blattvorschau ansehen' }).click()
+  const blatt = (await page.locator('.blatt p').allInnerTexts()).map((t) => t.split(',')[0])
+  pruefe('Blatt: Einordnungsperson vorn', blatt.join(' | ') === 'Anna Adler/Zoe Zebra: Gemeinschaftswerk | Max Mitte: Mittelwerk | Zoe Zebra/Anna Adler: Gemeinschaftswerk', blatt.join(' | '))
+  await page.keyboard.press('Escape')
+  const karte = (await daten()).werke.find((w) => w.id === 'Gemeinschaftswerk')
+  pruefe('Karte behält ihre Personenfolge', karte.personen.map((x) => x.nachname).join('/') === 'Adler/Zebra')
+}
+
 // Schmal
 await page.setViewportSize({ width: 390, height: 844 })
 pruefe('Liste ohne Querscrollen auf dem Telefon', (await page.evaluate(() => document.documentElement.scrollWidth)) <= 390)

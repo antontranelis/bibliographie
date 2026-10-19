@@ -48,6 +48,13 @@ export interface Abschnitt {
   zeilen: ListenZeile[]
 }
 
+/** Das Werk, wie die Zeile es druckt: bei „jeder Person“ steht die Einordnungsperson vorn. Die Karte selbst bleibt, wie sie ist. */
+export function druckWerk(z: ListenZeile): Werk {
+  const vorn = z.person
+  if (!vorn) return z.werk
+  return { ...z.werk, personen: [vorn, ...z.werk.personen.filter((p) => p !== vorn)] }
+}
+
 /** Laufende Nummern der Kapitel: „1“, „1.1“, „1.2“, „2“. */
 export function nummern(kapitel: Kapitel[]): Map<string, string> {
   const aus = new Map<string, string>()

@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Druckzeile, kopiereZeile } from './Druckzeile'
 import { druckzeileTeile, type Stil, type Teil } from './format'
-import { ALLE, abschnitte, entferne, kapitelEntfernen, rueckeUm, umschalten, verschiebe, type Abschnitt } from './listen'
+import { ALLE, abschnitte, druckWerk, entferne, kapitelEntfernen, rueckeUm, umschalten, verschiebe, type Abschnitt } from './listen'
 import { neueId, personSchluessel, type Kapitel, type Literaturliste, type Werk } from './model'
 import { herunterladen } from './herunterladen'
 import { Blatt } from './Symbole'
@@ -82,7 +82,7 @@ export function Liste({
     .map((a) => ({
       ueberschrift: a.kapitel ? `${a.nummer} ${a.kapitel.titel}`.trim() : '',
       ebene: (a.kapitel?.ebene ?? 0) as Druckabschnitt['ebene'],
-      zeilen: a.zeilen.filter((z) => z.drin).map((z) => druckzeileTeile(z.werk, stil)),
+      zeilen: a.zeilen.filter((z) => z.drin).map((z) => druckzeileTeile(druckWerk(z), stil)),
     }))
     .filter((a) => a.ueberschrift || a.zeilen.length)
   const anzahl = gedruckt.length
@@ -190,7 +190,7 @@ export function Liste({
               {a.kapitel && <KapitelKopf abschnitt={a} onAendern={(teil) => setzeKapitel(a.kapitel!.id, teil)} onEntfernen={() => onAendern(kapitelEntfernen(liste, a.kapitel!.id))} />}
               {a.zeilen.length === 0 && !a.kapitel && liste.kapitel.length === 0 && <p className="leise">Noch keine Karte in dieser Liste.</p>}
               {a.zeilen.filter(zeigen).map((z) => {
-                const zeile = druckzeileTeile(z.werk, stil)
+                const zeile = druckzeileTeile(druckWerk(z), stil)
                 return (
                   <div key={z.schluessel} className={`eintrag ${z.drin ? '' : 'heraus'}`}>
                     <input type="checkbox" checked={z.drin} aria-label={`${z.werk.titel || 'ohne Titel'} drucken`} onChange={() => onAendern(umschalten(liste, z.werk.id))} />
