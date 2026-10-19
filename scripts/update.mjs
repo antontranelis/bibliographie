@@ -3,6 +3,7 @@
 // Jeder Build ändert über den Build-Stempel auch den Word-Teil, so wie ein echtes Update.
 import { execSync } from 'node:child_process'
 import { chromium } from 'playwright-core'
+import { speicherFrei, speicherVoll } from './speicher-voll.mjs'
 
 const [url = 'http://localhost:4321/'] = process.argv.slice(2)
 const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN })
@@ -85,12 +86,26 @@ const wordOffline = async (p) => {
   await d.close()
   await kontext.setOffline(false)
 
+  // Voller Speicher: die neue Karte ist nicht gespeichert, also kein Scharfschalten
+  await speicherVoll(a)
+  await a.locator('.reiter button', { hasText: 'Erfassen' }).click()
+  await a.getByRole('button', { name: /nächste Karte/ }).click()
+  await a.getByLabel('Nachname, Person 1').fill('Arnheim')
+  await a.getByRole('combobox', { name: 'Titel' }).fill('Ungespeichert vor dem Update')
+  await a.keyboard.press('Escape')
+  await a.getByRole('button', { name: 'Jetzt aktualisieren' }).click()
+  await a.waitForTimeout(2500)
+  pruefe('Voller Speicher: kein Update, Meldung', (await stand(a)) === alt && (await a.getByText('Die neue Version wartet').count()) === 1)
+  await speicherFrei(a)
+
   await a.getByRole('button', { name: 'Jetzt aktualisieren' }).click()
   const alle = await Promise.all([a, b, c].map((p) => neuerStand(p, alt)))
   pruefe('Knopf bringt alle Tabs auf den neuen Stand', alle.every(Boolean), alle.join(','))
   pruefe('Danach nur der neue Vorrat', (await vorraete(a)).length === 1, (await vorraete(a)).join(', '))
   await a.waitForTimeout(800)
-  pruefe('Karte aus A übersteht das Update aller Tabs', (await a.evaluate(() => localStorage.getItem('bibliographie:datenstamm:v1') ?? '')).includes('Nur in A angelegt'))
+  const nachUpdate = await a.evaluate(() => localStorage.getItem('bibliographie:datenstamm:v1') ?? '')
+  pruefe('Karte aus A übersteht das Update aller Tabs', nachUpdate.includes('Nur in A angelegt'))
+  pruefe('Karte vom vollen Speicher ist nach dem Update da', nachUpdate.includes('Ungespeichert vor dem Update'))
   await kontext.close()
 }
 

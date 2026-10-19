@@ -6,6 +6,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 // Fenster, rückt das nächste nach und lädt den gespeicherten Stand.
 // „Hier weiterarbeiten“: Das schreibende Fenster speichert, hört auf zu schreiben und meldet „abgegeben“;
 // dann nimmt das bittende Fenster die Sperre (steal). Kommt keiner, schreibt das erste weiter.
+// Gelingt das Speichern nicht (Speicher voll), meldet es „verweigert“ und schreibt weiter. Antwortet das
+// schreibende Fenster gar nicht, wird nur übernommen, wenn die Sperre wirklich frei ist.
 
 const SPERRE = 'bibliographie-schreibrecht'
 const KANAL = 'bibliographie-schreibrecht'
@@ -14,13 +16,17 @@ const UEBERGABE = 3000
 
 export type Schreibrecht = 'pruefen' | 'ja' | 'nein'
 
+/** Warum eine Übernahme nicht geklappt hat */
+export type Absage = '' | 'verweigert' | 'antwortet-nicht'
+
 /**
- * @param speichern schreibt den aktuellen Stand sofort, bevor das Schreibrecht abgegeben wird
+ * @param speichern schreibt den aktuellen Stand sofort; falsch, wenn das nicht gelingt
  * @param neuLaden holt den Stand aus dem Speicher, wenn das Schreibrecht hierher wechselt
  */
-export function useSchreibrecht(speichern: () => void, neuLaden: () => void): { recht: Schreibrecht; uebernehmen: () => void } {
+export function useSchreibrecht(speichern: () => boolean, neuLaden: () => void): { recht: Schreibrecht; absage: Absage; uebernehmen: () => void } {
   const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined
   const [recht, setRecht] = useState<Schreibrecht>(locks ? 'pruefen' : 'ja')
+  const [absage, setAbsage] = useState<Absage>('')
   const rueckruf = useRef({ speichern, neuLaden })
   rueckruf.current = { speichern, neuLaden }
   // generation: zählt jeden Erwerb; nur das Ende des aktuellen Haltens zählt
@@ -80,7 +86,11 @@ export function useSchreibrecht(speichern: () => void, neuLaden: () => void): { 
     let weiter: ReturnType<typeof setTimeout> | undefined
     k.onmessage = (e) => {
       if (e.data !== 'gib-ab' || !z.halte) return
-      rueckruf.current.speichern()
+      // Nur abgeben, was sicher gespeichert ist
+      if (!rueckruf.current.speichern()) {
+        k.postMessage('verweigert')
+        return
+      }
       setRecht('nein')
       const g = z.generation
       k.postMessage('abgegeben')
@@ -112,22 +122,34 @@ export function useSchreibrecht(speichern: () => void, neuLaden: () => void): { 
   const uebernehmen = useCallback(() => {
     const k = z.kanal
     if (!locks || !k || z.halte) return
+    setAbsage('')
     let erledigt = false
-    const weiter = () => {
-      if (erledigt) return
+    const ende = () => {
+      if (erledigt) return false
       erledigt = true
       clearTimeout(t)
       k.removeEventListener('message', antwort)
+      return true
+    }
+    const nehmen = (optionen: LockOptions) => {
       z.schlange?.abort()
       z.schlange = null
-      erwerben({ steal: true }, true)
+      erwerben(optionen, true).then((ok) => ok || anstellenRef.current())
     }
-    const antwort = (e: MessageEvent) => e.data === 'abgegeben' && weiter()
-    // Antwortet niemand, ist das andere Fenster weg oder hängt: dann trotzdem übernehmen
-    const t = setTimeout(weiter, 1500)
+    const antwort = (e: MessageEvent) => {
+      if (e.data === 'abgegeben' && ende()) nehmen({ steal: true })
+      if (e.data === 'verweigert' && ende()) setAbsage('verweigert')
+    }
+    // Antwortet niemand: nur übernehmen, wenn die Sperre wirklich frei ist
+    const t = setTimeout(async () => {
+      if (!ende()) return
+      const stand = await locks.query()
+      if (stand.held?.some((s) => s.name === SPERRE)) setAbsage('antwortet-nicht')
+      else nehmen({ ifAvailable: true })
+    }, 1500)
     k.addEventListener('message', antwort)
     k.postMessage('gib-ab')
   }, [locks, erwerben, z])
 
-  return { recht, uebernehmen }
+  return { recht, absage, uebernehmen }
 }

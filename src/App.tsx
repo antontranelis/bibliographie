@@ -3,7 +3,7 @@ import { TEXT_ARTEN, alleAuflagen, leeresWerk, mitAuflagen, type Datenstamm, typ
 import { Karteikarte } from './Karteikarte'
 import { Kartei, LEERE_SICHT, type KarteiSicht, type ListenVorgabe } from './Kartei'
 import { Liste } from './Liste'
-import { jetztAktualisieren } from './aktualisierung'
+import { jetztAktualisieren, vorDemAktualisieren } from './aktualisierung'
 import { useSchreibrecht } from './schreibrecht'
 import { ImportDialog } from './ImportDialog'
 import type { ImportPlan } from './import/einlesen'
@@ -111,12 +111,24 @@ export default function App() {
   const zuSpeichern = useRef(daten)
   zuSpeichern.current = daten
   // Nur das Fenster mit Schreibrecht speichert; andere würden mit altem Stand überschreiben
-  const { recht: schreibrecht, uebernehmen } = useSchreibrecht(
-    () => setSpeicherVoll(!speichereLokal(zuSpeichern.current)),
-    () => setDaten(ladeLokal() ?? { werke: [], verlage: [], listen: [] }),
+  const sofortSpeichern = () => {
+    const ok = speichereLokal(zuSpeichern.current)
+    setSpeicherVoll(!ok)
+    return ok
+  }
+  const { recht: schreibrecht, absage, uebernehmen } = useSchreibrecht(sofortSpeichern, () =>
+    setDaten(ladeLokal() ?? { werke: [], verlage: [], listen: [] }),
   )
   const darfSchreiben = useRef(false)
   darfSchreiben.current = schreibrecht === 'ja'
+  // Eine neue Version nur nach erfolgreichem Speichern; ein Fenster ohne Schreibrecht hat nichts zu speichern
+  vorDemAktualisieren(() => !darfSchreiben.current || sofortSpeichern())
+  useEffect(() => {
+    const gestoppt = () =>
+      setMeldung('Die neue Version wartet: Der Speicher des Browsers ist voll. Bitte erst über „Ablage“ → „Sichern“ eine Datei speichern.')
+    window.addEventListener('aktualisierung-gestoppt', gestoppt)
+    return () => window.removeEventListener('aktualisierung-gestoppt', gestoppt)
+  }, [])
   useEffect(() => {
     const t = setTimeout(() => darfSchreiben.current && setSpeicherVoll(!speichereLokal(daten)), 400)
     return () => clearTimeout(t)
@@ -441,6 +453,16 @@ export default function App() {
           <div className="papier schreibrecht-kasten">
             <h2>Das Programm ist schon in einem anderen Fenster geöffnet</h2>
             <p>Damit sich die Fenster nicht gegenseitig überschreiben, wird immer nur in einem gearbeitet. Wird das andere Fenster geschlossen, geht es hier von selbst weiter.</p>
+            {absage === 'verweigert' && (
+              <p className="warnfarbe" role="alert">
+                Das andere Fenster kann gerade nicht speichern, weil der Speicher des Browsers voll ist. Bitte dort über „Ablage“ → „Sichern“ eine Datei speichern.
+              </p>
+            )}
+            {absage === 'antwortet-nicht' && (
+              <p className="warnfarbe" role="alert">
+                Das andere Fenster antwortet nicht. Bitte es schließen; dann geht es hier von selbst weiter.
+              </p>
+            )}
             <button type="button" className="knopf haupt" onClick={uebernehmen}>
               Hier weiterarbeiten
             </button>

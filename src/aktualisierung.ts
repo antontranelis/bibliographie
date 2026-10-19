@@ -10,9 +10,22 @@ let wartend: ServiceWorker | null = null
 /** Kennung dieses Tabs: Kanal-Nachrichten erreichen auch andere Kanal-Objekte im selben Tab */
 const TAB = Math.random().toString(36).slice(2)
 
-/** Neue Version scharf schalten; alle Tabs laden daraufhin neu. */
-export function jetztAktualisieren(): void {
-  wartend?.postMessage('aktivieren')
+let vorher: () => boolean = () => true
+
+/** Wird vor dem Scharfschalten aufgerufen; falsch, wenn nicht sicher gespeichert ist. */
+export function vorDemAktualisieren(f: () => boolean): void {
+  vorher = f
+}
+
+/** Neue Version scharf schalten, aber nur nach erfolgreichem Speichern; alle Tabs laden daraufhin neu. */
+export function jetztAktualisieren(): boolean {
+  if (!wartend) return false
+  if (!vorher()) {
+    window.dispatchEvent(new Event('aktualisierung-gestoppt'))
+    return false
+  }
+  wartend.postMessage('aktivieren')
+  return true
 }
 
 /** Andere offene Tabs der App, gefragt über einen gemeinsamen Kanal. */
@@ -56,8 +69,8 @@ export function starteAktualisierung(): void {
   const bereit = async (w: ServiceWorker) => {
     if (!navigator.serviceWorker.controller) return
     wartend = w
-    if (Date.now() - geoeffnet < STARTFENSTER && !(await andereTabs())) jetztAktualisieren()
-    else window.dispatchEvent(new Event('neue-version'))
+    const beimStart = Date.now() - geoeffnet < STARTFENSTER && !(await andereTabs())
+    if (!beimStart || !jetztAktualisieren()) window.dispatchEvent(new Event('neue-version'))
   }
 
   window.addEventListener('load', async () => {
