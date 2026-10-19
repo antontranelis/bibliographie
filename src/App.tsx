@@ -3,6 +3,7 @@ import { TEXT_ARTEN, alleAuflagen, leeresWerk, mitAuflagen, type Datenstamm, typ
 import { Karteikarte } from './Karteikarte'
 import { Kartei, LEERE_SICHT, type KarteiSicht, type ListenVorgabe } from './Kartei'
 import { Liste } from './Liste'
+import { jetztAktualisieren } from './aktualisierung'
 import { ImportDialog } from './ImportDialog'
 import type { ImportPlan } from './import/einlesen'
 import { ALLE, hinzufuegen, neueListe } from './listen'
@@ -428,9 +429,9 @@ export default function App() {
 
       {neueVersion && (
         <div className="speicher-warnung neue-version" role="status">
-          Eine neue Version des Programms ist da.{' '}
-          <button type="button" className="textknopf" onClick={() => location.reload()}>
-            Jetzt neu laden
+          Eine neue Version des Programms ist bereit. Beim Aktualisieren laden alle offenen Fenster des Programms neu, Ihre Daten bleiben erhalten.{' '}
+          <button type="button" className="textknopf" onClick={jetztAktualisieren}>
+            Jetzt aktualisieren
           </button>
         </div>
       )}
