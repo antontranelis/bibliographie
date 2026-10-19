@@ -24,6 +24,11 @@ describe('Import und Export', () => {
     const lNeu = { ...l, name: 'neu', geaendert: '2026-02-01' }
     expect(zusammenfuehren({ werke: [], verlage: [], listen: [lNeu] }, { werke: [], verlage: [], listen: [lAlt] }).listen[0].name).toBe('neu')
   })
+  it('ergänzt älteren Karten eine leere Vorlage', () => {
+    const { vorlage: _vorlage, ...ohne } = leeresWerk()
+    const v4 = { format: 'bibliographie-datenstamm', version: 4, verlage: [], listen: [], werke: [ohne] }
+    expect(importiere(JSON.stringify(v4)).werke[0].vorlage).toBe('')
+  })
   it('ergänzt älteren Dateien eine leere Listenablage', () => {
     const v3 = { format: 'bibliographie-datenstamm', version: 3, verlage: [], werke: [] }
     expect(importiere(JSON.stringify(v3)).listen).toEqual([])

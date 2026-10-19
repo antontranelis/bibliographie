@@ -11,11 +11,13 @@ export interface KarteiSicht {
   suche: string
   register: Register
   nurVorlaeufig: boolean
+  /** Nur Karten mit Originalzeile aus einer eingelesenen Liste */
+  nurVorlage: boolean
   buchstabe: string | null
   gewaehlt: string | null
 }
 
-export const LEERE_SICHT: KarteiSicht = { suche: '', register: 'autor', nurVorlaeufig: false, buchstabe: null, gewaehlt: null }
+export const LEERE_SICHT: KarteiSicht = { suche: '', register: 'autor', nurVorlaeufig: false, nurVorlage: false, buchstabe: null, gewaehlt: null }
 
 export interface ListenVorgabe {
   person?: string
@@ -99,11 +101,13 @@ export function Kartei({ werke, sicht, onSicht, onBearbeiten, onListe, onBeispie
   const setze = (teil: Partial<KarteiSicht>) => onSicht({ ...sicht, ...teil })
   const kasten = useRef<HTMLDivElement>(null)
 
+  const mitVorlage = useMemo(() => werke.some((w) => w.vorlage), [werke])
   const passend = useMemo(() => {
     const s = sicht.suche.trim().toLowerCase()
     return werke.filter(
       (w) =>
         (!sicht.nurVorlaeufig || w.status === 'vorlaeufig') &&
+        (!sicht.nurVorlage || Boolean(w.vorlage)) &&
         (!s ||
           [
             w.titel,
@@ -118,7 +122,7 @@ export function Kartei({ werke, sicht, onSicht, onBearbeiten, onListe, onBeispie
             .toLowerCase()
             .includes(s)),
     )
-  }, [werke, sicht.suche, sicht.nurVorlaeufig])
+  }, [werke, sicht.suche, sicht.nurVorlaeufig, sicht.nurVorlage])
 
   const gruppen = useMemo(() => bildeGruppen(passend, sicht.register), [passend, sicht.register])
   const vorhandeneBuchstaben = useMemo(() => new Set(gruppen.map((g) => g.buchstabe)), [gruppen])
@@ -211,6 +215,11 @@ export function Kartei({ werke, sicht, onSicht, onBearbeiten, onListe, onBeispie
           <label className="pille">
             <input type="checkbox" checked={sicht.nurVorlaeufig} onChange={(e) => setze({ nurVorlaeufig: e.target.checked })} /> nur vorläufige
           </label>
+          {(sicht.nurVorlage || mitVorlage) && (
+            <label className="pille">
+              <input type="checkbox" checked={sicht.nurVorlage} onChange={(e) => setze({ nurVorlage: e.target.checked })} /> nur mit Vorlage aus dem Import
+            </label>
+          )}
         </div>
 
         <div className="kasten-mit-register">

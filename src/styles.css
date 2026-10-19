@@ -132,6 +132,7 @@ select.eingabe { cursor: pointer; }
 .menue-linie { height: 1px; background: var(--zart); margin: 4px 6px; }
 .menue-hinweis { margin: 6px 12px 6px; font-size: 12px; color: var(--leise); }
 
+.speicher-warnung { background: var(--warn-bg); color: #5a3a00; border-bottom: 1px solid #d9b970; padding: 10px 24px; font-size: 15px; }
 .meldung {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 40;
   background: var(--tinte); color: #fff; border-radius: 8px; padding: 12px 18px; font-size: 15px;
@@ -429,6 +430,17 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
 .kapitel-nr { font: 600 17px/1 var(--serif); color: var(--lab); min-width: 28px; }
 .kapitel-knoepfe { padding-top: 12px; }
 .zeile-knoepfe { margin-top: 8px; }
+.vorlage { margin-top: 14px; padding: 12px 14px; background: var(--ocker-hell); border-left: 3px solid var(--ocker); border-radius: 4px; }
+.vorlage p { margin: 4px 0 6px; font-family: var(--serif); }
+.import-dialog { width: 100%; max-width: 860px; margin-top: 40px; padding: 22px 26px; display: flex; flex-direction: column; gap: 14px; }
+.import-dialog h2 { font: 600 20px/1.3 var(--serif); margin: 0; }
+.import-abschnitte td { font-size: 14px; }
+.import-abschnitte .zahl { text-align: right; white-space: nowrap; width: 80px; }
+.import-abschnitte tr.abgewaehlt td { color: var(--blass); }
+.import-zahlen { display: flex; flex-wrap: wrap; gap: 10px 28px; margin: 0; }
+.import-zahlen dt { font: 600 11px/1.2 var(--sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--lab); }
+.import-zahlen dd { margin: 2px 0 0; font: 600 22px/1.2 var(--serif); }
+.import-name { display: grid; gap: 4px; max-width: 420px; }
 .klein-wahl { font: 600 13px/1 var(--sans); border: 1px solid var(--linie2); background: #fff; border-radius: 5px; padding: 6px 8px; }
 .eintrag input { margin-top: 6px; align-self: start; width: 16px; height: 16px; }
 .fett { font-weight: 700; }

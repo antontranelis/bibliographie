@@ -173,6 +173,8 @@ export interface Werk {
   kommentar: string
   /** Anmerkung, die in der Liste kursiv mitgedruckt wird: „(Anm.: …)“; *Titel* darin steht aufrecht */
   anmerkung: string
+  /** Zeile aus einer eingelesenen Liste, solange die Karte nicht sicher zerlegt und nicht fest angelegt ist */
+  vorlage: string
   schlagwoerter: Schlagwort[]
   angelegt: string
   geaendert: string
@@ -298,6 +300,7 @@ export function leeresWerk(): Werk {
     ersterscheinung: '',
     kommentar: '',
     anmerkung: '',
+    vorlage: '',
     schlagwoerter: [],
     angelegt: jetzt,
     geaendert: jetzt,
