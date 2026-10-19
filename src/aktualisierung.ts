@@ -1,29 +1,36 @@
-// Neue Versionen: der Service Worker lädt sie im Hintergrund und lässt sie warten. Scharf geschaltet wird
-// beim Start, wenn kein anderer Tab der App offen ist, sonst über den Knopf „Jetzt aktualisieren“.
-// Dann laden alle Tabs neu; ihre Daten speichert die App beim Verlassen der Seite.
+// Neue Versionen: der Service Worker lädt sie im Hintergrund und lässt sie warten. Dieses Modul meldet nur,
+// was geschieht (neue Version bereit, Version übernommen). Ob und wann scharf geschaltet wird, entscheidet
+// allein die Sitzung (sitzung.ts): nur der Schreiber, nur nach erfolgreichem Speichern.
 
 /** So lange nach dem Öffnen gilt eine fertige neue Version als „beim Start“ */
 const STARTFENSTER = 10_000
 const STUENDLICH = 60 * 60 * 1000
 
+export interface Hoerer {
+  /** Eine neue Version wartet. beimStart: kurz nach dem Öffnen und kein anderer Tab der App offen. */
+  neueVersion: (beimStart: boolean) => void
+  /** Eine neue Version hat übernommen; die laufende Seite ist veraltet. */
+  uebernommen: () => void
+}
+
 let wartend: ServiceWorker | null = null
+let gemeldet: boolean | null = null
+let hoerer: Hoerer | null = null
 /** Kennung dieses Tabs: Kanal-Nachrichten erreichen auch andere Kanal-Objekte im selben Tab */
 const TAB = Math.random().toString(36).slice(2)
 
-let vorher: () => boolean = () => true
-
-/** Wird vor dem Scharfschalten aufgerufen; falsch, wenn nicht sicher gespeichert ist. */
-export function vorDemAktualisieren(f: () => boolean): void {
-  vorher = f
+/** Die Sitzung meldet sich an; eine schon gemeldete neue Version wird nachgereicht. */
+export function verbinde(h: Hoerer): () => void {
+  hoerer = h
+  if (gemeldet !== null) h.neueVersion(gemeldet)
+  return () => {
+    if (hoerer === h) hoerer = null
+  }
 }
 
-/** Neue Version scharf schalten, aber nur nach erfolgreichem Speichern; alle Tabs laden daraufhin neu. */
-export function jetztAktualisieren(): boolean {
+/** Nur für die Sitzung: die wartende Version übernehmen lassen. */
+export function schalteScharf(): boolean {
   if (!wartend) return false
-  if (!vorher()) {
-    window.dispatchEvent(new Event('aktualisierung-gestoppt'))
-    return false
-  }
   wartend.postMessage('aktivieren')
   return true
 }
@@ -59,10 +66,10 @@ export function starteAktualisierung(): void {
     }
   }
 
-  // Übernimmt eine neue Version, laden alle Tabs neu. Die erste Übernahme beim ersten Besuch ist keine.
+  // Die erste Übernahme beim ersten Besuch ist keine neue Version
   let gesteuert = Boolean(navigator.serviceWorker.controller)
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (gesteuert) location.reload()
+    if (gesteuert) (hoerer ? hoerer.uebernommen : () => location.reload())()
     gesteuert = true
   })
 
@@ -70,7 +77,8 @@ export function starteAktualisierung(): void {
     if (!navigator.serviceWorker.controller) return
     wartend = w
     const beimStart = Date.now() - geoeffnet < STARTFENSTER && !(await andereTabs())
-    if (!beimStart || !jetztAktualisieren()) window.dispatchEvent(new Event('neue-version'))
+    gemeldet = beimStart
+    hoerer?.neueVersion(beimStart)
   }
 
   window.addEventListener('load', async () => {
