@@ -58,13 +58,14 @@ const wordOffline = async (p) => {
   const a = await seite(kontext)
   await a.goto(url)
   await gesteuert(a)
-  await a.getByLabel('Nachname, Person 1').fill('Steiner')
-  await a.getByRole('combobox', { name: 'Titel' }).fill('Für die Word-Datei')
-  await a.keyboard.press('Escape')
-  await a.waitForTimeout(600)
   const b = await seite(kontext)
   await b.goto(url)
   const alt = await stand(a)
+  // Wie im Review: Karte nur in A, nachdem B schon offen ist
+  await a.getByLabel('Nachname, Person 1').fill('Steiner')
+  await a.getByRole('combobox', { name: 'Titel' }).fill('Nur in A angelegt')
+  await a.keyboard.press('Escape')
+  await a.waitForTimeout(600)
 
   bauen()
   await a.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r?.update()))
@@ -77,11 +78,10 @@ const wordOffline = async (p) => {
   pruefe('Neuer Tab bekommt solange die alte, stimmige Version', (await stand(c)) === alt)
 
   await kontext.setOffline(true)
-  pruefe('Alter Tab exportiert offline Word', await wordOffline(b))
+  pruefe('Alter Tab exportiert offline Word', await wordOffline(a))
   const d = await seite(kontext)
   await d.goto(url)
   pruefe('Offline geöffneter Tab: alte, stimmige Version', (await stand(d)) === alt)
-  pruefe('… und sein Word-Export geht', await wordOffline(d))
   await d.close()
   await kontext.setOffline(false)
 
@@ -89,6 +89,8 @@ const wordOffline = async (p) => {
   const alle = await Promise.all([a, b, c].map((p) => neuerStand(p, alt)))
   pruefe('Knopf bringt alle Tabs auf den neuen Stand', alle.every(Boolean), alle.join(','))
   pruefe('Danach nur der neue Vorrat', (await vorraete(a)).length === 1, (await vorraete(a)).join(', '))
+  await a.waitForTimeout(800)
+  pruefe('Karte aus A übersteht das Update aller Tabs', (await a.evaluate(() => localStorage.getItem('bibliographie:datenstamm:v1') ?? '')).includes('Nur in A angelegt'))
   await kontext.close()
 }
 

@@ -4,6 +4,7 @@ import { Karteikarte } from './Karteikarte'
 import { Kartei, LEERE_SICHT, type KarteiSicht, type ListenVorgabe } from './Kartei'
 import { Liste } from './Liste'
 import { jetztAktualisieren } from './aktualisierung'
+import { useSchreibrecht } from './schreibrecht'
 import { ImportDialog } from './ImportDialog'
 import type { ImportPlan } from './import/einlesen'
 import { ALLE, hinzufuegen, neueListe } from './listen'
@@ -109,12 +110,19 @@ export default function App() {
   }, [])
   const zuSpeichern = useRef(daten)
   zuSpeichern.current = daten
+  // Nur das Fenster mit Schreibrecht speichert; andere würden mit altem Stand überschreiben
+  const { recht: schreibrecht, uebernehmen } = useSchreibrecht(
+    () => setSpeicherVoll(!speichereLokal(zuSpeichern.current)),
+    () => setDaten(ladeLokal() ?? { werke: [], verlage: [], listen: [] }),
+  )
+  const darfSchreiben = useRef(false)
+  darfSchreiben.current = schreibrecht === 'ja'
   useEffect(() => {
-    const t = setTimeout(() => setSpeicherVoll(!speichereLokal(daten)), 400)
+    const t = setTimeout(() => darfSchreiben.current && setSpeicherVoll(!speichereLokal(daten)), 400)
     return () => clearTimeout(t)
   }, [daten])
   useEffect(() => {
-    const sofort = () => speichereLokal(zuSpeichern.current)
+    const sofort = () => darfSchreiben.current && speichereLokal(zuSpeichern.current)
     window.addEventListener('pagehide', sofort)
     return () => window.removeEventListener('pagehide', sofort)
   }, [])
@@ -337,6 +345,7 @@ export default function App() {
   // Tastatur für die Serienerfassung
   const tastenRef = useRef<(e: KeyboardEvent) => void>(() => {})
   tastenRef.current = (e: KeyboardEvent) => {
+    if (!darfSchreiben.current) return
     const wechsel: Record<string, Ansicht> = { F2: 'erfassen', F3: 'kartei', F4: 'liste', F5: 'verlage' }
     if (wechsel[e.key] && !e.ctrlKey && !e.altKey) {
       e.preventDefault()
@@ -427,6 +436,17 @@ export default function App() {
         </div>
       </header>
 
+      {schreibrecht === 'nein' && (
+        <div className="ueberlagerung schreibrecht" role="dialog" aria-modal="true" aria-label="In einem anderen Fenster geöffnet">
+          <div className="papier schreibrecht-kasten">
+            <h2>Das Programm ist schon in einem anderen Fenster geöffnet</h2>
+            <p>Damit sich die Fenster nicht gegenseitig überschreiben, wird immer nur in einem gearbeitet. Wird das andere Fenster geschlossen, geht es hier von selbst weiter.</p>
+            <button type="button" className="knopf haupt" onClick={uebernehmen}>
+              Hier weiterarbeiten
+            </button>
+          </div>
+        </div>
+      )}
       {neueVersion && (
         <div className="speicher-warnung neue-version" role="status">
           Eine neue Version des Programms ist bereit. Beim Aktualisieren laden alle offenen Fenster des Programms neu, Ihre Daten bleiben erhalten.{' '}
