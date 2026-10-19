@@ -26,6 +26,7 @@ export async function wordDatei(titel: string, abschnitte: Druckabschnitt[]): Pr
     ),
   ])
   const doc = new Document({
+    description: `Bibliographie, Stand ${__STAND__}`,
     styles: {
       default: { document: { run: { font: SCHRIFT, size: 24 } } },
     },

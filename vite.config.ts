@@ -27,17 +27,48 @@ self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(SPEICHER).then((c) => c.addAll(DATEIEN)).then(() => self.skipWaiting()))
 })
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys()
-      .then((namen) => Promise.all(namen.filter((n) => n.startsWith('bibliographie-') && n !== SPEICHER).map((n) => caches.delete(n))))
-      .then(() => self.clients.claim()),
-  )
+// Alte Vorräte bleiben, solange ein Tab offen ist, der beim Wechsel schon lief: er lädt noch die alten
+// Programmteile nach. Vermerkt werden sie im Cache-Speicher, damit das ein Beenden des Workers übersteht.
+const VERMERK = 'bibliographie-auslauf'
+const vermerk = async () => {
+  const a = await (await caches.open(VERMERK)).match('vermerk')
+  return a ? a.json() : { vorraete: [], tabs: [] }
+}
+const merke = async (v) => (await caches.open(VERMERK)).put('vermerk', new Response(JSON.stringify(v)))
+// Bereits gesteuerte Tabs wechseln schon beim Aktivieren zur neuen Version; aufgeräumt wird erst danach
+let aktivierung = Promise.resolve()
+
+// Geprüft, wenn eine Seite fertig geladen hat: dann ist ein ersetzter Tab (Neuladen) sicher geschlossen
+const aufraeumen = async () => {
+  await aktivierung
+  const v = await vermerk()
+  if (v.vorraete.length === 0) return
+  const offen = new Set((await self.clients.matchAll({ type: 'window', includeUncontrolled: true })).map((c) => c.id))
+  if (v.tabs.some((id) => offen.has(id))) return
+  await Promise.all(v.vorraete.map((n) => caches.delete(n)))
+  await merke({ vorraete: [], tabs: [] })
+}
+
+self.addEventListener('message', (e) => {
+  if (e.data === 'geladen') e.waitUntil(aufraeumen())
 })
 
-// Eigene Dateien: erst das Netz, ohne Verbindung oder bei Fehlerantwort der Vorrat.
+self.addEventListener('activate', (e) => {
+  aktivierung = (async () => {
+    const alt = (await caches.keys()).filter((n) => n.startsWith('bibliographie-') && n !== SPEICHER && n !== VERMERK)
+    const tabs = (await self.clients.matchAll({ type: 'window', includeUncontrolled: true })).map((c) => c.id)
+    const v = await vermerk()
+    await merke({ vorraete: [...new Set([...v.vorraete, ...alt])].filter((n) => n !== SPEICHER), tabs: [...new Set([...v.tabs, ...tabs])] })
+    await self.clients.claim()
+  })()
+  e.waitUntil(aktivierung.then(() => aufraeumen()))
+})
+
+// Eigene Dateien: erst das Netz, ohne Verbindung oder bei Fehlerantwort der Vorrat (alle Vorräte, auch auslaufende).
 // Kataloge und alles Fremde gehen direkt ins Netz.
-const ausVorrat = async (anfrage) => (await caches.match(anfrage)) ?? (anfrage.mode === 'navigate' ? await caches.match('./') : undefined)
+// ignoreVary: der Server schickt „Vary: Origin“, Modul-Anfragen haben einen Origin-Kopf, das Vorladen nicht
+const ausVorrat = async (anfrage) =>
+  (await caches.match(anfrage, { ignoreVary: true })) ?? (anfrage.mode === 'navigate' ? await caches.match('./', { ignoreVary: true }) : undefined)
 
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url)

@@ -12,12 +12,16 @@ document.documentElement.dataset.stand = __STAND__
 // Und den Browser bitten, die Daten nicht von selbst zu räumen.
 // Übernimmt eine neue Version, während die Seite offen ist, meldet die App das zum Neuladen.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  const hatteSteuerung = Boolean(navigator.serviceWorker.controller)
+  // Die erste Übernahme beim ersten Besuch ist keine neue Version, jede weitere schon
+  let gesteuert = Boolean(navigator.serviceWorker.controller)
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (hatteSteuerung) window.dispatchEvent(new Event('neue-version'))
+    if (gesteuert) window.dispatchEvent(new Event('neue-version'))
+    gesteuert = true
   })
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => {})
+    // Alte Vorräte darf der Service Worker räumen, sobald keine Seite mehr sie braucht
+    navigator.serviceWorker.controller?.postMessage('geladen')
     navigator.storage?.persist?.().catch(() => {})
   })
 }
