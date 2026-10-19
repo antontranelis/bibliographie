@@ -10,7 +10,11 @@ const UEBERSCHRIFT_LAENGE = 120
 
 export type PostenStatus = 'sicher' | 'pruefen' | 'hand'
 
+/** Nummer des Abschnitts für Einträge vor dem ersten Absatz */
+export const VOR_DEM_ERSTEN = -1
+
 export interface ImportAbschnitt {
+  /** Stelle des Absatzes in der Datei; VOR_DEM_ERSTEN für Einträge davor */
   nr: number
   titel: string
   eintraege: number
@@ -25,8 +29,8 @@ export interface ImportPosten {
   werk: Werk
   /** Dieselbe Karte steht schon in der Kartei */
   vorhandenId?: string
-  /** Steht weiter oben in derselben Datei: Stelle in `posten` */
-  doppeltVon?: number
+  /** Gleiche Gruppe = dasselbe Werk; leer, wenn ohne Titel nicht vergleichbar */
+  gruppe: string
 }
 
 export interface ImportPlan {
@@ -64,9 +68,8 @@ function teilwerk(laeufe: Lauf[]): Werk {
 export function planeImport(dok: OdtDokument, bestand: Werk[]): ImportPlan {
   const inKartei = new Map(bestand.map((w) => [schluessel(w), w.id]))
   inKartei.delete('')
-  const inDatei = new Map<string, number>()
 
-  const posten: ImportPosten[] = dok.eintraege.map((e, i) => {
+  const posten: ImportPosten[] = dok.eintraege.map((e) => {
     const r = zerlegeEintrag(e.laeufe)
     let status: PostenStatus = 'hand'
     let werk: Werk
@@ -75,19 +78,17 @@ export function planeImport(dok: OdtDokument, bestand: Werk[]): ImportPlan {
       werk = r.werk
     } else werk = r.werk ?? teilwerk(e.laeufe)
     werk = { ...werk, status: 'vorlaeufig', vorlage: status === 'sicher' ? '' : r.original, kommentar: r.hinweis }
-    const p: ImportPosten = { abschnittNr: e.abschnittNr, status, werk }
-    const k = schluessel(werk)
-    if (k && inKartei.has(k)) p.vorhandenId = inKartei.get(k)
-    else if (k && inDatei.has(k)) p.doppeltVon = inDatei.get(k)
-    else if (k) inDatei.set(k, i)
-    return p
+    const gruppe = schluessel(werk)
+    return { abschnittNr: e.abschnittNr, status, werk, gruppe, ...(gruppe && inKartei.has(gruppe) ? { vorhandenId: inKartei.get(gruppe) } : {}) }
   })
 
-  const abschnitte: ImportAbschnitt[] = dok.abschnitte.map((titel, nr) => {
+  const abschnitt = (nr: number, titel: string): ImportAbschnitt => {
     const eigene = posten.filter((p) => p.abschnittNr === nr)
     const erkannt = eigene.filter((p) => p.status !== 'hand').length
     return { nr, titel, eintraege: eigene.length, erkannt, vorschlag: eigene.length > 0 && erkannt / eigene.length >= 0.5 }
-  })
+  }
+  const davor = posten.some((p) => p.abschnittNr === VOR_DEM_ERSTEN) ? [abschnitt(VOR_DEM_ERSTEN, 'vor dem ersten Absatz')] : []
+  const abschnitte = [...davor, ...dok.abschnitte.map((titel, nr) => abschnitt(nr, titel))]
   // Kurze Absätze ohne Einträge direkt vor einem gewählten Abschnitt sind seine Überschrift
   for (let i = abschnitte.length - 1; i >= 0; i--) {
     const a = abschnitte[i]
@@ -96,20 +97,42 @@ export function planeImport(dok: OdtDokument, bestand: Werk[]): ImportPlan {
   return { abschnitte, posten }
 }
 
+export interface Aufloesung {
+  posten: ImportPosten
+  /** Stelle in `plan.posten` */
+  i: number
+  /** neu = wird Karte; vorhanden = steht in der Kartei; doppelt = weiter oben in der Auswahl */
+  art: 'neu' | 'vorhanden' | 'doppelt'
+  /** Bei „doppelt“: Stelle des ersten gewählten Fundes */
+  vertreter: number
+}
+
+/** Was aus den gewählten Einträgen wird. Doppelte zählen innerhalb der Auswahl: der erste gewählte Fund wird die Karte. */
+export function aufloesung(plan: ImportPlan, auswahl: Set<number>): Aufloesung[] {
+  const erster = new Map<string, number>()
+  return plan.posten.flatMap((posten, i): Aufloesung[] => {
+    if (!auswahl.has(posten.abschnittNr)) return []
+    if (posten.vorhandenId) return [{ posten, i, art: 'vorhanden', vertreter: i }]
+    if (posten.gruppe && erster.has(posten.gruppe)) return [{ posten, i, art: 'doppelt', vertreter: erster.get(posten.gruppe)! }]
+    if (posten.gruppe) erster.set(posten.gruppe, i)
+    return [{ posten, i, art: 'neu', vertreter: i }]
+  })
+}
+
 /**
  * Legt die Karten an und, wenn ein Name gegeben ist, eine Liste in der Reihenfolge der Datei.
  * Aufeinanderfolgende Abschnitte ohne Einträge werden zu einem Kapitel, die folgenden zu Unterkapiteln.
  */
 export function uebernimm(plan: ImportPlan, auswahl: Set<number>, listenName: string | null): { werke: Werk[]; liste?: Literaturliste } {
-  const gewaehlt = plan.posten.map((p, i) => ({ p, i })).filter(({ p }) => auswahl.has(p.abschnittNr))
+  const gewaehlt = aufloesung(plan, auswahl)
   const ids = new Map<number, string>()
   const werke: Werk[] = []
-  for (const { p, i } of gewaehlt) {
-    if (p.vorhandenId) ids.set(i, p.vorhandenId)
-    else if (p.doppeltVon !== undefined && ids.has(p.doppeltVon)) ids.set(i, ids.get(p.doppeltVon)!)
+  for (const { posten, i, art, vertreter } of gewaehlt) {
+    if (art === 'vorhanden') ids.set(i, posten.vorhandenId!)
+    else if (art === 'doppelt') ids.set(i, ids.get(vertreter)!)
     else {
       const jetzt = new Date().toISOString()
-      const w = { ...p.werk, id: neueId(), angelegt: jetzt, geaendert: jetzt }
+      const w = { ...posten.werk, id: neueId(), angelegt: jetzt, geaendert: jetzt }
       werke.push(w)
       ids.set(i, w.id)
     }
@@ -120,7 +143,8 @@ export function uebernimm(plan: ImportPlan, auswahl: Set<number>, listenName: st
   const kapitelVon = new Map<number, string>()
   let oben: Kapitel | null = null
   let letzterLeer = false
-  for (const a of plan.abschnitte.filter((x) => auswahl.has(x.nr))) {
+  // Einträge vor dem ersten Absatz stehen in der Liste vor den Kapiteln
+  for (const a of plan.abschnitte.filter((x) => auswahl.has(x.nr) && x.nr !== VOR_DEM_ERSTEN)) {
     if (a.eintraege === 0) {
       if (oben && letzterLeer) oben.titel = `${oben.titel} ${a.titel}`
       else {
@@ -138,11 +162,11 @@ export function uebernimm(plan: ImportPlan, auswahl: Set<number>, listenName: st
 
   const eintraege: ListenEintrag[] = []
   const drin = new Set<string>()
-  for (const { p, i } of gewaehlt) {
+  for (const { posten, i } of gewaehlt) {
     const werkId = ids.get(i)!
     if (drin.has(werkId)) continue
     drin.add(werkId)
-    eintraege.push({ werkId, kapitelId: kapitelVon.get(p.abschnittNr) ?? '' })
+    eintraege.push({ werkId, kapitelId: kapitelVon.get(posten.abschnittNr) ?? '' })
   }
   return { werke, liste: { ...neueListe(listenName, null), kapitel, eintraege, sortierung: 'hand' } }
 }

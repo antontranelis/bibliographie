@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { druckzeile } from '../format'
 import { abschnitte as listenAbschnitte } from '../listen'
 import { leeresWerk } from '../model'
-import { planeImport, uebernimm } from './einlesen'
+import { aufloesung, planeImport, uebernimm } from './einlesen'
 import type { Lauf, OdtDokument, OdtEintrag } from './odt'
 
 const n = (text: string): Lauf => ({ text, fett: false, kursiv: false, hinterlegt: null })
@@ -40,8 +40,9 @@ describe('planeImport', () => {
   it('teilt die Einträge in sicher, prüfen und von Hand', () => {
     expect(plan.posten.map((p) => p.status)).toEqual(['hand', 'sicher', 'sicher', 'hand', 'sicher', 'hand', 'sicher'])
   })
-  it('erkennt Doppelte in der Kartei und innerhalb der Datei', () => {
-    expect(plan.posten.map((p) => p.vorhandenId ?? (p.doppeltVon !== undefined ? `doppelt:${p.doppeltVon}` : ''))).toEqual(['', '', '', '', 'doppelt:1', '', 'da'])
+  it('erkennt Doppelte in der Kartei und innerhalb der Auswahl', () => {
+    const alle = new Set(plan.abschnitte.map((a) => a.nr))
+    expect(aufloesung(plan, alle).map((a) => (a.art === 'doppelt' ? `doppelt:${a.vertreter}` : a.art))).toEqual(['neu', 'neu', 'neu', 'neu', 'doppelt:1', 'neu', 'vorhanden'])
   })
   it('Karten von Hand behalten Personen, Titel und die Originalzeile', () => {
     const benjamin = plan.posten[3].werk
@@ -89,5 +90,41 @@ describe('uebernimm', () => {
   })
   it('ohne Liste nur Karten', () => {
     expect(uebernimm(plan, auswahl, null).liste).toBeUndefined()
+  })
+})
+
+describe('Auswahl und Doppelte', () => {
+  const iros = () => [n('Ernst Iros: '), f('Wesen und Dramaturgie des Films'), n(', Zürich 1938')]
+  const dreimal: OdtDokument = {
+    abschnitte: ['A', 'B', 'C'],
+    eintraege: [eintrag(0, iros()), eintrag(1, iros()), eintrag(2, iros())],
+  }
+  it('ist der erste Fund abgewählt, wird der erste gewählte zur Karte', () => {
+    const plan = planeImport(dreimal, [])
+    const auswahl = new Set([1, 2])
+    expect(aufloesung(plan, auswahl).map((a) => a.art)).toEqual(['neu', 'doppelt'])
+    const r = uebernimm(plan, auswahl, 'L')
+    expect(r.werke).toHaveLength(1)
+    expect(r.liste!.eintraege.map((e) => e.werkId)).toEqual([r.werke[0].id])
+  })
+})
+
+describe('Einträge vor dem ersten Absatz', () => {
+  const eintragA = () => [n('Ernst Iros: '), f('Wesen und Dramaturgie des Films'), n(', Zürich 1938')]
+  const eintragB = () => [n('Rudolf Arnheim: '), f('Film als Kunst'), n(', Berlin 1932')]
+  it('ohne jeden Absatz: ein wählbarer Abschnitt, Einträge vor den Kapiteln', () => {
+    const plan = planeImport({ abschnitte: [], eintraege: [eintrag(-1, eintragA())] }, [])
+    expect(plan.abschnitte.map((a) => [a.nr, a.eintraege, a.vorschlag])).toEqual([[-1, 1, true]])
+    const r = uebernimm(plan, new Set([-1]), 'L')
+    expect(r.werke).toHaveLength(1)
+    expect(r.liste!.kapitel).toEqual([])
+    expect(r.liste!.eintraege).toEqual([{ werkId: r.werke[0].id, kapitelId: '' }])
+  })
+  it('gemischt: führende Einträge vor den Kapiteln, der Rest im Kapitel', () => {
+    const plan = planeImport({ abschnitte: ['Kapitel'], eintraege: [eintrag(-1, eintragA()), eintrag(0, eintragB())] }, [])
+    expect(plan.abschnitte.map((a) => a.nr)).toEqual([-1, 0])
+    const r = uebernimm(plan, new Set([-1, 0]), 'L')
+    expect(r.liste!.kapitel.map((k) => k.titel)).toEqual(['Kapitel'])
+    expect(r.liste!.eintraege.map((e) => e.kapitelId)).toEqual(['', r.liste!.kapitel[0].id])
   })
 })

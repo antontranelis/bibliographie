@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ImportPlan } from './import/einlesen'
+import { aufloesung, VOR_DEM_ERSTEN, type ImportPlan } from './import/einlesen'
 
 /** Auswahl beim Einlesen einer Literaturliste: welche Abschnitte, ob zusätzlich eine Liste entsteht. */
 export function ImportDialog({
@@ -25,12 +25,11 @@ export function ImportDialog({
   }, [onAbbrechen])
 
   const zahlen = useMemo(() => {
-    const g = plan.posten.filter((p) => auswahl.has(p.abschnittNr))
-    const istDoppelt = (p: (typeof g)[number]) => !p.vorhandenId && p.doppeltVon !== undefined && auswahl.has(plan.posten[p.doppeltVon].abschnittNr)
-    // sicher, prüfen und von Hand zählen nur die Karten, die neu entstehen
-    const neu = g.filter((p) => !p.vorhandenId && !istDoppelt(p))
-    const z = (s: string) => neu.filter((p) => p.status === s).length
-    return { alle: g.length, sicher: z('sicher'), pruefen: z('pruefen'), hand: z('hand'), vorhanden: g.filter((p) => p.vorhandenId).length, doppelt: g.filter(istDoppelt).length, neu: neu.length }
+    // Dieselbe Auflösung wie bei der Übernahme; sicher, prüfen und von Hand zählen nur neue Karten
+    const g = aufloesung(plan, auswahl)
+    const neu = g.filter((a) => a.art === 'neu')
+    const z = (s: string) => neu.filter((a) => a.posten.status === s).length
+    return { alle: g.length, sicher: z('sicher'), pruefen: z('pruefen'), hand: z('hand'), vorhanden: g.filter((a) => a.art === 'vorhanden').length, doppelt: g.filter((a) => a.art === 'doppelt').length, neu: neu.length }
   }, [plan, auswahl])
   const umschalten = (nr: number) => {
     const neu = new Set(auswahl)
@@ -44,7 +43,7 @@ export function ImportDialog({
       <div className="papier import-dialog">
         <h2>Liste einlesen: {dateiname}</h2>
         <p className="leise">
-          Gefunden: {plan.posten.length} Einträge in {plan.abschnitte.length} Absätzen. Begleittext ohne erkennbare Einträge ist abgewählt.
+          Gefunden: {plan.posten.length} Einträge in {plan.abschnitte.filter((a) => a.nr !== VOR_DEM_ERSTEN).length} Absätzen. Begleittext ohne erkennbare Einträge ist abgewählt.
         </p>
         <div className="tabelle-rahmen">
           <table className="tabelle import-abschnitte">
@@ -62,10 +61,10 @@ export function ImportDialog({
               {plan.abschnitte.map((a) => (
                 <tr key={a.nr} className={auswahl.has(a.nr) ? '' : 'abgewaehlt'}>
                   <td className="sp-liste">
-                    <input type="checkbox" aria-label={`Absatz ${a.nr + 1} einlesen`} checked={auswahl.has(a.nr)} onChange={() => umschalten(a.nr)} />
+                    <input type="checkbox" aria-label={a.nr === VOR_DEM_ERSTEN ? 'Einträge vor dem ersten Absatz einlesen' : `Absatz ${a.nr + 1} einlesen`} checked={auswahl.has(a.nr)} onChange={() => umschalten(a.nr)} />
                   </td>
                   <td title={a.titel}>
-                    {a.titel.length > 90 ? `${a.titel.slice(0, 90)} …` : a.titel}
+                    {a.nr === VOR_DEM_ERSTEN ? <i>{a.titel}</i> : a.titel.length > 90 ? `${a.titel.slice(0, 90)} …` : a.titel}
                     {a.eintraege === 0 && <span className="leise klein"> · Überschrift</span>}
                   </td>
                   <td className="zahl">{a.eintraege || ''}</td>

@@ -87,6 +87,34 @@ const zweite = await page.locator('.import-zahlen dd').allInnerTexts()
 pruefe('Zweites Einlesen erkennt alles als vorhanden', zweite.join(',') === '0,0,0,5,0', zweite.join(','))
 await page.getByRole('button', { name: /Abbrechen/ }).click()
 
+// Einträge vor dem ersten Absatz (#13) und Doppelte bei abgewähltem Erstfund (#14)
+{
+  await spieleEin(page, null)
+  const iros = punkt(`Ernst Iros: ${fett('Wesen und Dramaturgie des Films')}, Zürich 1938`)
+  const zweite = zipSync({
+    'content.xml': strToU8(`<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content><office:automatic-styles>
+<style:style style:name="F" style:family="text"><style:text-properties fo:font-weight="bold"/></style:style>
+</office:automatic-styles><office:body><office:text>
+<text:list>${punkt(`Rudolf Arnheim: ${fett('Film als Kunst')}, Berlin 1932`)}</text:list>
+<text:p>A</text:p><text:list>${iros}</text:list>
+<text:p>B</text:p><text:list>${iros}</text:list>
+<text:p>C</text:p><text:list>${iros}</text:list>
+</office:text></office:body></office:document-content>`),
+  })
+  await einlesen('Zweite.odt', Buffer.from(zweite))
+  const zeilen = await page.locator('.import-abschnitte tbody tr').allInnerTexts()
+  pruefe('Einträge vor dem ersten Absatz sind wählbar', zeilen[0].trim().startsWith('vor dem ersten Absatz') && (await page.getByLabel('Einträge vor dem ersten Absatz einlesen').isChecked()), zeilen[0].replace(/\s+/g, ' '))
+  await page.getByLabel('Absatz 1 einlesen').uncheck()
+  const z = await page.locator('.import-zahlen dd').allInnerTexts()
+  pruefe('Erstfund abgewählt: ein Doppelter in der Auswahl', z.join(',') === '2,0,0,0,1', z.join(','))
+  await page.getByRole('button', { name: /2 Karten anlegen/ }).click()
+  const d2 = await daten()
+  pruefe('Zwei Karten, Iros nur einmal', d2.werke.length === 2 && d2.werke.filter((w) => w.titel.startsWith('Wesen')).length === 1, String(d2.werke.length))
+  const l2 = d2.listen.find((x) => x.name === 'Zweite')
+  pruefe('Arnheim vor den Kapiteln, Iros in B', l2 && l2.eintraege.length === 2 && l2.eintraege[0].kapitelId === '' && l2.kapitel.find((k) => k.id === l2.eintraege[1].kapitelId)?.titel === 'B', JSON.stringify(l2?.kapitel.map((k) => k.titel)))
+}
+
 // Echte Liste, wenn angegeben
 if (process.env.ODT_DATEI) {
   await spieleEin(page, null)
