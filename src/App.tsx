@@ -100,6 +100,12 @@ export default function App() {
 
   // Kurz verzögert speichern: bei tausenden Karten ist jeder Durchgang einige Megabyte groß
   const [speicherVoll, setSpeicherVoll] = useState(false)
+  const [neueVersion, setNeueVersion] = useState(false)
+  useEffect(() => {
+    const melden = () => setNeueVersion(true)
+    window.addEventListener('neue-version', melden)
+    return () => window.removeEventListener('neue-version', melden)
+  }, [])
   const zuSpeichern = useRef(daten)
   zuSpeichern.current = daten
   useEffect(() => {
@@ -420,6 +426,14 @@ export default function App() {
         </div>
       </header>
 
+      {neueVersion && (
+        <div className="speicher-warnung neue-version" role="status">
+          Eine neue Version des Programms ist da.{' '}
+          <button type="button" className="textknopf" onClick={() => location.reload()}>
+            Jetzt neu laden
+          </button>
+        </div>
+      )}
       {speicherVoll && (
         <div className="speicher-warnung" role="alert">
           Der Speicher des Browsers ist voll, die letzten Änderungen sind nur in diesem Fenster. Bitte über „Ablage“ → „Sichern“ eine Datei speichern.
