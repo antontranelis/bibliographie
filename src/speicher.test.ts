@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { neueListe } from './listen'
 import { exportiere, exportiereCsl, importiere, migriere, zusammenfuehren } from './speicher'
 import { leereAuflage, leereAusgabe, leeresWerk } from './model'
 
 describe('Import und Export', () => {
   const w = { ...leeresWerk(), titel: 'Wahrheit und Wissenschaft' }
   it('liest die eigene Exportdatei unverändert zurück', () => {
-    const d = { werke: [w], verlage: [{ id: 'v', kuerzel: 'goe', namen: [{ abJahr: '', name: 'Verlag am Goetheanum' }], orte: [], schreibweisen: [] }] }
+    const liste = { ...neueListe('Steiner'), kapitel: [{ id: 'k', titel: 'Frühwerk', ebene: 1 as const }], eintraege: [{ werkId: w.id, kapitelId: 'k' }] }
+    const d = { werke: [w], verlage: [{ id: 'v', kuerzel: 'goe', namen: [{ abJahr: '', name: 'Verlag am Goetheanum' }], orte: [], schreibweisen: [] }], listen: [liste] }
     expect(importiere(exportiere(d))).toEqual(d)
   })
   it('weist fremde Dateien ab', () => {
@@ -15,8 +17,16 @@ describe('Import und Export', () => {
   it('behält beim Zusammenführen die neuere Fassung', () => {
     const alt = { ...w, titel: 'alt', geaendert: '2026-01-01' }
     const neu = { ...w, titel: 'neu', geaendert: '2026-02-01' }
-    expect(zusammenfuehren({ werke: [neu], verlage: [] }, { werke: [alt], verlage: [] }).werke[0].titel).toBe('neu')
-    expect(zusammenfuehren({ werke: [alt], verlage: [] }, { werke: [neu], verlage: [] }).werke[0].titel).toBe('neu')
+    expect(zusammenfuehren({ werke: [neu], verlage: [], listen: [] }, { werke: [alt], verlage: [], listen: [] }).werke[0].titel).toBe('neu')
+    expect(zusammenfuehren({ werke: [alt], verlage: [], listen: [] }, { werke: [neu], verlage: [], listen: [] }).werke[0].titel).toBe('neu')
+    const l = neueListe('L')
+    const lAlt = { ...l, name: 'alt', geaendert: '2026-01-01' }
+    const lNeu = { ...l, name: 'neu', geaendert: '2026-02-01' }
+    expect(zusammenfuehren({ werke: [], verlage: [], listen: [lNeu] }, { werke: [], verlage: [], listen: [lAlt] }).listen[0].name).toBe('neu')
+  })
+  it('ergänzt älteren Dateien eine leere Listenablage', () => {
+    const v3 = { format: 'bibliographie-datenstamm', version: 3, verlage: [], werke: [] }
+    expect(importiere(JSON.stringify(v3)).listen).toEqual([])
   })
   it('schreibt CSL-JSON mit einem Eintrag pro Auflage', () => {
     const buch = {

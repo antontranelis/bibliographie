@@ -1,4 +1,5 @@
 import { leereAuflage, leereAusgabe, neueId, type Datenstamm, type Verlag, type Werk } from './model'
+import { ALLE, neueListe } from './listen'
 import { migriere } from './speicher'
 
 const jetzt = () => new Date().toISOString()
@@ -74,5 +75,6 @@ export function beispielDaten(): Datenstamm {
         schlagwoerter: [{ begriff: 'Pädagogik', primaer: true }],
       }),
     ],
+    listen: [neueListe('Rudolf Steiner', { ...ALLE, person: 'Steiner|Rudolf' })],
   })
 }

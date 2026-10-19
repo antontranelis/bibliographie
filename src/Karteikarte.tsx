@@ -12,6 +12,7 @@ import {
   type Ausgabe,
   type AusgabeArt,
   type ErschienenIn,
+  type Literaturliste,
   type Mitwirkung,
   type MitwirkungsRolle,
   type Person,
@@ -24,6 +25,7 @@ import { auflageLeer } from './entwurf'
 import { Druckzeile } from './Druckzeile'
 import { ausgabeBezeichnung, druckzeileTeile, ersterscheinung, nennen } from './format'
 import { VerlagFeld } from './VerlagFeld'
+import { ZeileKnoepfe } from './ZeileKnoepfe'
 import { type Treffer, type WerkVorschlag } from './lobid'
 import { sucheImKatalog } from './katalog'
 import { AusgabenWahl, Vorschlagsliste, besterVorschlag, ohneNichtsortier, karteiTreffer, optionenAus, useKatalog, jahrspanne, type Option } from './Katalogsuche'
@@ -48,6 +50,8 @@ interface Props {
   onFestAnlegen: () => void
   onNaechste: () => void
   onLoeschen: () => void
+  listen: Literaturliste[]
+  onInListe: (listeId: string) => void
 }
 
 const HAUPTARTEN: TextArt[] = ['buch', 'aufsatz', 'sammelband']
@@ -58,7 +62,7 @@ const jahrZahl = (a: Auflage) => parseInt(a.jahr, 10) || 9999
 
 export function Karteikarte(props: Props) {
   const { werk, istNeu, alleWerke, verlage, alleSchlagwoerter, fixiert, nachholen, seitenleiste } = props
-  const { onAendern, onFixieren, onVerlagsAbgleich, onVerlagAendern, onZuVorhandener, onFestAnlegen, onNaechste, onLoeschen } = props
+  const { onAendern, onFixieren, onVerlagsAbgleich, onVerlagAendern, onZuVorhandener, onFestAnlegen, onNaechste, onLoeschen, listen, onInListe } = props
   const setze = (teil: Partial<Werk>) => onAendern({ ...werk, ...teil })
   const istAufsatz = werk.art === 'aufsatz'
   const listeId = useId()
@@ -366,6 +370,7 @@ export function Karteikarte(props: Props) {
           <div className="vorschau">
             <span className="lab">So steht die Karte in der Liste</span>
             <p>{werk.titel.trim() ? <Druckzeile teile={druckzeileTeile(werk)} /> : <span className="leise">Erscheint, sobald ein Titel da ist.</span>}</p>
+            <ZeileKnoepfe werk={werk} teile={druckzeileTeile(werk)} listen={listen} onInListe={onInListe} />
           </div>
         </div>
 

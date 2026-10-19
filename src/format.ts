@@ -249,8 +249,9 @@ export function druckzeile(werk: Werk, stil: Stil = STANDARD_STIL): string {
     .join('')
 }
 
-function sortierName(werk: Werk): string {
-  const p = werk.personen.find((x) => x.nachname.trim() || x.vorname.trim())
+/** Name, nach dem ein Werk einsortiert wird: die gegebene oder die erste Person, sonst der Titel. */
+export function sortierName(werk: Werk, person?: Person): string {
+  const p = person ?? werk.personen.find((x) => x.nachname.trim() || x.vorname.trim())
   return p ? `${p.nachname.trim()} ${p.vorname.trim()}` : werk.titel.trim()
 }
 

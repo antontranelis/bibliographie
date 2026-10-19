@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { TEXT_ARTEN, alleAuflagen, leeresWerk, mitAuflagen, type Datenstamm, type ErschienenIn, type Person, type Schlagwort, type TextArt, type Verlag, type Werk } from './model'
+import { TEXT_ARTEN, alleAuflagen, leeresWerk, mitAuflagen, type Datenstamm, type Literaturliste, type ErschienenIn, type Person, type Schlagwort, type TextArt, type Verlag, type Werk } from './model'
 import { Karteikarte } from './Karteikarte'
 import { Kartei, LEERE_SICHT, type KarteiSicht, type ListenVorgabe } from './Kartei'
 import { Liste } from './Liste'
+import { ALLE, hinzufuegen, neueListe } from './listen'
 import { Verlage } from './Verlage'
 import { beispielDaten } from './beispiel'
 import { exportiere, exportiereCsl, importiere, ladeLokal, speichereLokal, zusammenfuehren } from './speicher'
@@ -77,7 +78,7 @@ const REITER: { ansicht: Ansicht; label: string; taste: string }[] = [
 ]
 
 export default function App() {
-  const [daten, setDaten] = useState<Datenstamm>(() => ladeLokal() ?? { werke: [], verlage: [] })
+  const [daten, setDaten] = useState<Datenstamm>(() => ladeLokal() ?? { werke: [], verlage: [], listen: [] })
   const [fixiert, setFixiert] = useState<Fixierung>(ladeFixierung)
   const [ansicht, setAnsicht] = useState<Ansicht>('erfassen')
   const [entwurf, setEntwurf] = useState<Werk | null>(() => mitFixierung(leeresWerk(), fixiert, daten.verlage))
@@ -89,7 +90,7 @@ export default function App() {
   const [nachholenId, setNachholenId] = useState<string | null>(null)
   const [sitzung, setSitzung] = useState<string[]>([])
   const [karteiSicht, setKarteiSicht] = useState<KarteiSicht>(LEERE_SICHT)
-  const [listenVorgabe, setListenVorgabe] = useState<ListenVorgabe & { nr: number }>({ nr: 0 })
+  const [listenId, setListenId] = useState<string | null>(null)
   const [meldung, setMeldung] = useState('')
   const dateiEingabe = useRef<HTMLInputElement>(null)
 
@@ -230,6 +231,33 @@ export default function App() {
   const aendereVerlage = (verlage: Verlag[]) => setDaten((d) => ({ ...d, verlage }))
   const aendereVerlag = (v: Verlag) => aendereVerlage(daten.verlage.map((x) => (x.id === v.id ? v : x)))
 
+  const liste = daten.listen.find((l) => l.id === listenId) ?? daten.listen[0]
+  // Wer die Listen öffnet und noch keine hat, bekommt eine mit allen Karten
+  useEffect(() => {
+    if (ansicht === 'liste' && daten.listen.length === 0) setDaten((d) => (d.listen.length ? d : { ...d, listen: [neueListe('Literaturliste')] }))
+  }, [ansicht, daten.listen.length])
+  const aendereListe = (l: Literaturliste) => setDaten((d) => ({ ...d, listen: d.listen.map((x) => (x.id === l.id ? l : x)) }))
+  const legeListeAn = (l: Literaturliste) => {
+    setDaten((d) => ({ ...d, listen: [...d.listen, l] }))
+    setListenId(l.id)
+    setAnsicht('liste')
+  }
+  const listeAusVorgabe = (v: ListenVorgabe) => {
+    const [n, vn] = (v.person ?? '').split('|')
+    const name = v.person ? [vn, n].filter(Boolean).join(' ') : v.schlagwort ?? 'Literaturliste'
+    legeListeAn(neueListe(name, { ...ALLE, person: v.person ?? '', schlagwort: v.schlagwort ?? '' }))
+  }
+  const loescheListe = (id: string) => {
+    setDaten((d) => ({ ...d, listen: d.listen.filter((l) => l.id !== id) }))
+    setListenId(null)
+  }
+  const inListeAufnehmen = (listeId: string, werkId: string) => {
+    const l = daten.listen.find((x) => x.id === listeId)
+    if (!l) return
+    aendereListe(hinzufuegen(l, werkId))
+    setMeldung(`In „${l.name || 'ohne Namen'}“ aufgenommen.`)
+  }
+
   const beispieleLaden = () => {
     const b = beispielDaten()
     setDaten((d) => zusammenfuehren(d, b))
@@ -359,6 +387,8 @@ export default function App() {
             onFestAnlegen={festAnlegen}
             onNaechste={neueKarte}
             onLoeschen={loeschen}
+            listen={daten.listen}
+            onInListe={(listeId) => inListeAufnehmen(listeId, karte.id)}
             seitenleiste={
               <>
                 <FixiertKasten fixiert={fixiert} onFixieren={setFixiert} />
@@ -392,15 +422,23 @@ export default function App() {
             sicht={karteiSicht}
             onSicht={setKarteiSicht}
             onBearbeiten={oeffne}
-            onListe={(v) => {
-              setListenVorgabe((alt) => ({ ...v, nr: alt.nr + 1 }))
-              setAnsicht('liste')
-            }}
+            onListe={listeAusVorgabe}
             onBeispiele={beispieleLaden}
             onNeueKarte={neueKarte}
           />
         )}
-        {ansicht === 'liste' && <Liste key={listenVorgabe.nr} werke={daten.werke} vorgabe={listenVorgabe} />}
+        {ansicht === 'liste' && liste && (
+          <Liste
+            key={liste.id}
+            werke={daten.werke}
+            listen={daten.listen}
+            liste={liste}
+            onAendern={aendereListe}
+            onWaehlen={setListenId}
+            onNeu={() => legeListeAn(neueListe(''))}
+            onLoeschen={loescheListe}
+          />
+        )}
         {ansicht === 'verlage' && <Verlage verlage={daten.verlage} werke={daten.werke} onAendern={aendereVerlage} onZurueck={() => setAnsicht('erfassen')} />}
       </main>
     </div>

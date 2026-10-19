@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useRef, useState } from 'react'
-import { TEXT_ARTEN, alleAuflagen, type Werk } from './model'
+import { TEXT_ARTEN, alleAuflagen, personSchluessel, type Werk } from './model'
 import { ausgabeBezeichnung } from './format'
 import { jahrspanne, namenListe } from './Katalogsuche'
 import { StatusMarke } from './Karteikarte'
@@ -34,7 +34,6 @@ interface Gruppe {
 const GRENZE = 300
 const BUCHSTABEN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
-export const personSchluessel = (p: { nachname: string; vorname: string }) => `${p.nachname.trim()}|${p.vorname.trim()}`
 const artLabel = (a: Werk['art']) => TEXT_ARTEN.find((x) => x.value === a)?.label ?? a
 
 function anfangsbuchstabe(s: string): string {
