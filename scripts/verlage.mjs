@@ -81,8 +81,8 @@ async function karte(page, { autor, titel, jahr, verlag, ort }) {
   pruefe('ISBN erscheint in der Liste', (await page.getByText('ISBN 3-7274-0040-5').count()) > 0)
 
   // 5. Verlage als eigener Reiter; Umbenennen zieht verknüpfte Auflagen nach
-  await page.keyboard.press('F5')
-  pruefe('F5 öffnet die Verlage', (await page.getByRole('heading', { name: 'Verlage', level: 1 }).count()) === 1)
+  await page.keyboard.press('F6')
+  pruefe('F6 öffnet die Verlage', (await page.getByRole('heading', { name: 'Verlage', level: 1 }).count()) === 1)
   if (aus) await page.screenshot({ path: `${aus}/verlage.png`, fullPage: true })
   // Verlagskarte schrittweise bearbeiten wie ein Mensch: löschen, neu tippen, Ortswechsel mit Jahr vor Ort
   const vorher = JSON.stringify((await daten(page)).werke)

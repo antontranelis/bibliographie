@@ -20,6 +20,7 @@ function werk(teil: Partial<Werk>): Werk {
     anmerkung: '',
     vorlage: '',
     schlagwoerter: [],
+    themen: [],
     angelegt: jetzt(),
     geaendert: jetzt(),
     ...teil,
@@ -31,8 +32,12 @@ const steiner = { vorname: 'Rudolf', nachname: 'Steiner', rolle: 'autor' as cons
 /** Wenige Beispielkarten zum Ausprobieren. */
 export function beispielDaten(): Datenstamm {
   const v = (name: string, kuerzel: string, orte: Verlag['orte']): Verlag => ({ id: neueId(), kuerzel, namen: [{ abJahr: '', name }], orte, schreibweisen: [] })
+  const erkenntnis = { id: neueId(), nummer: 'I.', titel: 'Erkenntnis und Freiheit', elternId: '' }
+  const erziehung = { id: neueId(), nummer: 'II.', titel: 'Erziehung', elternId: '' }
+  const kind = { id: neueId(), nummer: 'a)', titel: 'Das Kind im Elternhaus', elternId: erziehung.id }
   // migriere verknüpft die Auflagen über den Verlagsnamen
   return migriere({
+    themen: [erkenntnis, erziehung, kind],
     verlage: [
       v('Philosophisch-Anthroposophischer Verlag', 'pav', [
         { abJahr: '1908', ort: 'Berlin', wechselImJahr: false },
@@ -61,6 +66,7 @@ export function beispielDaten(): Datenstamm {
           },
         ],
         kommentar: 'Beispielkarte. Erschien schon Ende 1893, im Buch steht 1894.',
+        themen: [erkenntnis.id],
         schlagwoerter: [
           { begriff: 'Erkenntnistheorie', primaer: true },
           { begriff: 'Freiheit', primaer: true },
@@ -74,6 +80,7 @@ export function beispielDaten(): Datenstamm {
         erschienenIn: { art: 'zeitschrift', titel: 'Lucifer-Gnosis', jahrgang: '', jahr: '1907', heft: '33', ausgabe: '', seitenVon: '', seitenBis: '' },
         kommentar: 'Beispielkarte für einen Aufsatz. Angaben vor Gebrauch prüfen.',
         schlagwoerter: [{ begriff: 'Pädagogik', primaer: true }],
+        themen: [kind.id],
       }),
     ],
     listen: [neueListe('Rudolf Steiner', { ...ALLE, person: 'Steiner|Rudolf' })],

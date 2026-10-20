@@ -1,8 +1,9 @@
 import { STANDARD_STIL } from './format'
+import { ALLE } from './listen'
 import { leereAusgabe, neueId, type Auflage, type Ausgabe, type Datenstamm, type Verlag, type Werk } from './model'
 
 export const FORMAT = 'bibliographie-datenstamm'
-export const VERSION = 5
+export const VERSION = 6
 
 export interface Exportdatei extends Datenstamm {
   format: typeof FORMAT
@@ -26,13 +27,14 @@ export function importiere(text: string): Datenstamm {
   if (d.format !== FORMAT) throw new Error('Die Datei stammt nicht aus diesem Programm.')
   if (typeof d.version !== 'number' || d.version > VERSION)
     throw new Error('Die Datei stammt aus einer neueren Programmversion.')
-  return migriere({ werke: d.werke ?? [], verlage: d.verlage ?? [], listen: d.listen ?? [] })
+  return migriere({ werke: d.werke ?? [], verlage: d.verlage ?? [], listen: d.listen ?? [], themen: d.themen ?? [] })
 }
 
 /**
  * Bringt Daten auf den Stand von Version 4. Version 1 kannte pro Verlag nur einen Namen,
  * und Auflagen verwiesen über den Namenstext auf ihn. Bis Version 2 hingen die Auflagen direkt am Werk;
- * sie werden zur ersten Ausgabe. Seit Version 4 gibt es gespeicherte Listen, seit Version 5 die Vorlage aus dem Import.
+ * sie werden zur ersten Ausgabe. Seit Version 4 gibt es gespeicherte Listen, seit Version 5 die Vorlage aus dem Import,
+ * seit Version 6 die Themenordnung.
  */
 export function migriere(d: Datenstamm): Datenstamm {
   const verlage: Verlag[] = d.verlage.map((v) => {
@@ -59,13 +61,19 @@ export function migriere(d: Datenstamm): Datenstamm {
       ...rest,
       anmerkung: rest.anmerkung ?? '',
       vorlage: rest.vorlage ?? '',
+      themen: rest.themen ?? [],
       ersterscheinung: rest.ersterscheinung ?? '',
       ...(rest.erschienenIn ? { erschienenIn: { ...rest.erschienenIn, ausgabe: rest.erschienenIn.ausgabe ?? '' } } : {}),
       ausgaben: ausgaben.map((a) => ({ ...leereAusgabe(), ...a, auflagen: a.auflagen.map(auflage) })),
     }
   })
-  const listen = (d.listen ?? []).map((l) => ({ ...l, stil: { ...STANDARD_STIL, ...l.stil } }))
-  return { werke, verlage, listen }
+  const listen = (d.listen ?? []).map((l) => ({
+    ...l,
+    stil: { ...STANDARD_STIL, ...l.stil },
+    gliederung: l.gliederung ?? 'kapitel',
+    regel: l.regel && { ...ALLE, ...l.regel },
+  }))
+  return { werke, verlage, listen, themen: d.themen ?? [] }
 }
 
 /** Führt importierte Daten mit dem Bestand zusammen. Gleiche ID: die neuere Fassung gewinnt. */
@@ -82,7 +90,9 @@ export function zusammenfuehren(bestand: Datenstamm, neu: Datenstamm): Datenstam
     const alt = listen.get(l.id)
     if (!alt || l.geaendert > alt.geaendert) listen.set(l.id, l)
   }
-  return { werke: [...werke.values()], verlage: [...verlage.values()], listen: [...listen.values()] }
+  const themen = new Map(bestand.themen.map((t) => [t.id, t]))
+  for (const t of neu.themen) themen.set(t.id, t)
+  return { werke: [...werke.values()], verlage: [...verlage.values()], listen: [...listen.values()], themen: [...themen.values()] }
 }
 
 /** CSL-JSON für Zotero, Pandoc und Co. Eine Zeile pro Auflage, weil CSL kein Werk mit Ausgaben und Auflagen kennt. */

@@ -18,6 +18,7 @@ export const INHALTSFELDER = [
   'kommentar',
   'anmerkung',
   'schlagwoerter',
+  'themen',
 ] as const satisfies readonly (keyof Werk)[]
 
 export type Inhaltsfeld = (typeof INHALTSFELDER)[number]

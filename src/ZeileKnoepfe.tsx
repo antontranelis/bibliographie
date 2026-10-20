@@ -2,13 +2,25 @@ import { useState } from 'react'
 import { kopiereZeile } from './Druckzeile'
 import type { Teil } from './format'
 import { passtZurRegel } from './listen'
-import type { Literaturliste, Werk } from './model'
+import type { Literaturliste, Thema, Werk } from './model'
 
 /** Unter der Druckzeile einer Karte: Zeile kopieren und die Karte in eine gespeicherte Liste aufnehmen. */
-export function ZeileKnoepfe({ werk, teile, listen, onInListe }: { werk: Werk; teile: Teil[]; listen: Literaturliste[]; onInListe: (listeId: string) => void }) {
+export function ZeileKnoepfe({
+  werk,
+  teile,
+  listen,
+  themen,
+  onInListe,
+}: {
+  werk: Werk
+  teile: Teil[]
+  listen: Literaturliste[]
+  themen: Thema[]
+  onInListe: (listeId: string) => void
+}) {
   const [kopiert, setKopiert] = useState(false)
   const drin = (l: Literaturliste) =>
-    !l.ausgenommen.includes(werk.id) && (l.eintraege.some((e) => e.werkId === werk.id) || (l.regel !== null && passtZurRegel(werk, l.regel)))
+    !l.ausgenommen.includes(werk.id) && (l.eintraege.some((e) => e.werkId === werk.id) || (l.regel !== null && passtZurRegel(werk, l.regel, themen)))
   return (
     <div className="knopfreihe zeile-knoepfe">
       <button
