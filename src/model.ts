@@ -231,17 +231,9 @@ export interface ListenRegel {
   mitUnterthemen: boolean
 }
 
-export interface Kapitel {
-  id: string
-  titel: string
-  ebene: 1 | 2
-}
-
-/** Eine von Hand aufgenommene oder in ein Kapitel gelegte Karte. */
+/** Eine von Hand aufgenommene Karte. */
 export interface ListenEintrag {
   werkId: string
-  /** Leer = vor dem ersten Kapitel */
-  kapitelId: string
 }
 
 /** Gespeicherte Literaturliste. Sie verweist auf Karten und druckt immer deren aktuellen Stand. */
@@ -250,19 +242,21 @@ export interface Literaturliste {
   name: string
   /** Null = nur von Hand aufgenommene Karten */
   regel: ListenRegel | null
-  kapitel: Kapitel[]
   /** Reihenfolge zählt bei der Sortierung „von Hand“ */
   eintraege: ListenEintrag[]
+  /**
+   * Bei Gliederung nach Themen und „von Hand“: eigene Reihenfolge je Thema (Thema-ID → Werk-IDs),
+   * damit ein Werk unter jedem seiner Themen an seinem Platz steht. Ohne Eintrag gilt die Reihenfolge von eintraege.
+   */
+  abschnittsfolge: Record<string, string[]>
   /** Karten, die nicht gedruckt werden, obwohl Regel oder Eintrag sie aufnehmen */
   ausgenommen: string[]
   stil: Stil
   sortierung: 'name' | 'jahr' | 'hand'
   /** Ein Werk erscheint unter jeder seiner Personen, nicht nur unter der ersten */
   jedePerson: boolean
-  /** 'kapitel': eigene Kapitel der Liste; 'themen': Kapitel aus der Themenordnung, ein Werk unter jedem seiner Themen */
-  gliederung: 'kapitel' | 'themen'
-  /** Eigene Kapitel mit laufender Nummer drucken; aus bei Überschriften, die ihre Nummer selbst tragen */
-  kapitelNummern: boolean
+  /** 'themen': Abschnitte aus der Themenordnung, ein Werk unter jedem seiner Themen */
+  gliederung: 'keine' | 'themen'
   angelegt: string
   geaendert: string
 }

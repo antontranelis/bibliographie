@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Druckzeile, kopiereZeile } from './Druckzeile'
 import { druckzeileTeile, type Stil, type Teil } from './format'
-import { ALLE, abschnitte, druckWerk, entferne, kapitelEntfernen, rueckeUm, umschalten, verschiebe, type Abschnitt } from './listen'
-import { neueId, personSchluessel, type Kapitel, type Literaturliste, type Thema, type Werk } from './model'
+import { ALLE, abschnitte, druckWerk, entferne, rueckeUm, rueckeUmIn, umschalten, type Abschnitt } from './listen'
+import { personSchluessel, type Literaturliste, type Thema, type Werk } from './model'
 import { baum, bezeichnung } from './themen'
 import { herunterladen } from './herunterladen'
 import { Blatt } from './Symbole'
@@ -13,13 +13,13 @@ const personLabel = (schluessel: string) => {
 }
 const ERSTE_ZEILEN = 60
 
-/** Lange Kapitel- und Themenüberschriften in Auswahllisten kürzen; die Liste des Browsers würde sonst fensterbreit */
+/** Lange Themenüberschriften in Auswahllisten kürzen; die Liste des Browsers würde sonst fensterbreit */
 const kurz = (text: string, hoechstens = 48) => (text.length > hoechstens ? `${text.slice(0, hoechstens - 2).trimEnd()} …` : text)
 
-/** Ein Abschnitt, wie er aufs Papier kommt: Überschrift mit Nummer und die gedruckten Zeilen. */
+/** Ein Abschnitt, wie er aufs Papier kommt: Überschrift und die gedruckten Zeilen. */
 export interface Druckabschnitt {
   ueberschrift: string
-  /** 0 = vor dem ersten Kapitel, ohne Überschrift */
+  /** 0 = ohne Überschrift */
   ebene: 0 | 1 | 2
   zeilen: Teil[][]
 }
@@ -80,15 +80,14 @@ export function Liste({
   )
 
   const teile = useMemo(() => abschnitte(liste, werke, themen), [liste, werke, themen])
-  const nachKapiteln = liste.gliederung !== 'themen'
   const alleZeilen = teile.flatMap((a) => a.zeilen)
   const gedruckt = alleZeilen.filter((z) => z.drin)
   const herausgenommen = alleZeilen.length - gedruckt.length
   const vorlaeufig = gedruckt.filter((z) => z.werk.status === 'vorlaeufig').length
   const druck: Druckabschnitt[] = teile
     .map((a) => ({
-      ueberschrift: a.kapitel ? (liste.kapitelNummern && a.nummer ? `${a.nummer} ${a.kapitel.titel}` : a.kapitel.titel).trim() : '',
-      ebene: (a.kapitel?.ebene ?? 0) as Druckabschnitt['ebene'],
+      ueberschrift: a.ueberschrift?.titel ?? '',
+      ebene: (a.ueberschrift?.ebene ?? 0) as Druckabschnitt['ebene'],
       zeilen: a.zeilen.filter((z) => z.drin).map((z) => druckzeileTeile(druckWerk(z), stil)),
     }))
     .filter((a) => a.ueberschrift || a.zeilen.length)
@@ -98,16 +97,13 @@ export function Liste({
     const { wordDatei } = await import('./word')
     herunterladen(await wordDatei(liste.name, druck), `${liste.name.trim() || 'Literaturliste'}.docx`)
   }
-  const neuesKapitel = (ebene: 1 | 2) => aendere({ kapitel: [...liste.kapitel, { id: neueId(), titel: '', ebene }] })
-  const setzeKapitel = (id: string, teil: Partial<Kapitel>) => aendere({ kapitel: liste.kapitel.map((k) => (k.id === id ? { ...k, ...teil } : k)) })
   const kopiere = async (schluessel: string, z: Teil[]) => {
     await kopiereZeile(z)
     setKopiert(schluessel)
     setTimeout(() => setKopiert((k) => (k === schluessel ? '' : k)), 2000)
   }
 
-  // Lange Listen: zuerst nur die ersten Zeilen zeigen, Kapitelüberschriften immer
-  // Lange Listen: zuerst nur die ersten Zeilen; die Ansicht endet dort ganz, auch ohne die folgenden Überschriften
+    // Lange Listen: zuerst nur die ersten Zeilen; die Ansicht endet dort ganz, auch ohne die folgenden Überschriften
   const sichtbar: { abschnitt: Abschnitt; zeilen: Abschnitt['zeilen'] }[] = []
   let platz = ERSTE_ZEILEN
   for (const a of teile) {
@@ -117,9 +113,7 @@ export function Liste({
     sichtbar.push({ abschnitt: a, zeilen })
   }
   const verborgen = alleZeilen.length - sichtbar.reduce((n, s) => n + s.zeilen.length, 0)
-  const verborgeneKapitel = teile.filter((a) => a.kapitel).length - sichtbar.filter((s) => s.abschnitt.kapitel).length
-  const nummerieren = liste.kapitelNummern
-  const kapitelTitel = (a: Abschnitt) => (nummerieren && a.nummer ? `${a.nummer} ${a.kapitel!.titel}` : a.kapitel!.titel)
+  const verborgeneThemen = teile.filter((a) => a.ueberschrift).length - sichtbar.filter((s) => s.abschnitt.ueberschrift).length
 
   return (
     <div className="liste">
@@ -226,18 +220,15 @@ export function Liste({
             <span className="leise klein rechts">Haken entfernen = nicht drucken</span>
           </div>
           {sichtbar.map(({ abschnitt: a, zeilen: gezeigteZeilen }) => (
-            <Fragment key={a.kapitel?.id ?? 'vorn'}>
-              {a.kapitel && a.ausThema && <h3 className={`kapitel-kopf thema-kopf ebene-${a.kapitel.ebene}`}>{a.kapitel.titel}</h3>}
-              {a.kapitel && !a.ausThema && (
-                <KapitelKopf
-                  abschnitt={a}
-                  nummerieren={nummerieren}
-                  onAendern={(teil) => setzeKapitel(a.kapitel!.id, teil)}
-                  onEntfernen={() => onAendern(kapitelEntfernen(liste, a.kapitel!.id))}
-                />
-              )}
-              {a.zeilen.length === 0 && !a.kapitel && liste.kapitel.length === 0 && <p className="leise">Noch keine Karte in dieser Liste.</p>}
+            <Fragment key={a.ueberschrift?.id ?? 'alle'}>
+              {a.ueberschrift && <h3 className={`kapitel-kopf thema-kopf ebene-${a.ueberschrift.ebene}`}>{a.ueberschrift.titel}</h3>}
+              {a.zeilen.length === 0 && !a.ueberschrift && <p className="leise">Noch keine Karte in dieser Liste.</p>}
               {gezeigteZeilen.map((z) => {
+                // Unter einem Thema gilt eine eigene Reihenfolge; ohne Thema die der Liste
+                const verschieben = (richtung: -1 | 1) =>
+                  a.ueberschrift
+                    ? rueckeUmIn(liste, a.ueberschrift.id, a.zeilen.filter((x) => x.vonHand).map((x) => x.werk.id), z.werk.id, richtung)
+                    : rueckeUm(liste, z.werk.id, richtung)
                 const zeile = druckzeileTeile(druckWerk(z), stil)
                 return (
                   <div key={z.schluessel} className={`eintrag ${z.drin ? '' : 'heraus'}`}>
@@ -247,24 +238,12 @@ export function Liste({
                       {z.werk.status === 'vorlaeufig' && <span className="marke-vorlaeufig">vorläufig</span>}
                     </span>
                     <span className="eintrag-knoepfe">
-                      {nachKapiteln && liste.kapitel.length > 0 && (
-                        <select aria-label="Kapitel" value={a.kapitel?.id ?? ''} onChange={(e) => onAendern(verschiebe(liste, z.werk.id, e.target.value))}>
-                          <option value="">vor den Kapiteln</option>
-                          {teile
-                            .filter((x) => x.kapitel)
-                            .map((x) => (
-                              <option key={x.kapitel!.id} value={x.kapitel!.id} title={kapitelTitel(x)}>
-                                {kurz(kapitelTitel(x))}
-                              </option>
-                            ))}
-                        </select>
-                      )}
                       {liste.sortierung === 'hand' && z.vonHand && (
                         <>
-                          <button type="button" className="klein-knopf" aria-label="nach oben" onClick={() => onAendern(rueckeUm(liste, z.werk.id, -1))}>
+                          <button type="button" className="klein-knopf" aria-label="nach oben" onClick={() => onAendern(verschieben(-1))}>
                             ↑
                           </button>
-                          <button type="button" className="klein-knopf" aria-label="nach unten" onClick={() => onAendern(rueckeUm(liste, z.werk.id, 1))}>
+                          <button type="button" className="klein-knopf" aria-label="nach unten" onClick={() => onAendern(verschieben(1))}>
                             ↓
                           </button>
                         </>
@@ -286,20 +265,8 @@ export function Liste({
           {!alleZeigen && verborgen > 0 && (
             <div className="weitere-eintraege">
               <button type="button" className="textknopf" onClick={() => setAlleZeigen(true)}>
-                {verborgen} weitere Einträge{verborgeneKapitel > 0 && ` in ${verborgeneKapitel} ${verborgeneKapitel === 1 ? 'weiteren Kapitel' : 'weiteren Kapiteln'}`} zeigen
+                {verborgen} weitere Einträge{verborgeneThemen > 0 && ` unter ${verborgeneThemen} ${verborgeneThemen === 1 ? 'weiteren Thema' : 'weiteren Themen'}`} zeigen
               </button>
-            </div>
-          )}
-          {nachKapiteln && (
-            <div className="knopfreihe kapitel-knoepfe">
-              <button type="button" className="textknopf" onClick={() => neuesKapitel(1)}>
-                + Kapitel
-              </button>
-              {liste.kapitel.length > 0 && (
-                <button type="button" className="textknopf" onClick={() => neuesKapitel(2)}>
-                  + Unterkapitel
-                </button>
-              )}
             </div>
           )}
         </div>
@@ -379,17 +346,12 @@ export function Liste({
             <input type="checkbox" checked={stil.schlusspunkt} onChange={(e) => setStil({ ...stil, schlusspunkt: e.target.checked })} /> Punkt am Zeilenende
           </label>
           <div className="trennlinie" />
-          {nachKapiteln && liste.kapitel.length > 0 && (
-            <label className="haken">
-              <input type="checkbox" checked={liste.kapitelNummern} onChange={(e) => aendere({ kapitelNummern: e.target.checked })} /> Kapitel nummerieren (1, 1.1, 2 …)
-            </label>
-          )}
           {themen.length > 0 && (
             <Wahl
               label="Gliederung"
               wert={liste.gliederung}
               optionen={[
-                ['kapitel', 'eigene Kapitel'],
+                ['keine', 'keine'],
                 ['themen', 'nach Themenordnung'],
               ]}
               onWahl={(gliederung) => aendere({ gliederung })}
@@ -438,35 +400,6 @@ export function Liste({
   )
 }
 
-function KapitelKopf({
-  abschnitt,
-  nummerieren,
-  onAendern,
-  onEntfernen,
-}: {
-  abschnitt: Abschnitt
-  nummerieren: boolean
-  onAendern: (t: Partial<Kapitel>) => void
-  onEntfernen: () => void
-}) {
-  const k = abschnitt.kapitel!
-  return (
-    <div className={`kapitel-kopf ebene-${k.ebene}`}>
-      {nummerieren && (
-        <span className="kapitel-nr" title="Laufende Kapitelnummer; abschalten unter „Darstellung“ → „Kapitel nummerieren“">
-          {abschnitt.nummer}
-        </span>
-      )}
-      <input className="eingabe serif" aria-label={`Kapitel ${abschnitt.nummer}`} value={k.titel} placeholder="Kapitelüberschrift" onChange={(e) => onAendern({ titel: e.target.value })} />
-      <button type="button" className="klein-knopf" onClick={() => onAendern({ ebene: k.ebene === 1 ? 2 : 1 })}>
-        {k.ebene === 1 ? 'als Unterkapitel' : 'als Kapitel'}
-      </button>
-      <button type="button" className="klein-knopf" onClick={onEntfernen}>
-        Kapitel entfernen
-      </button>
-    </div>
-  )
-}
 
 function Blattinhalt({ ueberschrift, druck }: { ueberschrift: string; druck: Druckabschnitt[] }) {
   return (

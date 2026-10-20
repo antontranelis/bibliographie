@@ -1,8 +1,8 @@
 import { ersterscheinung, sortierName, STANDARD_STIL } from './format'
-import { neueId, personSchluessel, type Kapitel, type ListenRegel, type Literaturliste, type Person, type Thema, type Werk } from './model'
+import { neueId, personSchluessel, type ListenRegel, type Literaturliste, type Person, type Thema, type Werk } from './model'
 import { baum, bezeichnung, unterthemen } from './themen'
 
-// Gespeicherte Literaturlisten: welche Karten in welchem Kapitel in welcher Reihenfolge stehen.
+// Gespeicherte Literaturlisten: welche Karten in welcher Reihenfolge stehen, wahlweise gegliedert nach Themen.
 
 export const ALLE: ListenRegel = { person: '', schlagwort: '', nurPrimaer: false, nurFest: false, thema: '', mitUnterthemen: true }
 
@@ -12,14 +12,13 @@ export function neueListe(name: string, regel: ListenRegel | null = ALLE): Liter
     id: neueId(),
     name,
     regel: regel && { ...regel },
-    kapitel: [],
     eintraege: [],
+    abschnittsfolge: {},
     ausgenommen: [],
     stil: { ...STANDARD_STIL },
     sortierung: 'name',
     jedePerson: false,
-    gliederung: 'kapitel',
-    kapitelNummern: true,
+    gliederung: 'keine',
     angelegt: jetzt,
     geaendert: jetzt,
   }
@@ -47,17 +46,21 @@ export interface ListenZeile {
   person?: Person
   /** Wird gedruckt; herausgenommene Karten bleiben zum Wiederaufnehmen sichtbar */
   drin: boolean
-  /** Von Hand aufgenommen oder in ein Kapitel gelegt */
+  /** Von Hand aufgenommen */
   vonHand: boolean
   schluessel: string
 }
 
+/** Überschrift eines Abschnitts, aus der Themenordnung */
+export interface Ueberschrift {
+  id: string
+  titel: string
+  ebene: 1 | 2
+}
+
 export interface Abschnitt {
-  /** Null = vor dem ersten Kapitel */
-  kapitel: Kapitel | null
-  /** Kapitel aus der Themenordnung: nicht in der Liste bearbeitbar */
-  ausThema?: boolean
-  nummer: string
+  /** Null = ohne Überschrift */
+  ueberschrift: Ueberschrift | null
   zeilen: ListenZeile[]
 }
 
@@ -66,21 +69,6 @@ export function druckWerk(z: ListenZeile): Werk {
   const vorn = z.person
   if (!vorn) return z.werk
   return { ...z.werk, personen: [vorn, ...z.werk.personen.filter((p) => p !== vorn)] }
-}
-
-/** Laufende Nummern der Kapitel: „1“, „1.1“, „1.2“, „2“. */
-export function nummern(kapitel: Kapitel[]): Map<string, string> {
-  const aus = new Map<string, string>()
-  let haupt = 0
-  let unter = 0
-  for (const k of kapitel) {
-    if (k.ebene === 1 || haupt === 0) {
-      haupt++
-      unter = 0
-      aus.set(k.id, String(haupt))
-    } else aus.set(k.id, `${haupt}.${++unter}`)
-  }
-  return aus
 }
 
 const vgl = (a: string, b: string) => a.localeCompare(b, 'de', { sensitivity: 'base' })
@@ -95,17 +83,17 @@ function sortiert(zeilen: ListenZeile[], nach: 'name' | 'jahr'): ListenZeile[] {
 }
 
 /**
- * Die Liste, wie sie gedruckt wird: Abschnitte vor und in den Kapiteln, jeweils sortiert.
- * Bei der Gliederung nach Themen bilden die Themen die Kapitel, und ein Werk steht unter jedem seiner Themen.
+ * Die Liste, wie sie gedruckt wird: ein Abschnitt ohne Überschrift, oder bei der Gliederung nach Themen
+ * ein Abschnitt je Thema, und ein Werk steht unter jedem seiner Themen.
  */
 export function abschnitte(liste: Literaturliste, werke: Werk[], themen: Thema[] = []): Abschnitt[] {
   const nachId = new Map(werke.map((w) => [w.id, w]))
-  const kapitelIds = new Set(liste.kapitel.map((k) => k.id))
   const ausgenommen = new Set(liste.ausgenommen)
-  const platz = new Map<string, string>()
-  for (const e of liste.eintraege) if (nachId.has(e.werkId)) platz.set(e.werkId, kapitelIds.has(e.kapitelId) ? e.kapitelId : '')
+  // Von Hand Aufgenommene in ihrer Reihenfolge; gelöschte Karten fallen weg
+  const hand = [...new Set(liste.eintraege.map((e) => e.werkId))].filter((id) => nachId.has(id)).map((id) => nachId.get(id)!)
+  const handIds = new Set(hand.map((w) => w.id))
   const regel = liste.regel
-  const treffer = regel ? werke.filter((w) => !platz.has(w.id) && passtZurRegel(w, regel, themen)) : []
+  const treffer = regel ? werke.filter((w) => !handIds.has(w.id) && passtZurRegel(w, regel, themen)) : []
 
   const zeile = (w: Werk, vonHand: boolean, person?: Person): ListenZeile => ({
     werk: w,
@@ -127,19 +115,11 @@ export function abschnitte(liste: Literaturliste, werke: Werk[], themen: Thema[]
     return sortiert(ausgeweitet, sortierung)
   }
 
-  if (liste.gliederung === 'themen') return nachThemen(liste, [...platz.keys()].map((id) => nachId.get(id)!), treffer, themen, ordne)
-
-  const zeilenIn = (kapitelId: string): ListenZeile[] =>
-    ordne(
-      liste.eintraege.filter((e) => platz.get(e.werkId) === kapitelId).map((e) => nachId.get(e.werkId)!),
-      kapitelId === '' ? treffer : [],
-      liste.sortierung,
-    )
-  const nr = nummern(liste.kapitel)
-  return [{ kapitel: null, nummer: '', zeilen: zeilenIn('') }, ...liste.kapitel.map((k) => ({ kapitel: k, nummer: nr.get(k.id)!, zeilen: zeilenIn(k.id) }))]
+  if (liste.gliederung === 'themen') return nachThemen(liste, hand, treffer, themen, ordne)
+  return [{ ueberschrift: null, zeilen: ordne(hand, treffer, liste.sortierung) }]
 }
 
-/** Kapitel aus der Themenordnung; Zweige ohne Werke entfallen. Was in keinem gezeigten Thema steht, kommt in einen Schlussabschnitt. */
+/** Abschnitte aus der Themenordnung; Zweige ohne Werke entfallen. Was in keinem gezeigten Thema steht, kommt in einen Schlussabschnitt. */
 function nachThemen(
   liste: Literaturliste,
   hand: Werk[],
@@ -151,14 +131,16 @@ function nachThemen(
   const knoten = baum(themen).filter((k) => !erlaubt || erlaubt.has(k.thema.id))
   const handIds = new Set(hand.map((w) => w.id))
   const alle = [...hand, ...treffer.filter((w) => !handIds.has(w.id))]
-  const sortierung = liste.sortierung === 'hand' ? 'name' : liste.sortierung
+  // „von Hand“: die Reihenfolge der Einträge gilt auch unter jedem Thema
+  const sortierung = liste.sortierung
   const flach = Math.min(...knoten.map((k) => k.tiefe))
   const abschnitte: Abschnitt[] = knoten.map((k) => {
-    const hier = alle.filter((w) => w.themen.includes(k.thema.id))
+    const hier = nachFolge(
+      alle.filter((w) => w.themen.includes(k.thema.id)),
+      sortierung === 'hand' ? (liste.abschnittsfolge?.[k.thema.id] ?? []) : [],
+    )
     return {
-      kapitel: { id: k.thema.id, titel: bezeichnung(k.thema), ebene: k.tiefe - flach === 0 ? 1 : 2 },
-      ausThema: true,
-      nummer: '',
+      ueberschrift: { id: k.thema.id, titel: bezeichnung(k.thema), ebene: k.tiefe - flach === 0 ? 1 : 2 },
       zeilen: ordne(hier.filter((w) => handIds.has(w.id)), hier.filter((w) => !handIds.has(w.id)), sortierung),
     }
   })
@@ -166,20 +148,28 @@ function nachThemen(
   const mitWerken = new Set<string>()
   for (const a of abschnitte) {
     if (a.zeilen.length === 0) continue
-    for (const id of mitVorfahren(themen, a.kapitel!.id)) mitWerken.add(id)
+    for (const id of mitVorfahren(themen, a.ueberschrift!.id)) mitWerken.add(id)
   }
-  const ergebnis = abschnitte.filter((a) => mitWerken.has(a.kapitel!.id))
+  const ergebnis = abschnitte.filter((a) => mitWerken.has(a.ueberschrift!.id))
   // Jede Karte der Liste erscheint mindestens einmal: ohne Thema, oder von Hand aufgenommen außerhalb des Regelzweigs
   const gezeigt = new Set(ergebnis.flatMap((a) => a.zeilen.map((z) => z.werk.id)))
-  const rest = alle.filter((w) => !gezeigt.has(w.id))
+  const rest = nachFolge(
+    alle.filter((w) => !gezeigt.has(w.id)),
+    sortierung === 'hand' ? (liste.abschnittsfolge?.['~weitere'] ?? []) : [],
+  )
   if (rest.length)
     ergebnis.push({
-      kapitel: { id: '~weitere', titel: erlaubt ? 'Weitere Titel' : 'ohne Thema', ebene: 1 },
-      ausThema: true,
-      nummer: '',
+      ueberschrift: { id: '~weitere', titel: erlaubt ? 'Weitere Titel' : 'ohne Thema', ebene: 1 },
       zeilen: ordne(rest.filter((w) => handIds.has(w.id)), rest.filter((w) => !handIds.has(w.id)), sortierung),
     })
   return ergebnis
+}
+
+/** Werke in der gespeicherten Reihenfolge des Abschnitts; nicht darin genannte behalten ihre Folge dahinter. */
+function nachFolge(werke: Werk[], folge: string[]): Werk[] {
+  if (folge.length === 0) return werke
+  const stelle = new Map(folge.map((id, i) => [id, i]))
+  return [...werke].sort((a, b) => (stelle.get(a.id) ?? Infinity) - (stelle.get(b.id) ?? Infinity))
 }
 
 /** Das Thema und alle seine Vorfahren. */
@@ -193,21 +183,12 @@ function mitVorfahren(themen: Thema[], id: string): string[] {
 const geaendert = (l: Literaturliste): Literaturliste => ({ ...l, geaendert: new Date().toISOString() })
 
 /** Karte aufnehmen; eine herausgenommene wird wieder gedruckt. */
-export function hinzufuegen(l: Literaturliste, werkId: string, kapitelId = ''): Literaturliste {
+export function hinzufuegen(l: Literaturliste, werkId: string): Literaturliste {
   const da = l.eintraege.some((e) => e.werkId === werkId)
   return geaendert({
     ...l,
-    eintraege: da ? l.eintraege : [...l.eintraege, { werkId, kapitelId }],
+    eintraege: da ? l.eintraege : [...l.eintraege, { werkId }],
     ausgenommen: l.ausgenommen.filter((id) => id !== werkId),
-  })
-}
-
-/** Karte in ein Kapitel legen; leer = vor das erste Kapitel. */
-export function verschiebe(l: Literaturliste, werkId: string, kapitelId: string): Literaturliste {
-  const da = l.eintraege.some((e) => e.werkId === werkId)
-  return geaendert({
-    ...l,
-    eintraege: da ? l.eintraege.map((e) => (e.werkId === werkId ? { ...e, kapitelId } : e)) : [...l.eintraege, { werkId, kapitelId }],
   })
 }
 
@@ -222,24 +203,25 @@ export function umschalten(l: Literaturliste, werkId: string): Literaturliste {
   return geaendert({ ...l, ausgenommen: raus ? l.ausgenommen.filter((id) => id !== werkId) : [...l.ausgenommen, werkId] })
 }
 
-/** Von Hand aufgenommene Karte innerhalb ihres Kapitels um eine Stelle verschieben. */
+/**
+ * Unter einem Thema eine Karte um eine Stelle verschieben; reihenfolge ist die angezeigte Folge der
+ * von Hand aufgenommenen Karten dieses Abschnitts. Andere Themen und die Reihenfolge der Liste bleiben.
+ */
+export function rueckeUmIn(l: Literaturliste, themaId: string, reihenfolge: string[], werkId: string, richtung: -1 | 1): Literaturliste {
+  const i = reihenfolge.indexOf(werkId)
+  const j = i + richtung
+  if (i < 0 || j < 0 || j >= reihenfolge.length) return l
+  const neu = [...reihenfolge]
+  ;[neu[i], neu[j]] = [neu[j], neu[i]]
+  return geaendert({ ...l, abschnittsfolge: { ...l.abschnittsfolge, [themaId]: neu } })
+}
+
+/** Von Hand aufgenommene Karte um eine Stelle verschieben. */
 export function rueckeUm(l: Literaturliste, werkId: string, richtung: -1 | 1): Literaturliste {
   const i = l.eintraege.findIndex((e) => e.werkId === werkId)
-  if (i < 0) return l
-  const kapitelId = l.eintraege[i].kapitelId
-  let j = i + richtung
-  while (j >= 0 && j < l.eintraege.length && l.eintraege[j].kapitelId !== kapitelId) j += richtung
-  if (j < 0 || j >= l.eintraege.length) return l
+  const j = i + richtung
+  if (i < 0 || j < 0 || j >= l.eintraege.length) return l
   const eintraege = [...l.eintraege]
   ;[eintraege[i], eintraege[j]] = [eintraege[j], eintraege[i]]
   return geaendert({ ...l, eintraege })
-}
-
-/** Kapitel entfernen; seine Einträge rücken vor das erste Kapitel. */
-export function kapitelEntfernen(l: Literaturliste, kapitelId: string): Literaturliste {
-  return geaendert({
-    ...l,
-    kapitel: l.kapitel.filter((k) => k.id !== kapitelId),
-    eintraege: l.eintraege.map((e) => (e.kapitelId === kapitelId ? { ...e, kapitelId: '' } : e)),
-  })
 }

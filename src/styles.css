@@ -424,11 +424,6 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
 .eintrag-knoepfe .klein-knopf { border-color: var(--linie2); padding: 5px 8px; }
 .listen-wahl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
 .kapitel-kopf { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 18px 0 8px; border-bottom: 1px solid var(--linie); }
-.kapitel-kopf .eingabe { flex: 1 1 260px; font-size: 19px; font-weight: 600; }
-.kapitel-kopf.ebene-2 { padding-left: 20px; }
-.kapitel-kopf.ebene-2 .eingabe { font-size: 17px; }
-.kapitel-nr { font: 600 17px/1 var(--serif); color: var(--lab); min-width: 28px; }
-.kapitel-knoepfe { padding-top: 12px; }
 .weitere-eintraege { padding: 12px 0 4px; border-bottom: 1px solid var(--zart); }
 .zeile-knoepfe { margin-top: 8px; }
 .vorlage { margin-top: 14px; padding: 12px 14px; background: var(--ocker-hell); border-left: 3px solid var(--ocker); border-radius: 4px; }
