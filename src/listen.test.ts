@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { abschnitte, druckWerk, entferne, hinzufuegen, kapitelEntfernen, neueListe, nummern, rueckeUm, umschalten, verschiebe } from './listen'
+import { ALLE, abschnitte, druckWerk, entferne, hinzufuegen, kapitelEntfernen, neueListe, nummern, rueckeUm, umschalten, verschiebe } from './listen'
 import { druckzeile } from './format'
 import { leereAuflage, leereAusgabe, leeresWerk, type Kapitel, type Literaturliste, type Thema, type Werk } from './model'
 
@@ -116,6 +116,13 @@ describe('Themen', () => {
       'b) rundfunk|2:arnheim',
       'ohne Thema|1:ohne',
     ])
+  })
+  it('von Hand aufgenommene Karten außerhalb des Regelzweigs bleiben beim Umschalten erhalten', () => {
+    const l = hinzufuegen(hinzufuegen({ ...neueListe('Rundfunk'), regel: { ...ALLE, thema: 'rundfunk', mitUnterthemen: true } }, 'iros'), 'ohne')
+    const zeilen = (x: Literaturliste) => abschnitte(x, alle, themen).flatMap((a) => a.zeilen.map((z) => z.werk.id)).sort()
+    expect(zeilen(l)).toEqual(['arnheim', 'iros', 'ohne'])
+    const t = abschnitte({ ...l, gliederung: 'themen' }, alle, themen)
+    expect(t.map((x) => `${x.kapitel?.titel}:${x.zeilen.map((z) => z.werk.id).join(',')}`)).toEqual(['b) rundfunk:arnheim', 'Weitere Titel:iros,ohne'])
   })
   it('Gliederung nach Themen mit Themenregel: nur dieser Zweig', () => {
     const l = neueListe('Film')

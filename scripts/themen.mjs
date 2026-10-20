@@ -50,6 +50,20 @@ try {
   await page.locator('.kasten-gruppe', { hasText: 'III. Medien › Film' }).getByRole('button', { name: 'Liste daraus' }).click()
   pruefe('„Liste daraus“ legt eine Liste zum Thema an', (await page.locator('#listen-name').inputValue()) === 'Film' && (await page.locator('.eintraege .eintrag').count()) === 1)
 
+  // Von Hand aufgenommene Karte außerhalb des Themas bleibt beim Umschalten auf die Themengliederung (#20)
+  await reiter('Kartei').click()
+  await page.getByRole('radio', { name: 'nach Autor' }).click()
+  await page.locator('.kartei-karte', { hasText: 'Die Erziehung des Kindes' }).dblclick()
+  await page.getByLabel('In Liste aufnehmen').selectOption({ label: 'Film' })
+  await reiter('Liste').click()
+  await page.locator('.listen-wahl select').selectOption({ label: 'Film' })
+  const vorher = await page.locator('.eintraege .eintrag').count()
+  await page.getByRole('radio', { name: 'nach Themenordnung' }).click()
+  const nachher = await page.locator('.eintraege .eintrag').count()
+  const koepfeFilm = await page.locator('.thema-kopf').allInnerTexts()
+  pruefe('Von Hand Aufgenommenes bleibt in der Themengliederung', vorher === 2 && nachher === 2 && koepfeFilm.includes('Weitere Titel'), `${vorher} → ${nachher}, ${koepfeFilm.join(' | ')}`)
+  await page.getByRole('radio', { name: 'eigene Kapitel' }).click()
+
   // Themenkartei als eine Liste
   await page.getByRole('button', { name: '+ Neue Liste' }).click()
   await page.locator('#listen-name').fill('Themenkartei')

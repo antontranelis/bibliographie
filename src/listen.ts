@@ -138,7 +138,7 @@ export function abschnitte(liste: Literaturliste, werke: Werk[], themen: Thema[]
   return [{ kapitel: null, nummer: '', zeilen: zeilenIn('') }, ...liste.kapitel.map((k) => ({ kapitel: k, nummer: nr.get(k.id)!, zeilen: zeilenIn(k.id) }))]
 }
 
-/** Kapitel aus der Themenordnung; Zweige ohne Werke entfallen, Werke ohne Thema stehen am Ende. */
+/** Kapitel aus der Themenordnung; Zweige ohne Werke entfallen. Was in keinem gezeigten Thema steht, kommt in einen Schlussabschnitt. */
 function nachThemen(
   liste: Literaturliste,
   hand: Werk[],
@@ -168,17 +168,16 @@ function nachThemen(
     for (const id of mitVorfahren(themen, a.kapitel!.id)) mitWerken.add(id)
   }
   const ergebnis = abschnitte.filter((a) => mitWerken.has(a.kapitel!.id))
-  if (!erlaubt) {
-    const bekannt = new Set(themen.map((t) => t.id))
-    const ohne = alle.filter((w) => !w.themen.some((t) => bekannt.has(t)))
-    if (ohne.length)
-      ergebnis.push({
-        kapitel: { id: '~ohne-thema', titel: 'ohne Thema', ebene: 1 },
-        ausThema: true,
-        nummer: '',
-        zeilen: ordne(ohne.filter((w) => handIds.has(w.id)), ohne.filter((w) => !handIds.has(w.id)), sortierung),
-      })
-  }
+  // Jede Karte der Liste erscheint mindestens einmal: ohne Thema, oder von Hand aufgenommen außerhalb des Regelzweigs
+  const gezeigt = new Set(ergebnis.flatMap((a) => a.zeilen.map((z) => z.werk.id)))
+  const rest = alle.filter((w) => !gezeigt.has(w.id))
+  if (rest.length)
+    ergebnis.push({
+      kapitel: { id: '~weitere', titel: erlaubt ? 'Weitere Titel' : 'ohne Thema', ebene: 1 },
+      ausThema: true,
+      nummer: '',
+      zeilen: ordne(rest.filter((w) => handIds.has(w.id)), rest.filter((w) => !handIds.has(w.id)), sortierung),
+    })
   return ergebnis
 }
 
