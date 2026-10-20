@@ -1,4 +1,5 @@
 // Prüft, dass nur ein Fenster schreibt und die Übergabe nichts verliert. Aufruf: node scripts/fenster.mjs <url>
+// Auch gegen den Devserver laufen lassen: dort startet React im StrictMode doppelt.
 import { chromium } from 'playwright-core'
 import { speicherFrei, speicherVoll } from './speicher-voll.mjs'
 
@@ -32,6 +33,8 @@ const gespeichert = (p) => p.evaluate(() => localStorage.getItem('bibliographie:
 
 try {
   const a = await seite()
+  // Im Devserver kann der Hinweis beim doppelten Start kurz aufblitzen
+  await gesperrt(a).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {})
   pruefe('Erstes Fenster schreibt', (await gesperrt(a).count()) === 0)
   const b = await seite()
   pruefe('Zweites Fenster ist gesperrt', await gesperrt(b).isVisible())
@@ -67,6 +70,17 @@ try {
     pruefe('B hat die Karte, die A erst bei der Übergabe speichern konnte', await inKartei(b2, 'Bei vollem Speicher'))
     await b2.close()
     await gesperrt(a).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+  }
+
+  // A hat die Sperre inzwischen über die Schlange bekommen: auch dann Übergabe hin und zurück, danach Nachrücken
+  {
+    const c2 = await seite()
+    await c2.getByRole('button', { name: 'Hier weiterarbeiten' }).click()
+    await gesperrt(c2).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+    pruefe('Übernahme von einem Fenster, das über die Schlange kam', (await gesperrt(c2).count()) === 0 && (await gesperrt(a).isVisible()))
+    await c2.close()
+    await gesperrt(a).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+    pruefe('Danach rückt A wieder von selbst nach', (await gesperrt(a).count()) === 0)
   }
 
   // Gesperrtes Fenster schreibt nie, auch nicht beim Schließen
