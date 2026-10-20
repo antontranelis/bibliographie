@@ -64,6 +64,8 @@ export function useSitzung(speichern: () => boolean, neuLaden: () => void): Sitz
     wechselt: false,
     startWunschBis: 0,
     generation: 0,
+    /** Zählt jeden Abbau der Komponente; eine Sperre, die erst danach bewilligt wird, gehört niemandem mehr */
+    abbau: 0,
     halte: false,
     loslassen: null as (() => void) | null,
     schlange: null as AbortController | null,
@@ -140,9 +142,14 @@ export function useSitzung(speichern: () => boolean, neuLaden: () => void): Sitz
     (optionen: LockOptions, zuvorLesend: boolean): Promise<boolean> => {
       if (!locks) return Promise.resolve(false)
       let meine = 0
+      const aufbau = z.abbau
       return locks
         .request(SPERRE, optionen, (sperre) => {
           if (!sperre) return null
+          // Erst nach dem Abbau bewilligt (etwa beim doppelten Start im Entwicklungsmodus): sofort zurückgeben
+          if (z.abbau !== aufbau) return null
+          // Bewilligt: dieses Fenster wartet nicht mehr in der Schlange
+          z.schlange = null
           meine = ++z.generation
           z.halte = true
           if (zuvorLesend) rueckruf.current.neuLaden()
@@ -206,6 +213,7 @@ export function useSitzung(speichern: () => boolean, neuLaden: () => void): Sitz
       clearTimeout(weiter)
       k.close()
       // Abbau: Sperre freigeben, ohne dass das als „weggenommen“ zählt
+      z.abbau++
       z.generation++
       z.halte = false
       z.loslassen?.()
