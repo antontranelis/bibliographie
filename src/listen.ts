@@ -1,9 +1,10 @@
 import { ersterscheinung, sortierName, STANDARD_STIL } from './format'
-import { neueId, personSchluessel, type Kapitel, type ListenRegel, type Literaturliste, type Person, type Werk } from './model'
+import { neueId, personSchluessel, type Kapitel, type ListenRegel, type Literaturliste, type Person, type Thema, type Werk } from './model'
+import { baum, bezeichnung, unterthemen } from './themen'
 
 // Gespeicherte Literaturlisten: welche Karten in welchem Kapitel in welcher Reihenfolge stehen.
 
-export const ALLE: ListenRegel = { person: '', schlagwort: '', nurPrimaer: false, nurFest: false }
+export const ALLE: ListenRegel = { person: '', schlagwort: '', nurPrimaer: false, nurFest: false, thema: '', mitUnterthemen: true }
 
 export function neueListe(name: string, regel: ListenRegel | null = ALLE): Literaturliste {
   const jetzt = new Date().toISOString()
@@ -17,13 +18,22 @@ export function neueListe(name: string, regel: ListenRegel | null = ALLE): Liter
     stil: { ...STANDARD_STIL },
     sortierung: 'name',
     jedePerson: false,
+    gliederung: 'kapitel',
     angelegt: jetzt,
     geaendert: jetzt,
   }
 }
 
-export function passtZurRegel(w: Werk, r: ListenRegel): boolean {
+/** Themen, die eine Regel aufnimmt; null = jedes */
+export function regelThemen(r: ListenRegel | null, themen: Thema[]): Set<string> | null {
+  if (!r?.thema) return null
+  return r.mitUnterthemen ? unterthemen(themen, r.thema) : new Set([r.thema])
+}
+
+export function passtZurRegel(w: Werk, r: ListenRegel, themen: Thema[] = []): boolean {
+  const menge = regelThemen(r, themen)
   return (
+    (!menge || w.themen.some((t) => menge.has(t))) &&
     (!r.nurFest || w.status === 'fest') &&
     (!r.person || w.personen.some((p) => personSchluessel(p) === r.person)) &&
     (!r.schlagwort || w.schlagwoerter.some((s) => s.begriff === r.schlagwort && (!r.nurPrimaer || s.primaer)))
@@ -44,6 +54,8 @@ export interface ListenZeile {
 export interface Abschnitt {
   /** Null = vor dem ersten Kapitel */
   kapitel: Kapitel | null
+  /** Kapitel aus der Themenordnung: nicht in der Liste bearbeitbar */
+  ausThema?: boolean
   nummer: string
   zeilen: ListenZeile[]
 }
@@ -81,27 +93,29 @@ function sortiert(zeilen: ListenZeile[], nach: 'name' | 'jahr'): ListenZeile[] {
   })
 }
 
-/** Die Liste, wie sie gedruckt wird: Abschnitte vor und in den Kapiteln, jeweils sortiert. */
-export function abschnitte(liste: Literaturliste, werke: Werk[]): Abschnitt[] {
+/**
+ * Die Liste, wie sie gedruckt wird: Abschnitte vor und in den Kapiteln, jeweils sortiert.
+ * Bei der Gliederung nach Themen bilden die Themen die Kapitel, und ein Werk steht unter jedem seiner Themen.
+ */
+export function abschnitte(liste: Literaturliste, werke: Werk[], themen: Thema[] = []): Abschnitt[] {
   const nachId = new Map(werke.map((w) => [w.id, w]))
   const kapitelIds = new Set(liste.kapitel.map((k) => k.id))
   const ausgenommen = new Set(liste.ausgenommen)
   const platz = new Map<string, string>()
   for (const e of liste.eintraege) if (nachId.has(e.werkId)) platz.set(e.werkId, kapitelIds.has(e.kapitelId) ? e.kapitelId : '')
   const regel = liste.regel
-  const treffer = regel ? werke.filter((w) => !platz.has(w.id) && passtZurRegel(w, regel)) : []
+  const treffer = regel ? werke.filter((w) => !platz.has(w.id) && passtZurRegel(w, regel, themen)) : []
 
-  const zeilenIn = (kapitelId: string): ListenZeile[] => {
-    const hand = liste.eintraege.filter((e) => platz.get(e.werkId) === kapitelId).map((e) => nachId.get(e.werkId)!)
-    const ausRegel = kapitelId === '' ? treffer : []
-    const zeile = (w: Werk, vonHand: boolean, person?: Person): ListenZeile => ({
-      werk: w,
-      person,
-      drin: !ausgenommen.has(w.id),
-      vonHand,
-      schluessel: person ? `${w.id}|${personSchluessel(person)}` : w.id,
-    })
-    if (liste.sortierung === 'hand') return [...hand.map((w) => zeile(w, true)), ...sortiert(ausRegel.map((w) => zeile(w, false)), 'name')]
+  const zeile = (w: Werk, vonHand: boolean, person?: Person): ListenZeile => ({
+    werk: w,
+    person,
+    drin: !ausgenommen.has(w.id),
+    vonHand,
+    schluessel: person ? `${w.id}|${personSchluessel(person)}` : w.id,
+  })
+  /** Von Hand aufgenommene zuerst in ihrer Reihenfolge, oder alle sortiert; bei „jeder Person“ ausgeweitet. */
+  const ordne = (hand: Werk[], ausRegel: Werk[], sortierung: Literaturliste['sortierung']): ListenZeile[] => {
+    if (sortierung === 'hand') return [...hand.map((w) => zeile(w, true)), ...sortiert(ausRegel.map((w) => zeile(w, false)), 'name')]
     const alle = [...hand.map((w) => zeile(w, true)), ...ausRegel.map((w) => zeile(w, false))]
     const ausgeweitet = liste.jedePerson
       ? alle.flatMap((z) => {
@@ -109,11 +123,70 @@ export function abschnitte(liste: Literaturliste, werke: Werk[]): Abschnitt[] {
           return personen.length > 1 ? personen.map((p) => zeile(z.werk, z.vonHand, p)) : [personen.length ? zeile(z.werk, z.vonHand, personen[0]) : z]
         })
       : alle
-    return sortiert(ausgeweitet, liste.sortierung)
+    return sortiert(ausgeweitet, sortierung)
   }
 
+  if (liste.gliederung === 'themen') return nachThemen(liste, [...platz.keys()].map((id) => nachId.get(id)!), treffer, themen, ordne)
+
+  const zeilenIn = (kapitelId: string): ListenZeile[] =>
+    ordne(
+      liste.eintraege.filter((e) => platz.get(e.werkId) === kapitelId).map((e) => nachId.get(e.werkId)!),
+      kapitelId === '' ? treffer : [],
+      liste.sortierung,
+    )
   const nr = nummern(liste.kapitel)
   return [{ kapitel: null, nummer: '', zeilen: zeilenIn('') }, ...liste.kapitel.map((k) => ({ kapitel: k, nummer: nr.get(k.id)!, zeilen: zeilenIn(k.id) }))]
+}
+
+/** Kapitel aus der Themenordnung; Zweige ohne Werke entfallen. Was in keinem gezeigten Thema steht, kommt in einen Schlussabschnitt. */
+function nachThemen(
+  liste: Literaturliste,
+  hand: Werk[],
+  treffer: Werk[],
+  themen: Thema[],
+  ordne: (hand: Werk[], ausRegel: Werk[], s: Literaturliste['sortierung']) => ListenZeile[],
+): Abschnitt[] {
+  const erlaubt = regelThemen(liste.regel, themen)
+  const knoten = baum(themen).filter((k) => !erlaubt || erlaubt.has(k.thema.id))
+  const handIds = new Set(hand.map((w) => w.id))
+  const alle = [...hand, ...treffer.filter((w) => !handIds.has(w.id))]
+  const sortierung = liste.sortierung === 'hand' ? 'name' : liste.sortierung
+  const flach = Math.min(...knoten.map((k) => k.tiefe))
+  const abschnitte: Abschnitt[] = knoten.map((k) => {
+    const hier = alle.filter((w) => w.themen.includes(k.thema.id))
+    return {
+      kapitel: { id: k.thema.id, titel: bezeichnung(k.thema), ebene: k.tiefe - flach === 0 ? 1 : 2 },
+      ausThema: true,
+      nummer: '',
+      zeilen: ordne(hier.filter((w) => handIds.has(w.id)), hier.filter((w) => !handIds.has(w.id)), sortierung),
+    }
+  })
+  // Ein Thema bleibt, wenn es selbst oder eines seiner Unterthemen Werke hat
+  const mitWerken = new Set<string>()
+  for (const a of abschnitte) {
+    if (a.zeilen.length === 0) continue
+    for (const id of mitVorfahren(themen, a.kapitel!.id)) mitWerken.add(id)
+  }
+  const ergebnis = abschnitte.filter((a) => mitWerken.has(a.kapitel!.id))
+  // Jede Karte der Liste erscheint mindestens einmal: ohne Thema, oder von Hand aufgenommen außerhalb des Regelzweigs
+  const gezeigt = new Set(ergebnis.flatMap((a) => a.zeilen.map((z) => z.werk.id)))
+  const rest = alle.filter((w) => !gezeigt.has(w.id))
+  if (rest.length)
+    ergebnis.push({
+      kapitel: { id: '~weitere', titel: erlaubt ? 'Weitere Titel' : 'ohne Thema', ebene: 1 },
+      ausThema: true,
+      nummer: '',
+      zeilen: ordne(rest.filter((w) => handIds.has(w.id)), rest.filter((w) => !handIds.has(w.id)), sortierung),
+    })
+  return ergebnis
+}
+
+/** Das Thema und alle seine Vorfahren. */
+function mitVorfahren(themen: Thema[], id: string): string[] {
+  const nachId = new Map(themen.map((t) => [t.id, t]))
+  const aus: string[] = []
+  for (let t = nachId.get(id); t && !aus.includes(t.id); t = nachId.get(t.elternId)) aus.push(t.id)
+  return aus
 }
 
 const geaendert = (l: Literaturliste): Literaturliste => ({ ...l, geaendert: new Date().toISOString() })

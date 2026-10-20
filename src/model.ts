@@ -176,6 +176,8 @@ export interface Werk {
   /** Zeile aus einer eingelesenen Liste, solange die Karte nicht sicher zerlegt und nicht fest angelegt ist */
   vorlage: string
   schlagwoerter: Schlagwort[]
+  /** Themen aus der Themenordnung, beliebig viele */
+  themen: string[]
   angelegt: string
   geaendert: string
 }
@@ -203,13 +205,30 @@ export interface Verlag {
   schreibweisen: string[]
 }
 
-/** Welche Karten eine Liste von selbst aufnimmt. Leere Person und leeres Schlagwort heißen: alle. */
+/**
+ * Ein Thema der Themenordnung. Der Baum entsteht über elternId; die Reihenfolge der Geschwister
+ * ist ihre Reihenfolge in Datenstamm.themen.
+ */
+export interface Thema {
+  id: string
+  /** Wie gedruckt, etwa „V.“, „a)“ oder „1.2“; darf leer sein */
+  nummer: string
+  titel: string
+  /** Leer = oberste Ebene */
+  elternId: string
+}
+
+/** Welche Karten eine Liste von selbst aufnimmt. Leere Person, leeres Schlagwort und leeres Thema heißen: alle. */
 export interface ListenRegel {
   /** Schlüssel „Nachname|Vorname“ */
   person: string
   schlagwort: string
   nurPrimaer: boolean
   nurFest: boolean
+  /** ID eines Themas */
+  thema: string
+  /** Auch Karten der Unterthemen */
+  mitUnterthemen: boolean
 }
 
 export interface Kapitel {
@@ -240,6 +259,8 @@ export interface Literaturliste {
   sortierung: 'name' | 'jahr' | 'hand'
   /** Ein Werk erscheint unter jeder seiner Personen, nicht nur unter der ersten */
   jedePerson: boolean
+  /** 'kapitel': eigene Kapitel der Liste; 'themen': Kapitel aus der Themenordnung, ein Werk unter jedem seiner Themen */
+  gliederung: 'kapitel' | 'themen'
   angelegt: string
   geaendert: string
 }
@@ -248,7 +269,10 @@ export interface Datenstamm {
   werke: Werk[]
   verlage: Verlag[]
   listen: Literaturliste[]
+  themen: Thema[]
 }
+
+export const leererDatenstamm = (): Datenstamm => ({ werke: [], verlage: [], listen: [], themen: [] })
 
 export const personSchluessel = (p: { nachname: string; vorname: string }) => `${p.nachname.trim()}|${p.vorname.trim()}`
 
@@ -302,6 +326,7 @@ export function leeresWerk(): Werk {
     anmerkung: '',
     vorlage: '',
     schlagwoerter: [],
+    themen: [],
     angelegt: jetzt,
     geaendert: jetzt,
   }

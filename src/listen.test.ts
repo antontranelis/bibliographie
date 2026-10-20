@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { abschnitte, druckWerk, entferne, hinzufuegen, kapitelEntfernen, neueListe, nummern, rueckeUm, umschalten, verschiebe } from './listen'
+import { ALLE, abschnitte, druckWerk, entferne, hinzufuegen, kapitelEntfernen, neueListe, nummern, rueckeUm, umschalten, verschiebe } from './listen'
 import { druckzeile } from './format'
-import { leereAuflage, leereAusgabe, leeresWerk, type Kapitel, type Literaturliste, type Werk } from './model'
+import { leereAuflage, leereAusgabe, leeresWerk, type Kapitel, type Literaturliste, type Thema, type Werk } from './model'
 
 const p = (vorname: string, nachname: string) => ({ vorname, nachname, rolle: 'autor' as const })
 function werk(id: string, personen: ReturnType<typeof p>[], jahr: string, schlagwoerter: string[] = [], status: Werk['status'] = 'fest'): Werk {
@@ -89,5 +89,44 @@ describe('abschnitte', () => {
     l = hinzufuegen(hinzufuegen(l, 'pdf'), 'pdf')
     expect(l.ausgenommen).toEqual([])
     expect(l.eintraege).toHaveLength(1)
+  })
+})
+
+describe('Themen', () => {
+  const th = (id: string, elternId = '', nummer = ''): Thema => ({ id, nummer, titel: id, elternId })
+  // Medien > Film; Medien > Rundfunk; Technik
+  const themen = [th('medien', '', 'V.'), th('film', 'medien', 'a)'), th('rundfunk', 'medien', 'b)'), th('technik', '', 'VI.')]
+  const mit = (w: Werk, ...ids: string[]): Werk => ({ ...w, themen: ids })
+  const iros = mit(werk('iros', [p('Ernst', 'Iros')], '1938'), 'film')
+  const arnheim = mit(werk('arnheim', [p('Rudolf', 'Arnheim')], '1932'), 'film', 'rundfunk')
+  const ohne = werk('ohne', [p('Max', 'Mitte')], '1990')
+  const alle = [iros, arnheim, ohne]
+
+  it('Regel nach Thema, wahlweise mit Unterthemen', () => {
+    const l = neueListe('Medien')
+    expect(ids(abschnitte({ ...l, regel: { ...l.regel!, thema: 'film', mitUnterthemen: false } }, alle, themen))).toEqual([':arnheim,iros'])
+    expect(ids(abschnitte({ ...l, regel: { ...l.regel!, thema: 'medien', mitUnterthemen: false } }, alle, themen))).toEqual([':'])
+    expect(ids(abschnitte({ ...l, regel: { ...l.regel!, thema: 'medien', mitUnterthemen: true } }, alle, themen))).toEqual([':arnheim,iros'])
+  })
+  it('Gliederung nach Themen: ein Werk unter jedem seiner Themen, leere Zweige entfallen, ohne Thema am Ende', () => {
+    const a = abschnitte({ ...neueListe('Themenkartei'), gliederung: 'themen' }, alle, themen)
+    expect(a.map((x) => `${x.kapitel?.titel ?? ''}|${x.kapitel?.ebene ?? 0}:${x.zeilen.map((z) => z.werk.id).join(',')}`)).toEqual([
+      'V. medien|1:',
+      'a) film|2:arnheim,iros',
+      'b) rundfunk|2:arnheim',
+      'ohne Thema|1:ohne',
+    ])
+  })
+  it('von Hand aufgenommene Karten außerhalb des Regelzweigs bleiben beim Umschalten erhalten', () => {
+    const l = hinzufuegen(hinzufuegen({ ...neueListe('Rundfunk'), regel: { ...ALLE, thema: 'rundfunk', mitUnterthemen: true } }, 'iros'), 'ohne')
+    const zeilen = (x: Literaturliste) => abschnitte(x, alle, themen).flatMap((a) => a.zeilen.map((z) => z.werk.id)).sort()
+    expect(zeilen(l)).toEqual(['arnheim', 'iros', 'ohne'])
+    const t = abschnitte({ ...l, gliederung: 'themen' }, alle, themen)
+    expect(t.map((x) => `${x.kapitel?.titel}:${x.zeilen.map((z) => z.werk.id).join(',')}`)).toEqual(['b) rundfunk:arnheim', 'Weitere Titel:iros,ohne'])
+  })
+  it('Gliederung nach Themen mit Themenregel: nur dieser Zweig', () => {
+    const l = neueListe('Film')
+    const a = abschnitte({ ...l, gliederung: 'themen', regel: { ...l.regel!, thema: 'rundfunk', mitUnterthemen: true } }, alle, themen)
+    expect(a.map((x) => `${x.kapitel?.titel}:${x.zeilen.map((z) => z.werk.id).join(',')}`)).toEqual(['b) rundfunk:arnheim'])
   })
 })

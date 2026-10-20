@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { TEXT_ARTEN, alleAuflagen, leeresWerk, mitAuflagen, type Datenstamm, type Literaturliste, type ErschienenIn, type Person, type Schlagwort, type TextArt, type Verlag, type Werk } from './model'
+import { TEXT_ARTEN, alleAuflagen, leererDatenstamm, leeresWerk, mitAuflagen, type Datenstamm, type Thema, type Literaturliste, type ErschienenIn, type Person, type Schlagwort, type TextArt, type Verlag, type Werk } from './model'
 import { Karteikarte } from './Karteikarte'
 import { Kartei, LEERE_SICHT, type KarteiSicht, type ListenVorgabe } from './Kartei'
 import { Liste } from './Liste'
+import { Themen } from './Themen'
+import { bezeichnung, pfad } from './themen'
 import { useSitzung } from './sitzung'
 import { ImportDialog } from './ImportDialog'
 import type { ImportPlan } from './import/einlesen'
@@ -21,9 +23,11 @@ export interface Fixierung {
   verlag?: string
   erschienenIn?: ErschienenIn
   schlagwoerter?: Schlagwort[]
+  /** IDs aus der Themenordnung */
+  themen?: string[]
 }
 
-type Ansicht = 'erfassen' | 'kartei' | 'liste' | 'verlage'
+type Ansicht = 'erfassen' | 'kartei' | 'liste' | 'themen' | 'verlage'
 
 const FIX_SCHLUESSEL = 'bibliographie:fixierung'
 
@@ -42,6 +46,7 @@ function mitFixierung(w: Werk, fixiert: Fixierung, verlage: Verlag[]): Werk {
   if (fixiert.art) neu.art = fixiert.art
   if (fixiert.erschienenIn) neu.erschienenIn = { ...fixiert.erschienenIn }
   if (fixiert.schlagwoerter) neu.schlagwoerter = fixiert.schlagwoerter.map((s) => ({ ...s }))
+  if (fixiert.themen) neu.themen = [...fixiert.themen]
   if (fixiert.verlag !== undefined) {
     const v = findeExakt(verlage, fixiert.verlag)
     return mitAuflagen(neu, (a) => ({
@@ -71,17 +76,19 @@ const FELDNAMEN: Record<Inhaltsfeld, string> = {
   kommentar: 'Rückseite',
   anmerkung: 'Anmerkung',
   schlagwoerter: 'Schlagwörter',
+  themen: 'Themen',
 }
 
 const REITER: { ansicht: Ansicht; label: string; taste: string }[] = [
   { ansicht: 'erfassen', label: 'Erfassen', taste: 'F2' },
   { ansicht: 'kartei', label: 'Kartei', taste: 'F3' },
   { ansicht: 'liste', label: 'Liste', taste: 'F4' },
-  { ansicht: 'verlage', label: 'Verlage', taste: 'F5' },
+  { ansicht: 'themen', label: 'Themen', taste: 'F5' },
+  { ansicht: 'verlage', label: 'Verlage', taste: 'F6' },
 ]
 
 export default function App() {
-  const [daten, setDaten] = useState<Datenstamm>(() => ladeLokal() ?? { werke: [], verlage: [], listen: [] })
+  const [daten, setDaten] = useState<Datenstamm>(() => ladeLokal() ?? leererDatenstamm())
   const [fixiert, setFixiert] = useState<Fixierung>(ladeFixierung)
   const [ansicht, setAnsicht] = useState<Ansicht>('erfassen')
   const [entwurf, setEntwurf] = useState<Werk | null>(() => mitFixierung(leeresWerk(), fixiert, daten.verlage))
@@ -110,7 +117,7 @@ export default function App() {
     return ok
   }
   // Schreibrecht, Speichern und Versionswechsel entscheidet allein die Sitzung (sitzung.ts)
-  const fenster = useSitzung(sofortSpeichern, () => setDaten(ladeLokal() ?? { werke: [], verlage: [], listen: [] }))
+  const fenster = useSitzung(sofortSpeichern, () => setDaten(ladeLokal() ?? leererDatenstamm()))
   const schreibend = fenster.recht === 'ja' && !fenster.wechselt
   const darfSchreiben = useRef(false)
   darfSchreiben.current = schreibend
@@ -272,8 +279,23 @@ export default function App() {
   }
   const listeAusVorgabe = (v: ListenVorgabe) => {
     const [n, vn] = (v.person ?? '').split('|')
-    const name = v.person ? [vn, n].filter(Boolean).join(' ') : v.schlagwort ?? 'Literaturliste'
-    legeListeAn(neueListe(name, { ...ALLE, person: v.person ?? '', schlagwort: v.schlagwort ?? '' }))
+    const thema = v.thema ? daten.themen.find((t) => t.id === v.thema) : undefined
+    const name = v.person ? [vn, n].filter(Boolean).join(' ') : thema ? bezeichnung(thema) : (v.schlagwort ?? 'Literaturliste')
+    legeListeAn(neueListe(name, { ...ALLE, person: v.person ?? '', schlagwort: v.schlagwort ?? '', thema: v.thema ?? '' }))
+  }
+  /** Themenordnung ändern; entfernte Themen verschwinden auch von den Karten, aus Listenregeln und Fixierung. */
+  const aendereThemen = (themen: Thema[], entfernt?: Set<string>) => {
+    setDaten((d) => {
+      if (!entfernt?.size) return { ...d, themen }
+      const jetzt = new Date().toISOString()
+      return {
+        ...d,
+        themen,
+        werke: d.werke.map((w) => (w.themen.some((t) => entfernt.has(t)) ? { ...w, themen: w.themen.filter((t) => !entfernt.has(t)), geaendert: jetzt } : w)),
+        listen: d.listen.map((l) => (l.regel && entfernt.has(l.regel.thema) ? { ...l, regel: { ...l.regel, thema: '' }, geaendert: jetzt } : l)),
+      }
+    })
+    if (entfernt?.size && fixiert.themen?.some((t) => entfernt.has(t))) setFixiert({ ...fixiert, themen: fixiert.themen.filter((t) => !entfernt.has(t)) })
   }
   const loescheListe = (id: string) => {
     setDaten((d) => ({ ...d, listen: d.listen.filter((l) => l.id !== id) }))
@@ -343,7 +365,7 @@ export default function App() {
   const tastenRef = useRef<(e: KeyboardEvent) => void>(() => {})
   tastenRef.current = (e: KeyboardEvent) => {
     if (!darfSchreiben.current) return
-    const wechsel: Record<string, Ansicht> = { F2: 'erfassen', F3: 'kartei', F4: 'liste', F5: 'verlage' }
+    const wechsel: Record<string, Ansicht> = { F2: 'erfassen', F3: 'kartei', F4: 'liste', F5: 'themen', F6: 'verlage' }
     if (wechsel[e.key] && !e.ctrlKey && !e.altKey) {
       e.preventDefault()
       setAnsicht(wechsel[e.key])
@@ -477,10 +499,11 @@ export default function App() {
             onNaechste={neueKarte}
             onLoeschen={loeschen}
             listen={daten.listen}
+            themen={daten.themen}
             onInListe={(listeId) => inListeAufnehmen(listeId, karte.id)}
             seitenleiste={
               <>
-                <FixiertKasten fixiert={fixiert} onFixieren={setFixiert} />
+                <FixiertKasten fixiert={fixiert} themen={daten.themen} onFixieren={setFixiert} />
                 <SitzungKasten karten={sitzungsKarten} aktivId={karte.id} onOeffnen={oeffne} />
                 {daten.werke.length === 0 && (
                   <div className="papier kasten-innen">
@@ -508,6 +531,7 @@ export default function App() {
         {ansicht === 'kartei' && (
           <Kartei
             werke={daten.werke}
+            themen={daten.themen}
             sicht={karteiSicht}
             onSicht={setKarteiSicht}
             onBearbeiten={oeffne}
@@ -521,11 +545,20 @@ export default function App() {
             key={liste.id}
             werke={daten.werke}
             listen={daten.listen}
+            themen={daten.themen}
             liste={liste}
             onAendern={aendereListe}
             onWaehlen={setListenId}
             onNeu={() => legeListeAn(neueListe(''))}
             onLoeschen={loescheListe}
+          />
+        )}
+        {ansicht === 'themen' && (
+          <Themen
+            themen={daten.themen}
+            werke={daten.werke}
+            onAendern={aendereThemen}
+            onListe={(thema) => listeAusVorgabe({ thema })}
           />
         )}
         {ansicht === 'verlage' && <Verlage verlage={daten.verlage} werke={daten.werke} onAendern={aendereVerlage} onZurueck={() => setAnsicht('erfassen')} />}
@@ -629,7 +662,7 @@ function Ablage({
   )
 }
 
-function FixiertKasten({ fixiert, onFixieren }: { fixiert: Fixierung; onFixieren: (f: Fixierung) => void }) {
+function FixiertKasten({ fixiert, themen, onFixieren }: { fixiert: Fixierung; themen: Thema[]; onFixieren: (f: Fixierung) => void }) {
   const zeilen: { was: string; wert: string; loesen: () => void }[] = []
   if (fixiert.personen)
     zeilen.push({
@@ -646,6 +679,12 @@ function FixiertKasten({ fixiert, onFixieren }: { fixiert: Fixierung; onFixieren
       was: 'Schlagwörter',
       wert: fixiert.schlagwoerter.map((s) => s.begriff).join(', ') || '(leer)',
       loesen: () => onFixieren({ ...fixiert, schlagwoerter: undefined }),
+    })
+  if (fixiert.themen)
+    zeilen.push({
+      was: 'Themen',
+      wert: fixiert.themen.map((id) => pfad(themen, id)).filter(Boolean).join('; ') || '(leer)',
+      loesen: () => onFixieren({ ...fixiert, themen: undefined }),
     })
 
   return (

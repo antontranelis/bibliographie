@@ -2,7 +2,8 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Druckzeile, kopiereZeile } from './Druckzeile'
 import { druckzeileTeile, type Stil, type Teil } from './format'
 import { ALLE, abschnitte, druckWerk, entferne, kapitelEntfernen, rueckeUm, umschalten, verschiebe, type Abschnitt } from './listen'
-import { neueId, personSchluessel, type Kapitel, type Literaturliste, type Werk } from './model'
+import { neueId, personSchluessel, type Kapitel, type Literaturliste, type Thema, type Werk } from './model'
+import { baum, bezeichnung } from './themen'
 import { herunterladen } from './herunterladen'
 import { Blatt } from './Symbole'
 
@@ -38,6 +39,7 @@ function Wahl<T extends string>({ label, wert, optionen, onWahl }: { label: stri
 export function Liste({
   werke,
   listen,
+  themen,
   liste,
   onAendern,
   onWaehlen,
@@ -46,6 +48,7 @@ export function Liste({
 }: {
   werke: Werk[]
   listen: Literaturliste[]
+  themen: Thema[]
   liste: Literaturliste
   onAendern: (l: Literaturliste) => void
   onWaehlen: (id: string) => void
@@ -73,7 +76,8 @@ export function Liste({
     [werke],
   )
 
-  const teile = useMemo(() => abschnitte(liste, werke), [liste, werke])
+  const teile = useMemo(() => abschnitte(liste, werke, themen), [liste, werke, themen])
+  const nachKapiteln = liste.gliederung !== 'themen'
   const alleZeilen = teile.flatMap((a) => a.zeilen)
   const gedruckt = alleZeilen.filter((z) => z.drin)
   const herausgenommen = alleZeilen.length - gedruckt.length
@@ -167,6 +171,28 @@ export function Liste({
                   <input type="checkbox" checked={regel.nurPrimaer} onChange={(e) => setzeRegel({ nurPrimaer: e.target.checked })} /> nur primär
                 </label>
               )}
+              {themen.length > 0 && (
+                <>
+                  <span className="leise">und</span>
+                  <label className={`bedingung ${regel.thema ? 'gesetzt' : ''}`}>
+                    <span>Thema</span>
+                    <select value={regel.thema} onChange={(e) => setzeRegel({ thema: e.target.value })}>
+                      <option value="">alle Themen</option>
+                      {baum(themen).map((k) => (
+                        <option key={k.thema.id} value={k.thema.id}>
+                          {'\u00a0\u00a0'.repeat(k.tiefe)}
+                          {bezeichnung(k.thema) || 'ohne Titel'}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {regel.thema && (
+                    <label className="pille">
+                      <input type="checkbox" checked={regel.mitUnterthemen} onChange={(e) => setzeRegel({ mitUnterthemen: e.target.checked })} /> mit Unterthemen
+                    </label>
+                  )}
+                </>
+              )}
               <label className="pille">
                 <input type="checkbox" checked={regel.nurFest} onChange={(e) => setzeRegel({ nurFest: e.target.checked })} /> nur fest angelegte
               </label>
@@ -187,7 +213,10 @@ export function Liste({
           </div>
           {teile.map((a) => (
             <Fragment key={a.kapitel?.id ?? 'vorn'}>
-              {a.kapitel && <KapitelKopf abschnitt={a} onAendern={(teil) => setzeKapitel(a.kapitel!.id, teil)} onEntfernen={() => onAendern(kapitelEntfernen(liste, a.kapitel!.id))} />}
+              {a.kapitel && a.ausThema && <h3 className={`kapitel-kopf thema-kopf ebene-${a.kapitel.ebene}`}>{a.kapitel.titel}</h3>}
+              {a.kapitel && !a.ausThema && (
+                <KapitelKopf abschnitt={a} onAendern={(teil) => setzeKapitel(a.kapitel!.id, teil)} onEntfernen={() => onAendern(kapitelEntfernen(liste, a.kapitel!.id))} />
+              )}
               {a.zeilen.length === 0 && !a.kapitel && liste.kapitel.length === 0 && <p className="leise">Noch keine Karte in dieser Liste.</p>}
               {a.zeilen.filter(zeigen).map((z) => {
                 const zeile = druckzeileTeile(druckWerk(z), stil)
@@ -199,7 +228,7 @@ export function Liste({
                       {z.werk.status === 'vorlaeufig' && <span className="marke-vorlaeufig">vorläufig</span>}
                     </span>
                     <span className="eintrag-knoepfe">
-                      {liste.kapitel.length > 0 && (
+                      {nachKapiteln && liste.kapitel.length > 0 && (
                         <select aria-label="Kapitel" value={a.kapitel?.id ?? ''} onChange={(e) => onAendern(verschiebe(liste, z.werk.id, e.target.value))}>
                           <option value="">vor den Kapiteln</option>
                           {teile
@@ -240,16 +269,18 @@ export function Liste({
               {alleZeilen.length - ERSTE_ZEILEN} weitere Einträge
             </button>
           )}
-          <div className="knopfreihe kapitel-knoepfe">
-            <button type="button" className="textknopf" onClick={() => neuesKapitel(1)}>
-              + Kapitel
-            </button>
-            {liste.kapitel.length > 0 && (
-              <button type="button" className="textknopf" onClick={() => neuesKapitel(2)}>
-                + Unterkapitel
+          {nachKapiteln && (
+            <div className="knopfreihe kapitel-knoepfe">
+              <button type="button" className="textknopf" onClick={() => neuesKapitel(1)}>
+                + Kapitel
               </button>
-            )}
-          </div>
+              {liste.kapitel.length > 0 && (
+                <button type="button" className="textknopf" onClick={() => neuesKapitel(2)}>
+                  + Unterkapitel
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
@@ -327,6 +358,17 @@ export function Liste({
             <input type="checkbox" checked={stil.schlusspunkt} onChange={(e) => setStil({ ...stil, schlusspunkt: e.target.checked })} /> Punkt am Zeilenende
           </label>
           <div className="trennlinie" />
+          {themen.length > 0 && (
+            <Wahl
+              label="Gliederung"
+              wert={liste.gliederung}
+              optionen={[
+                ['kapitel', 'eigene Kapitel'],
+                ['themen', 'nach Themenordnung'],
+              ]}
+              onWahl={(gliederung) => aendere({ gliederung })}
+            />
+          )}
           <Wahl
             label="Sortieren nach"
             wert={liste.sortierung}

@@ -432,6 +432,24 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
 .zeile-knoepfe { margin-top: 8px; }
 .vorlage { margin-top: 14px; padding: 12px 14px; background: var(--ocker-hell); border-left: 3px solid var(--ocker); border-radius: 4px; }
 .vorlage p { margin: 4px 0 6px; font-family: var(--serif); }
+.themen { display: flex; flex-direction: column; gap: 18px; max-width: 1100px; }
+.themen-baum { padding: 8px 0; }
+.thema-zeile { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding-top: 6px; padding-bottom: 6px; padding-right: 12px; border-bottom: 1px solid var(--zart); }
+.thema-zeile:last-child { border-bottom: 0; }
+.thema-nummer { width: 64px; flex: 0 0 auto; }
+.thema-titel { flex: 1 1 240px; font-size: 17px; }
+.thema-anzahl { min-width: 90px; }
+.thema-knoepfe { display: flex; flex-wrap: wrap; gap: 4px; }
+.thema-knoepfe .klein-knopf { border-color: var(--linie2); padding: 5px 8px; }
+.chip.thema-chip { background: var(--ocker-hell); border-color: #d9b970; color: var(--tinte); }
+.chip.thema-chip .chip-weg { color: var(--text2); }
+.thema-chip .chip-text { cursor: default; }
+.feld .schlagwort-eingabe [role='listbox'] { min-width: 380px; }
+.klein-menue li.markiert { background: var(--blau-hell); }
+.thema-kopf { margin: 0; font: 600 19px/1.3 var(--serif); }
+.thema-kopf.ebene-2 { font-size: 17px; padding-left: 20px; }
+.lesen-themen { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 2px; font-size: 14px; color: var(--text2); }
+.lesen-themen li::before { content: '› '; color: var(--blass); }
 .schreibrecht { justify-content: center; z-index: 60; }
 .schreibrecht-kasten { max-width: 520px; padding: 24px 28px; display: grid; gap: 12px; justify-items: start; }
 .schreibrecht-kasten h2 { font: 600 20px/1.3 var(--serif); margin: 0; }

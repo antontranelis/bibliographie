@@ -13,6 +13,7 @@ import {
   type AusgabeArt,
   type ErschienenIn,
   type Literaturliste,
+  type Thema,
   type Mitwirkung,
   type MitwirkungsRolle,
   type Person,
@@ -26,6 +27,7 @@ import { Druckzeile } from './Druckzeile'
 import { ausgabeBezeichnung, druckzeile, druckzeileTeile, ersterscheinung, nennen } from './format'
 import { VerlagFeld } from './VerlagFeld'
 import { ZeileKnoepfe } from './ZeileKnoepfe'
+import { ThemenFeld } from './ThemenFeld'
 import { type Treffer, type WerkVorschlag } from './lobid'
 import { sucheImKatalog } from './katalog'
 import { AusgabenWahl, Vorschlagsliste, besterVorschlag, ohneNichtsortier, karteiTreffer, optionenAus, useKatalog, jahrspanne, type Option } from './Katalogsuche'
@@ -51,6 +53,7 @@ interface Props {
   onNaechste: () => void
   onLoeschen: () => void
   listen: Literaturliste[]
+  themen: Thema[]
   onInListe: (listeId: string) => void
 }
 
@@ -62,7 +65,7 @@ const jahrZahl = (a: Auflage) => parseInt(a.jahr, 10) || 9999
 
 export function Karteikarte(props: Props) {
   const { werk, istNeu, alleWerke, verlage, alleSchlagwoerter, fixiert, nachholen, seitenleiste } = props
-  const { onAendern, onFixieren, onVerlagsAbgleich, onVerlagAendern, onZuVorhandener, onFestAnlegen, onNaechste, onLoeschen, listen, onInListe } = props
+  const { onAendern, onFixieren, onVerlagsAbgleich, onVerlagAendern, onZuVorhandener, onFestAnlegen, onNaechste, onLoeschen, listen, themen, onInListe } = props
   const setze = (teil: Partial<Werk>) => onAendern({ ...werk, ...teil })
   const istAufsatz = werk.art === 'aufsatz'
   const listeId = useId()
@@ -341,6 +344,21 @@ export function Karteikarte(props: Props) {
 
           {!istAufsatz && <Reihe werk={werk} onAendern={setze} />}
 
+          <ThemenFeld
+            gewaehlt={werk.themen}
+            themen={themen}
+            onAendern={(ids) => setze({ themen: ids })}
+            fixiert={fixiert.themen ?? []}
+            nadel={
+              <NadelKnopf
+                was="Themen"
+                aktiv={fixiert.themen !== undefined}
+                an={() => onFixieren({ ...fixiert, themen: [...werk.themen] })}
+                aus={() => onFixieren({ ...fixiert, themen: undefined })}
+              />
+            }
+          />
+
           <Schlagwoerter
             werk={werk}
             alle={alleSchlagwoerter}
@@ -370,7 +388,7 @@ export function Karteikarte(props: Props) {
           <div className="vorschau">
             <span className="lab">So steht die Karte in der Liste</span>
             <p>{werk.titel.trim() ? <Druckzeile teile={druckzeileTeile(werk)} /> : <span className="leise">Erscheint, sobald ein Titel da ist.</span>}</p>
-            <ZeileKnoepfe werk={werk} teile={druckzeileTeile(werk)} listen={listen} onInListe={onInListe} />
+            <ZeileKnoepfe werk={werk} teile={druckzeileTeile(werk)} listen={listen} themen={themen} onInListe={onInListe} />
           </div>
 
           {werk.vorlage && <Vorlage werk={werk} />}

@@ -1,11 +1,12 @@
 import { Fragment, useMemo, useRef, useState } from 'react'
-import { TEXT_ARTEN, alleAuflagen, personSchluessel, type Werk } from './model'
+import { TEXT_ARTEN, alleAuflagen, personSchluessel, type Thema, type Werk } from './model'
+import { baum, pfad } from './themen'
 import { ausgabeBezeichnung } from './format'
 import { jahrspanne, namenListe } from './Katalogsuche'
 import { StatusMarke } from './Karteikarte'
 import { Lupe, StatusPunkt } from './Symbole'
 
-export type Register = 'autor' | 'titel' | 'schlagwort'
+export type Register = 'autor' | 'titel' | 'schlagwort' | 'thema'
 
 export interface KarteiSicht {
   suche: string
@@ -22,6 +23,7 @@ export const LEERE_SICHT: KarteiSicht = { suche: '', register: 'autor', nurVorla
 export interface ListenVorgabe {
   person?: string
   schlagwort?: string
+  thema?: string
 }
 
 interface Gruppe {
@@ -30,6 +32,8 @@ interface Gruppe {
   buchstabe: string
   werke: Werk[]
   liste?: ListenVorgabe
+  /** Stelle in der Themenordnung; sonst alphabetisch */
+  reihenfolge?: number
 }
 
 /** Höchstzahl gleichzeitig gezeigter Karten; darüber hilft Register oder Suche. */
@@ -57,14 +61,24 @@ function jahreVon(w: Werk): string[] {
 }
 const ersteJahr = (w: Werk) => Math.min(9999, ...jahreVon(w).map((j) => parseInt(j, 10)).filter((j) => !Number.isNaN(j)))
 
-function bildeGruppen(werke: Werk[], register: Register): Gruppe[] {
+function bildeGruppen(werke: Werk[], register: Register, themen: Thema[]): Gruppe[] {
   const gruppen = new Map<string, Gruppe>()
-  const hinein = (schluessel: string, titel: string, buchstabe: string, w: Werk, liste?: ListenVorgabe) => {
+  const hinein = (schluessel: string, titel: string, buchstabe: string, w: Werk, liste?: ListenVorgabe, reihenfolge?: number) => {
     const g = gruppen.get(schluessel)
     if (g) g.werke.push(w)
-    else gruppen.set(schluessel, { schluessel, titel, buchstabe, werke: [w], liste })
+    else gruppen.set(schluessel, { schluessel, titel, buchstabe, werke: [w], liste, reihenfolge })
   }
+  const stelle = new Map(baum(themen).map((k, i) => [k.thema.id, i]))
   for (const w of werke) {
+    if (register === 'thema') {
+      const eigene = w.themen.filter((t) => stelle.has(t))
+      if (eigene.length === 0) hinein('~ohne', 'Ohne Thema', '#', w, undefined, Infinity)
+      for (const id of eigene) {
+        const t = themen.find((x) => x.id === id)!
+        hinein(`t:${id}`, pfad(themen, id), anfangsbuchstabe(t.titel), w, { thema: id }, stelle.get(id))
+      }
+      continue
+    }
     if (register === 'autor') {
       const personen = w.personen.filter((p) => p.nachname.trim() || p.vorname.trim())
       if (personen.length === 0) hinein('~ohne', 'Ohne Person', '#', w)
@@ -84,11 +98,13 @@ function bildeGruppen(werke: Werk[], register: Register): Gruppe[] {
   for (const g of liste) {
     g.werke.sort((a, b) => (register === 'titel' ? vgl(ohneArtikel(a.titel), ohneArtikel(b.titel)) : ersteJahr(a) - ersteJahr(b) || vgl(a.titel, b.titel)))
   }
+  if (register === 'thema') return liste.sort((a, b) => (a.reihenfolge ?? 0) - (b.reihenfolge ?? 0))
   return liste.sort((a, b) => (a.buchstabe === '#' ? 1 : 0) - (b.buchstabe === '#' ? 1 : 0) || vgl(a.titel, b.titel))
 }
 
 interface Props {
   werke: Werk[]
+  themen: Thema[]
   sicht: KarteiSicht
   onSicht: (s: KarteiSicht) => void
   onBearbeiten: (id: string, nachholen?: boolean) => void
@@ -97,7 +113,7 @@ interface Props {
   onNeueKarte: () => void
 }
 
-export function Kartei({ werke, sicht, onSicht, onBearbeiten, onListe, onBeispiele, onNeueKarte }: Props) {
+export function Kartei({ werke, themen, sicht, onSicht, onBearbeiten, onListe, onBeispiele, onNeueKarte }: Props) {
   const setze = (teil: Partial<KarteiSicht>) => onSicht({ ...sicht, ...teil })
   const kasten = useRef<HTMLDivElement>(null)
 
@@ -116,15 +132,16 @@ export function Kartei({ werke, sicht, onSicht, onBearbeiten, onListe, onBeispie
             w.erschienenIn?.titel ?? '',
             ...w.personen.map((p) => `${p.vorname} ${p.nachname}`),
             ...w.schlagwoerter.map((x) => x.begriff),
+            ...w.themen.map((id) => pfad(themen, id)),
             ...alleAuflagen(w).map((a) => `${a.verlag} ${a.ort} ${a.jahr}`),
           ]
             .join(' ')
             .toLowerCase()
             .includes(s)),
     )
-  }, [werke, sicht.suche, sicht.nurVorlaeufig, sicht.nurVorlage])
+  }, [werke, themen, sicht.suche, sicht.nurVorlaeufig, sicht.nurVorlage])
 
-  const gruppen = useMemo(() => bildeGruppen(passend, sicht.register), [passend, sicht.register])
+  const gruppen = useMemo(() => bildeGruppen(passend, sicht.register, themen), [passend, sicht.register, themen])
   const vorhandeneBuchstaben = useMemo(() => new Set(gruppen.map((g) => g.buchstabe)), [gruppen])
   const imBuchstaben = sicht.buchstabe && vorhandeneBuchstaben.has(sicht.buchstabe) ? gruppen.filter((g) => g.buchstabe === sicht.buchstabe) : gruppen
 
@@ -199,9 +216,9 @@ export function Kartei({ werke, sicht, onSicht, onBearbeiten, onListe, onBeispie
             />
           </label>
           <div className="segment" role="radiogroup" aria-label="Register">
-            {(['autor', 'titel', 'schlagwort'] as const).map((r) => (
+            {(['autor', 'titel', 'schlagwort', ...(themen.length ? (['thema'] as const) : [])] as const).map((r) => (
               <button key={r} type="button" role="radio" aria-checked={sicht.register === r} onClick={() => setze({ register: r, buchstabe: null })}>
-                nach {r === 'autor' ? 'Autor' : r === 'titel' ? 'Titel' : 'Schlagwort'}
+                nach {r === 'autor' ? 'Autor' : r === 'titel' ? 'Titel' : r === 'schlagwort' ? 'Schlagwort' : 'Thema'}
               </button>
             ))}
           </div>
@@ -302,7 +319,7 @@ export function Kartei({ werke, sicht, onSicht, onBearbeiten, onListe, onBeispie
 
       <aside className="kartei-seite" aria-label="Geöffnete Karte">
         {gewaehlt ? (
-          <KarteLesen key={gewaehlt.id} werk={gewaehlt} onBearbeiten={onBearbeiten} />
+          <KarteLesen key={gewaehlt.id} werk={gewaehlt} themen={themen} onBearbeiten={onBearbeiten} />
         ) : (
           <div className="platzhalter">Eine Karte anklicken, dann steht sie hier.</div>
         )}
@@ -311,7 +328,7 @@ export function Kartei({ werke, sicht, onSicht, onBearbeiten, onListe, onBeispie
   )
 }
 
-function KarteLesen({ werk, onBearbeiten }: { werk: Werk; onBearbeiten: (id: string, nachholen?: boolean) => void }) {
+function KarteLesen({ werk, themen, onBearbeiten }: { werk: Werk; themen: Thema[]; onBearbeiten: (id: string, nachholen?: boolean) => void }) {
   const [seite, setSeite] = useState<'vorne' | 'hinten'>('vorne')
   const [alleZeigen, setAlleZeigen] = useState(false)
   // Weitere Ausgaben bekommen eine Kopfzeile, die erste nur, wenn es mehrere gibt
@@ -413,6 +430,15 @@ function KarteLesen({ werk, onBearbeiten }: { werk: Werk; onBearbeiten: (id: str
               </table>
             ) : (
               <p className="leise">Noch keine Auflage eingetragen.</p>
+            )}
+            {werk.themen.some((id) => themen.some((t) => t.id === id)) && (
+              <ul className="lesen-themen" aria-label="Themen">
+                {werk.themen
+                  .filter((id) => themen.some((t) => t.id === id))
+                  .map((id) => (
+                    <li key={id}>{pfad(themen, id)}</li>
+                  ))}
+              </ul>
             )}
             {werk.schlagwoerter.length > 0 && (
               <div className="schlagwoerter">
