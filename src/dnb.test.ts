@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { dnbAnfrage, leseMarc, trefferAusMarc } from './dnb'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { dnbAnfrage, leseMarc, sucheDnb, trefferAusMarc } from './dnb'
 
 const kopf = '<?xml version="1.0" encoding="UTF-8"?><searchRetrieveResponse><numberOfRecords>165</numberOfRecords><records><record><recordData>'
 const fuss = '</recordData></record></records></searchRetrieveResponse>'
@@ -139,5 +139,46 @@ describe('dnbAnfrage', () => {
   })
   it('liefert ohne Angaben nichts', () => {
     expect(dnbAnfrage(' ', '')).toBe('')
+  })
+})
+
+describe('sucheDnb bei Netzaussetzern', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  const antwort = (text: string) => ({ ok: true, status: 200, text: async () => text })
+  const seite1 = kopf + gedruckt + fuss
+  const seite2 = kopf + gedruckt.replace('891438521', '891438522') + fuss
+  const abrufe = (folge: (() => unknown)[]) => {
+    const f = vi.fn()
+    for (const schritt of folge) f.mockImplementationOnce(async () => schritt())
+    vi.stubGlobal('fetch', f)
+    return f
+  }
+  const aussetzer = () => {
+    throw new TypeError('Failed to fetch')
+  }
+
+  it('behält die erste Seite, wenn eine weitere auch beim zweiten Versuch scheitert', async () => {
+    abrufe([() => antwort(seite1), aussetzer, aussetzer])
+    const t = await sucheDnb('Steiner', 'Philosophie der Freiheit')
+    expect(t.map((x) => x.auflage.quelle?.id)).toEqual(['891438521'])
+  })
+  it('wiederholt eine Seite nach einem einmaligen Aussetzer', async () => {
+    const f = abrufe([aussetzer, () => antwort(seite1), () => antwort(seite2)])
+    const t = await sucheDnb('Steiner', 'Philosophie der Freiheit')
+    expect(f).toHaveBeenCalledTimes(3)
+    expect(t).toHaveLength(2)
+  })
+  it('scheitert nur, wenn schon die erste Seite zweimal scheitert', async () => {
+    abrufe([aussetzer, aussetzer])
+    await expect(sucheDnb('Steiner', 'Philosophie der Freiheit')).rejects.toThrow()
+  })
+  it('wiederholt nicht nach einem Abbruch', async () => {
+    const f = abrufe([
+      () => {
+        throw new DOMException('abgebrochen', 'AbortError')
+      },
+    ])
+    await expect(sucheDnb('Steiner', 'Philosophie der Freiheit')).rejects.toThrow('abgebrochen')
+    expect(f).toHaveBeenCalledTimes(1)
   })
 })

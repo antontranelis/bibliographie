@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { istIsbn, vorauswahl, type Treffer, type WerkVorschlag } from './lobid'
 import { sucheImKatalog } from './katalog'
 import { alleAuflagen, type Werk } from './model'
@@ -11,11 +11,14 @@ export type KatalogStand =
   | { zustand: 'ruhe' }
   | { zustand: 'laedt' }
   | { zustand: 'fertig'; werke: WerkVorschlag[] }
-  | { zustand: 'fehler' }
+  | { zustand: 'fehler'; nochmal: () => void }
 
 /** Fragt den Katalog erst nach einer kurzen Tipppause, nie bei jedem Zeichen. */
 export function useKatalog(autor: string, titel: string, aktiv: boolean, pauseMs = 500): KatalogStand {
   const [stand, setStand] = useState<KatalogStand>({ zustand: 'ruhe' })
+  // Wiederholung nach „nicht erreichbar“: startet genau diese Suche ohne Tipppause neu
+  const [versuch, setVersuch] = useState(0)
+  const sofort = useRef(false)
   useEffect(() => {
     if (!aktiv || titel.trim().length < 3) {
       setStand({ zustand: 'ruhe' })
@@ -27,14 +30,20 @@ export function useKatalog(autor: string, titel: string, aktiv: boolean, pauseMs
       try {
         setStand({ zustand: 'fertig', werke: await sucheImKatalog(autor, titel, ctrl.signal) })
       } catch (e) {
-        if ((e as Error).name !== 'AbortError') setStand({ zustand: 'fehler' })
+        if ((e as Error).name === 'AbortError') return
+        const nochmal = () => {
+          sofort.current = true
+          setVersuch((v) => v + 1)
+        }
+        setStand({ zustand: 'fehler', nochmal })
       }
-    }, pauseMs)
+    }, sofort.current ? 0 : pauseMs)
+    sofort.current = false
     return () => {
       clearTimeout(t)
       ctrl.abort()
     }
-  }, [autor, titel, aktiv, pauseMs])
+  }, [autor, titel, aktiv, pauseMs, versuch])
   return stand
 }
 
@@ -173,7 +182,14 @@ export function Vorschlagsliste({
           <span className="rechts">
             {katalog.zustand === 'laedt' && 'wird gefragt …'}
             {katalog.zustand === 'fertig' && anzahlKatalog === 0 && 'nichts gefunden'}
-            {katalog.zustand === 'fehler' && 'nicht erreichbar, nur die eigene Kartei'}
+            {katalog.zustand === 'fehler' && (
+              <>
+                nicht erreichbar, nur die eigene Kartei ·{' '}
+                <button type="button" className="textknopf" onMouseDown={(e) => e.preventDefault()} onClick={katalog.nochmal}>
+                  Noch einmal versuchen
+                </button>
+              </>
+            )}
             {katalog.zustand === 'ruhe' && 'nach einer kurzen Tipppause'}
             {katalog.zustand === 'fertig' && anzahlKatalog > 0 && 'Werke, je mit Zahl der Ausgaben'}
           </span>

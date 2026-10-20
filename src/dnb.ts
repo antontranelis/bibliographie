@@ -116,11 +116,20 @@ export function dnbAnfrage(autor: string, titel: string): string {
 const SEITE = 100
 const HOECHSTENS = 300
 
-/** Ausgaben aus der Deutschen Nationalbibliothek, bis zu drei Seiten zu je 100 Datensätzen. */
+/** Pause vor dem zweiten Versuch nach einem Netzaussetzer */
+const ZWEITER_VERSUCH = 400
+
+const istAbbruch = (e: unknown) => e instanceof DOMException && e.name === 'AbortError'
+
+/**
+ * Ausgaben aus der Deutschen Nationalbibliothek, bis zu drei Seiten zu je 100 Datensätzen.
+ * Jede Seite bekommt bei einem Aussetzer einen zweiten Versuch; scheitern weitere Seiten trotzdem,
+ * bleiben die Treffer der ersten. Nur wenn schon die erste Seite scheitert, gilt die DNB als nicht erreichbar.
+ */
 export async function sucheDnb(autor: string, titel: string, signal?: AbortSignal): Promise<Treffer[]> {
   const q = dnbAnfrage(autor, titel)
   if (!q) return []
-  const seite = async (start: number) => {
+  const abrufen = async (start: number) => {
     const url =
       'https://services.dnb.de/sru/dnb?version=1.1&operation=searchRetrieve&recordSchema=MARC21-xml' +
       `&maximumRecords=${SEITE}&startRecord=${start}&query=${encodeURIComponent(q)}`
@@ -128,10 +137,21 @@ export async function sucheDnb(autor: string, titel: string, signal?: AbortSigna
     if (!antwort.ok) throw new Error(`DNB antwortet mit ${antwort.status}`)
     return antwort.text()
   }
+  const seite = async (start: number) => {
+    try {
+      return await abrufen(start)
+    } catch (e) {
+      if (istAbbruch(e) || signal?.aborted) throw e
+      await new Promise((weiter) => setTimeout(weiter, ZWEITER_VERSUCH))
+      return abrufen(start)
+    }
+  }
   const erste = await seite(1)
   const gesamt = parseInt(erste.match(/<numberOfRecords>(\d+)<\/numberOfRecords>/)?.[1] ?? '0', 10)
   const weitere = []
   for (let start = SEITE + 1; start <= Math.min(gesamt, HOECHSTENS); start += SEITE) weitere.push(seite(start))
-  const texte = [erste, ...(await Promise.all(weitere))]
+  const ergebnisse = await Promise.allSettled(weitere)
+  if (signal?.aborted) throw new DOMException('abgebrochen', 'AbortError')
+  const texte = [erste, ...ergebnisse.flatMap((e) => (e.status === 'fulfilled' ? [e.value] : []))]
   return texte.flatMap(leseMarc).map(trefferAusMarc).filter((t): t is Treffer => t !== null)
 }
