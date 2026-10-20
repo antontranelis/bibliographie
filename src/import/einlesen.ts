@@ -222,11 +222,22 @@ export function uebernimm(plan: ImportPlan, auswahl: Set<number>, listenName: st
 
   const eintraege: ListenEintrag[] = []
   const drin = new Set<string>()
-  for (const { i } of gewaehlt) {
+  // Reihenfolge je Thema: ein Werk aus mehreren Abschnitten steht in jedem an seinem Platz
+  const abschnittsfolge: Record<string, string[]> = {}
+  for (const { posten, i } of gewaehlt) {
     const werkId = ids.get(i)!
+    const thema = themaVonAbschnitt(posten.abschnittNr)
+    if (thema) {
+      const folge = (abschnittsfolge[thema] ??= [])
+      if (!folge.includes(werkId)) folge.push(werkId)
+    }
     if (drin.has(werkId)) continue
     drin.add(werkId)
     eintraege.push({ werkId })
   }
-  return { werke, liste: { ...neueListe(listenName, null), eintraege, sortierung: 'hand', gliederung: themen ? 'themen' : 'keine' }, ...themenTeil }
+  return {
+    werke,
+    liste: { ...neueListe(listenName, null), eintraege, abschnittsfolge, sortierung: 'hand', gliederung: themen ? 'themen' : 'keine' },
+    ...themenTeil,
+  }
 }

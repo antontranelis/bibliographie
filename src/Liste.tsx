@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Druckzeile, kopiereZeile } from './Druckzeile'
 import { druckzeileTeile, type Stil, type Teil } from './format'
-import { ALLE, abschnitte, druckWerk, entferne, rueckeUm, umschalten, type Abschnitt } from './listen'
+import { ALLE, abschnitte, druckWerk, entferne, rueckeUm, rueckeUmIn, umschalten, type Abschnitt } from './listen'
 import { personSchluessel, type Literaturliste, type Thema, type Werk } from './model'
 import { baum, bezeichnung } from './themen'
 import { herunterladen } from './herunterladen'
@@ -224,6 +224,11 @@ export function Liste({
               {a.ueberschrift && <h3 className={`kapitel-kopf thema-kopf ebene-${a.ueberschrift.ebene}`}>{a.ueberschrift.titel}</h3>}
               {a.zeilen.length === 0 && !a.ueberschrift && <p className="leise">Noch keine Karte in dieser Liste.</p>}
               {gezeigteZeilen.map((z) => {
+                // Unter einem Thema gilt eine eigene Reihenfolge; ohne Thema die der Liste
+                const verschieben = (richtung: -1 | 1) =>
+                  a.ueberschrift
+                    ? rueckeUmIn(liste, a.ueberschrift.id, a.zeilen.filter((x) => x.vonHand).map((x) => x.werk.id), z.werk.id, richtung)
+                    : rueckeUm(liste, z.werk.id, richtung)
                 const zeile = druckzeileTeile(druckWerk(z), stil)
                 return (
                   <div key={z.schluessel} className={`eintrag ${z.drin ? '' : 'heraus'}`}>
@@ -235,10 +240,10 @@ export function Liste({
                     <span className="eintrag-knoepfe">
                       {liste.sortierung === 'hand' && z.vonHand && (
                         <>
-                          <button type="button" className="klein-knopf" aria-label="nach oben" onClick={() => onAendern(rueckeUm(liste, z.werk.id, -1))}>
+                          <button type="button" className="klein-knopf" aria-label="nach oben" onClick={() => onAendern(verschieben(-1))}>
                             ↑
                           </button>
-                          <button type="button" className="klein-knopf" aria-label="nach unten" onClick={() => onAendern(rueckeUm(liste, z.werk.id, 1))}>
+                          <button type="button" className="klein-knopf" aria-label="nach unten" onClick={() => onAendern(verschieben(1))}>
                             ↓
                           </button>
                         </>

@@ -170,3 +170,16 @@ describe('Abschnitte als Themen', () => {
     expect(r.werke.every((w) => w.themen.length === 0)).toBe(true)
   })
 })
+
+describe('Reihenfolge je Abschnitt', () => {
+  const alpha = () => [n('Anna Alpha: '), f('Alpha'), n(', Basel 1990')]
+  const beta = () => [n('Bert Beta: '), f('Beta'), n(', Bern 1991')]
+  it('gemeinsame Werke behalten in jedem Abschnitt ihre Reihenfolge aus der Datei', () => {
+    const umgekehrt: OdtDokument = { abschnitte: ['A', 'B'], eintraege: [eintrag(0, alpha()), eintrag(0, beta()), eintrag(1, beta()), eintrag(1, alpha())] }
+    const plan = planeImport(umgekehrt, [])
+    const r = uebernimm(plan, new Set([0, 1]), 'L', [])
+    expect(r.werke).toHaveLength(2)
+    const druck = listenAbschnitte(r.liste!, r.werke, r.themen).map((a) => `${a.ueberschrift?.titel}:${a.zeilen.map((z) => z.werk.titel).join(',')}`)
+    expect(druck).toEqual(['A:Alpha,Beta', 'B:Beta,Alpha'])
+  })
+})

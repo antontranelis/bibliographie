@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ALLE, abschnitte, druckWerk, entferne, hinzufuegen, neueListe, rueckeUm, umschalten } from './listen'
+import { ALLE, abschnitte, druckWerk, entferne, hinzufuegen, neueListe, rueckeUm, rueckeUmIn, umschalten } from './listen'
 import { druckzeile } from './format'
 import { leereAuflage, leereAusgabe, leeresWerk, type Literaturliste, type Thema, type Werk } from './model'
 
@@ -120,6 +120,15 @@ describe('Themen', () => {
       'b) rundfunk:arnheim',
       'ohne Thema:ohne',
     ])
+  })
+  it('von Hand unter einem Thema verschieben ändert nur dieses Thema', () => {
+    let l: Literaturliste = { ...neueListe('Datei'), regel: null, gliederung: 'themen', sortierung: 'hand' }
+    l = hinzufuegen(hinzufuegen(l, 'iros'), 'arnheim')
+    const folge = (x: Literaturliste) => abschnitte(x, alle, themen).map((a) => `${a.ueberschrift?.titel}:${a.zeilen.map((z) => z.werk.id).join(',')}`)
+    expect(folge(l)).toEqual(['V. medien:', 'a) film:iros,arnheim', 'b) rundfunk:arnheim'])
+    l = rueckeUmIn(l, 'film', ['iros', 'arnheim'], 'arnheim', -1)
+    expect(folge(l)).toEqual(['V. medien:', 'a) film:arnheim,iros', 'b) rundfunk:arnheim'])
+    expect(l.eintraege.map((e) => e.werkId)).toEqual(['iros', 'arnheim'])
   })
   it('Gliederung nach Themen mit Themenregel: nur dieser Zweig', () => {
     const l = neueListe('Film')

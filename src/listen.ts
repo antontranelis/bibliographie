@@ -13,6 +13,7 @@ export function neueListe(name: string, regel: ListenRegel | null = ALLE): Liter
     name,
     regel: regel && { ...regel },
     eintraege: [],
+    abschnittsfolge: {},
     ausgenommen: [],
     stil: { ...STANDARD_STIL },
     sortierung: 'name',
@@ -134,7 +135,10 @@ function nachThemen(
   const sortierung = liste.sortierung
   const flach = Math.min(...knoten.map((k) => k.tiefe))
   const abschnitte: Abschnitt[] = knoten.map((k) => {
-    const hier = alle.filter((w) => w.themen.includes(k.thema.id))
+    const hier = nachFolge(
+      alle.filter((w) => w.themen.includes(k.thema.id)),
+      sortierung === 'hand' ? (liste.abschnittsfolge?.[k.thema.id] ?? []) : [],
+    )
     return {
       ueberschrift: { id: k.thema.id, titel: bezeichnung(k.thema), ebene: k.tiefe - flach === 0 ? 1 : 2 },
       zeilen: ordne(hier.filter((w) => handIds.has(w.id)), hier.filter((w) => !handIds.has(w.id)), sortierung),
@@ -149,13 +153,23 @@ function nachThemen(
   const ergebnis = abschnitte.filter((a) => mitWerken.has(a.ueberschrift!.id))
   // Jede Karte der Liste erscheint mindestens einmal: ohne Thema, oder von Hand aufgenommen außerhalb des Regelzweigs
   const gezeigt = new Set(ergebnis.flatMap((a) => a.zeilen.map((z) => z.werk.id)))
-  const rest = alle.filter((w) => !gezeigt.has(w.id))
+  const rest = nachFolge(
+    alle.filter((w) => !gezeigt.has(w.id)),
+    sortierung === 'hand' ? (liste.abschnittsfolge?.['~weitere'] ?? []) : [],
+  )
   if (rest.length)
     ergebnis.push({
       ueberschrift: { id: '~weitere', titel: erlaubt ? 'Weitere Titel' : 'ohne Thema', ebene: 1 },
       zeilen: ordne(rest.filter((w) => handIds.has(w.id)), rest.filter((w) => !handIds.has(w.id)), sortierung),
     })
   return ergebnis
+}
+
+/** Werke in der gespeicherten Reihenfolge des Abschnitts; nicht darin genannte behalten ihre Folge dahinter. */
+function nachFolge(werke: Werk[], folge: string[]): Werk[] {
+  if (folge.length === 0) return werke
+  const stelle = new Map(folge.map((id, i) => [id, i]))
+  return [...werke].sort((a, b) => (stelle.get(a.id) ?? Infinity) - (stelle.get(b.id) ?? Infinity))
 }
 
 /** Das Thema und alle seine Vorfahren. */
@@ -187,6 +201,19 @@ export function entferne(l: Literaturliste, werkId: string): Literaturliste {
 export function umschalten(l: Literaturliste, werkId: string): Literaturliste {
   const raus = l.ausgenommen.includes(werkId)
   return geaendert({ ...l, ausgenommen: raus ? l.ausgenommen.filter((id) => id !== werkId) : [...l.ausgenommen, werkId] })
+}
+
+/**
+ * Unter einem Thema eine Karte um eine Stelle verschieben; reihenfolge ist die angezeigte Folge der
+ * von Hand aufgenommenen Karten dieses Abschnitts. Andere Themen und die Reihenfolge der Liste bleiben.
+ */
+export function rueckeUmIn(l: Literaturliste, themaId: string, reihenfolge: string[], werkId: string, richtung: -1 | 1): Literaturliste {
+  const i = reihenfolge.indexOf(werkId)
+  const j = i + richtung
+  if (i < 0 || j < 0 || j >= reihenfolge.length) return l
+  const neu = [...reihenfolge]
+  ;[neu[i], neu[j]] = [neu[j], neu[i]]
+  return geaendert({ ...l, abschnittsfolge: { ...l.abschnittsfolge, [themaId]: neu } })
 }
 
 /** Von Hand aufgenommene Karte um eine Stelle verschieben. */

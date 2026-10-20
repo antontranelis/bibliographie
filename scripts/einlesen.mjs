@@ -70,6 +70,20 @@ const blattzeilen = await page.locator('.eintraege .eintrag').count()
 pruefe('Liste zeigt die Überschriften der Datei, Iros unter beiden', koepfeKlein.join(' | ') === 'V. Medien und Technik | a) Film | b) Rundfunk' && blattzeilen === 5, `${koepfeKlein.join(' | ')}, ${blattzeilen} Zeilen`)
 if (aus) await page.screenshot({ path: `${aus}/einlesen-liste.png`, fullPage: true })
 
+// Reihenfolge je Thema: Iros steht in a) vorn, in b) hinter Arnheims Rundfunk (#24)
+const abschnitteDerListe = () =>
+  page.locator('.eintraege').evaluate((e) => {
+    const aus = []
+    for (const k of e.children) {
+      if (k.matches('.thema-kopf')) aus.push({ titel: k.textContent.trim(), zeilen: [] })
+      else if (k.matches('.eintrag') && aus.length) aus.at(-1).zeilen.push(k.textContent.includes('Iros') ? 'Iros' : k.textContent.includes('Rundfunk') ? 'Rundfunk' : 'andere')
+    }
+    return aus.map((a) => `${a.titel.slice(0, 2)}:${a.zeilen.join(',')}`).join(' | ')
+  })
+pruefe('Jedes Thema in der Reihenfolge der Datei', (await abschnitteDerListe()) === 'V.: | a):Iros,andere,andere | b):Rundfunk,Iros', await abschnitteDerListe())
+await page.locator('.eintraege .eintrag', { hasText: 'Iros' }).nth(1).getByRole('button', { name: 'nach oben' }).click()
+pruefe('↑ unter b) ändert nur b)', (await abschnitteDerListe()) === 'V.: | a):Iros,andere,andere | b):Iros,Rundfunk', await abschnitteDerListe())
+
 // Kartei: nur Karten mit Vorlage
 await reiter('Kartei').click()
 await page.getByLabel('nur mit Vorlage aus dem Import').check()

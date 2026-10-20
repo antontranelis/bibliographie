@@ -73,6 +73,7 @@ export function migriere(d: Datenstamm): Datenstamm {
     return {
       ...l,
       eintraege: l.eintraege.map((e) => ({ werkId: e.werkId })),
+      abschnittsfolge: l.abschnittsfolge ?? {},
       stil: { ...STANDARD_STIL, ...l.stil },
       gliederung: l.gliederung === 'themen' ? 'themen' : 'keine',
       regel: l.regel && { ...ALLE, ...l.regel },

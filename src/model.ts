@@ -244,6 +244,11 @@ export interface Literaturliste {
   regel: ListenRegel | null
   /** Reihenfolge zählt bei der Sortierung „von Hand“ */
   eintraege: ListenEintrag[]
+  /**
+   * Bei Gliederung nach Themen und „von Hand“: eigene Reihenfolge je Thema (Thema-ID → Werk-IDs),
+   * damit ein Werk unter jedem seiner Themen an seinem Platz steht. Ohne Eintrag gilt die Reihenfolge von eintraege.
+   */
+  abschnittsfolge: Record<string, string[]>
   /** Karten, die nicht gedruckt werden, obwohl Regel oder Eintrag sie aufnehmen */
   ausgenommen: string[]
   stil: Stil
