@@ -1,5 +1,7 @@
 import { neueListe } from '../listen'
-import { leeresWerk, neueId, type Kapitel, type ListenEintrag, type Literaturliste, type Werk } from '../model'
+import { leeresWerk, neueId, type Kapitel, type ListenEintrag, type Literaturliste, type Thema, type Werk } from '../model'
+import { gleichesThema, neuesNach } from '../themen'
+import { nummerUndTitel } from './geruest'
 import { KOMMENTARFARBE, rueckprobe, zerlegeEintrag, zerlegePersonen } from './eintrag'
 import type { Lauf, OdtDokument } from './odt'
 
@@ -119,28 +121,28 @@ export function aufloesung(plan: ImportPlan, auswahl: Set<number>): Aufloesung[]
   })
 }
 
+export interface Uebernahme {
+  werke: Werk[]
+  liste?: Literaturliste
+  /** Themenordnung mit den neu angelegten Themen, wenn Abschnitte als Themen zugeordnet werden */
+  themen?: Thema[]
+  /** Themen für schon vorhandene Karten */
+  zuordnung?: Map<string, string[]>
+}
+
 /**
  * Legt die Karten an und, wenn ein Name gegeben ist, eine Liste in der Reihenfolge der Datei.
  * Aufeinanderfolgende Abschnitte ohne Einträge werden zu einem Kapitel, die folgenden zu Unterkapiteln.
+ * Mit einem Themenbestand werden die Kapitel zu Themen (gleichnamige genutzt, fehlende angelegt)
+ * und jede Karte bekommt das Thema ihres Abschnitts; steht sie in mehreren, alle.
  */
-export function uebernimm(plan: ImportPlan, auswahl: Set<number>, listenName: string | null): { werke: Werk[]; liste?: Literaturliste } {
+export function uebernimm(plan: ImportPlan, auswahl: Set<number>, listenName: string | null, themenBestand?: Thema[]): Uebernahme {
   const gewaehlt = aufloesung(plan, auswahl)
-  const ids = new Map<number, string>()
-  const werke: Werk[] = []
-  for (const { posten, i, art, vertreter } of gewaehlt) {
-    if (art === 'vorhanden') ids.set(i, posten.vorhandenId!)
-    else if (art === 'doppelt') ids.set(i, ids.get(vertreter)!)
-    else {
-      const jetzt = new Date().toISOString()
-      const w = { ...posten.werk, id: neueId(), angelegt: jetzt, geaendert: jetzt }
-      werke.push(w)
-      ids.set(i, w.id)
-    }
-  }
-  if (listenName === null) return { werke }
 
+  // Gliederung: Kapitel, ihr Oberkapitel und welcher Abschnitt in welches Kapitel gehört
   const kapitel: Kapitel[] = []
   const kapitelVon = new Map<number, string>()
+  const obenVon = new Map<string, string>()
   let oben: Kapitel | null = null
   let letzterLeer = false
   // Einträge vor dem ersten Absatz stehen in der Liste vor den Kapiteln
@@ -157,8 +159,59 @@ export function uebernimm(plan: ImportPlan, auswahl: Set<number>, listenName: st
     const k: Kapitel = { id: neueId(), titel: a.titel, ebene: oben ? 2 : 1 }
     kapitel.push(k)
     kapitelVon.set(a.nr, k.id)
+    if (oben) obenVon.set(k.id, oben.id)
     letzterLeer = false
   }
+
+  // Kapitel als Themen
+  let themen: Thema[] | undefined
+  const themaVon = new Map<string, string>()
+  if (themenBestand) {
+    themen = [...themenBestand]
+    for (const k of kapitel) {
+      const { nummer, titel } = nummerUndTitel(k.titel.replace(/[:;,]\s*$/, ''))
+      const elternId = obenVon.has(k.id) ? (themaVon.get(obenVon.get(k.id)!) ?? '') : ''
+      const vorhanden =
+        themen.find((t) => t.elternId === elternId && gleichesThema(t, nummer, titel)) ?? themen.find((t) => gleichesThema(t, nummer, titel))
+      const thema = vorhanden ?? { id: neueId(), nummer, titel, elternId }
+      if (!vorhanden) themen = neuesNach(themen, thema)
+      themaVon.set(k.id, thema.id)
+    }
+  }
+  const themaVonAbschnitt = (nr: number) => {
+    const k = kapitelVon.get(nr)
+    return k ? themaVon.get(k) : undefined
+  }
+
+  // Karten
+  const ids = new Map<number, string>()
+  const werke: Werk[] = []
+  const neu = new Map<string, Werk>()
+  const zuordnung = new Map<string, string[]>()
+  const dazu = (werkId: string, themaId: string | undefined) => {
+    if (!themaId) return
+    const w = neu.get(werkId)
+    if (w) {
+      if (!w.themen.includes(themaId)) w.themen = [...w.themen, themaId]
+    } else {
+      const liste = zuordnung.get(werkId) ?? []
+      if (!liste.includes(themaId)) zuordnung.set(werkId, [...liste, themaId])
+    }
+  }
+  for (const { posten, i, art, vertreter } of gewaehlt) {
+    if (art === 'vorhanden') ids.set(i, posten.vorhandenId!)
+    else if (art === 'doppelt') ids.set(i, ids.get(vertreter)!)
+    else {
+      const jetzt = new Date().toISOString()
+      const w = { ...posten.werk, id: neueId(), themen: [...posten.werk.themen], angelegt: jetzt, geaendert: jetzt }
+      werke.push(w)
+      neu.set(w.id, w)
+      ids.set(i, w.id)
+    }
+    dazu(ids.get(i)!, themaVonAbschnitt(posten.abschnittNr))
+  }
+  const themenTeil = themen ? { themen, zuordnung } : {}
+  if (listenName === null) return { werke, ...themenTeil }
 
   const eintraege: ListenEintrag[] = []
   const drin = new Set<string>()
@@ -168,5 +221,5 @@ export function uebernimm(plan: ImportPlan, auswahl: Set<number>, listenName: st
     drin.add(werkId)
     eintraege.push({ werkId, kapitelId: kapitelVon.get(posten.abschnittNr) ?? '' })
   }
-  return { werke, liste: { ...neueListe(listenName, null), kapitel, eintraege, sortierung: 'hand' } }
+  return { werke, liste: { ...neueListe(listenName, null), kapitel, eintraege, sortierung: 'hand' }, ...themenTeil }
 }

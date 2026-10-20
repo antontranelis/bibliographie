@@ -7,6 +7,7 @@ import { Themen } from './Themen'
 import { bezeichnung, pfad } from './themen'
 import { useSitzung } from './sitzung'
 import { ImportDialog } from './ImportDialog'
+import { GeruestDialog } from './GeruestDialog'
 import type { ImportPlan } from './import/einlesen'
 import { ALLE, hinzufuegen, neueListe } from './listen'
 import { Verlage } from './Verlage'
@@ -104,6 +105,8 @@ export default function App() {
   const [meldung, setMeldung] = useState('')
   const dateiEingabe = useRef<HTMLInputElement>(null)
   const listenEingabe = useRef<HTMLInputElement>(null)
+  const themenEingabe = useRef<HTMLInputElement>(null)
+  const [geruest, setGeruest] = useState<{ dateiname: string; themen: Thema[] } | null>(null)
   const [einlesen, setEinlesen] = useState<{ dateiname: string; plan: ImportPlan } | null>(null)
 
   // Kurz verzögert speichern: bei tausenden Karten ist jeder Durchgang einige Megabyte groß
@@ -345,13 +348,49 @@ export default function App() {
       setMeldung('Die Datei ließ sich nicht als ODT-Datei lesen.')
     }
   }
-  const einlesenUebernehmen = async (auswahl: Set<number>, listenName: string | null) => {
+  const themenEinlesen = async (datei: File) => {
+    try {
+      const { geruestAusAbsaetzen, geruestAusText } = await import('./import/geruest')
+      let themen: Thema[]
+      if (/\.odt$/i.test(datei.name)) {
+        const { leseAbsaetze } = await import('./import/odt')
+        themen = geruestAusAbsaetzen(leseAbsaetze(new Uint8Array(await datei.arrayBuffer())))
+      } else themen = geruestAusText(await datei.text())
+      if (themen.length === 0) setMeldung('In der Datei steht nichts, was sich als Thema lesen lässt.')
+      else setGeruest({ dateiname: datei.name, themen })
+    } catch {
+      setMeldung('Die Datei ließ sich nicht lesen. Möglich sind ODT- und Textdateien.')
+    }
+  }
+  const geruestUebernehmen = async (themen: Thema[]) => {
+    const { fuegeEin } = await import('./import/geruest')
+    const r = fuegeEin(daten.themen, themen)
+    setDaten((d) => ({ ...d, themen: r.themen }))
+    setGeruest(null)
+    setMeldung(r.neu === themen.length ? `${r.neu} Themen übernommen.` : `${r.neu} neue Themen übernommen, ${themen.length - r.neu} waren schon da.`)
+    setAnsicht('themen')
+  }
+
+  const einlesenUebernehmen = async (auswahl: Set<number>, listenName: string | null, alsThemen: boolean) => {
     if (!einlesen) return
     const { uebernimm } = await import('./import/einlesen')
-    const r = uebernimm(einlesen.plan, auswahl, listenName)
-    setDaten((d) => ({ ...d, werke: [...d.werke, ...r.werke], listen: r.liste ? [...d.listen, r.liste] : d.listen }))
+    const r = uebernimm(einlesen.plan, auswahl, listenName, alsThemen ? daten.themen : undefined)
+    const neueThemen = r.themen ? r.themen.length - daten.themen.length : 0
+    setDaten((d) => {
+      const jetzt = new Date().toISOString()
+      // Schon vorhandene Karten bekommen die Themen ihres Abschnitts dazu
+      const werke = r.zuordnung?.size
+        ? d.werke.map((w) => {
+            const dazu = (r.zuordnung!.get(w.id) ?? []).filter((t) => !w.themen.includes(t))
+            return dazu.length ? { ...w, themen: [...w.themen, ...dazu], geaendert: jetzt } : w
+          })
+        : d.werke
+      return { ...d, werke: [...werke, ...r.werke], listen: r.liste ? [...d.listen, r.liste] : d.listen, themen: r.themen ?? d.themen }
+    })
     setEinlesen(null)
-    setMeldung(`${r.werke.length} Karten vorläufig angelegt${r.liste ? `, Liste „${r.liste.name}“ steht unter Liste` : ''}.`)
+    setMeldung(
+      `${r.werke.length} Karten vorläufig angelegt${neueThemen > 0 ? `, ${neueThemen} neue Themen` : ''}${r.liste ? `, Liste „${r.liste.name}“ steht unter Liste` : ''}.`,
+    )
     if (r.liste) {
       setListenId(r.liste.id)
       setAnsicht('liste')
@@ -427,8 +466,21 @@ export default function App() {
               onSichern={exportJson}
               onEinlesen={() => dateiEingabe.current?.click()}
               onListeEinlesen={() => listenEingabe.current?.click()}
+              onThemenEinlesen={() => themenEingabe.current?.click()}
               onCsl={exportCsl}
               onBeispiele={beispieleLaden}
+            />
+            <input
+              ref={themenEingabe}
+              type="file"
+              accept="application/vnd.oasis.opendocument.text,.odt,text/plain,.txt"
+              hidden
+              aria-label="Themenordnung als ODT- oder Textdatei"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) themenEinlesen(f)
+                e.target.value = ''
+              }}
             />
             <input
               ref={listenEingabe}
@@ -471,6 +523,9 @@ export default function App() {
         <div className="speicher-warnung" role="alert">
           Der Speicher des Browsers ist voll, die letzten Änderungen sind nur in diesem Fenster. Bitte über „Ablage“ → „Sichern“ eine Datei speichern.
         </div>
+      )}
+      {geruest && (
+        <GeruestDialog dateiname={geruest.dateiname} themen={geruest.themen} bestand={daten.themen.length} onUebernehmen={geruestUebernehmen} onAbbrechen={() => setGeruest(null)} />
       )}
       {einlesen && <ImportDialog dateiname={einlesen.dateiname} plan={einlesen.plan} onUebernehmen={einlesenUebernehmen} onAbbrechen={() => setEinlesen(null)} />}
       {meldung && (
@@ -603,6 +658,7 @@ function Ablage({
   onSichern,
   onEinlesen,
   onListeEinlesen,
+  onThemenEinlesen,
   onCsl,
   onBeispiele,
 }: {
@@ -610,6 +666,7 @@ function Ablage({
   onSichern: () => void
   onEinlesen: () => void
   onListeEinlesen: () => void
+  onThemenEinlesen: () => void
   onCsl: () => void
   onBeispiele: () => void
 }) {
@@ -645,6 +702,9 @@ function Ablage({
           </button>
           <button type="button" role="menuitem" onClick={tu(onListeEinlesen)}>
             Liste einlesen <span>Literaturliste als ODT-Datei</span>
+          </button>
+          <button type="button" role="menuitem" onClick={tu(onThemenEinlesen)}>
+            Themenordnung einlesen <span>Gesamtgerüst als ODT- oder Textdatei</span>
           </button>
           <div className="menue-linie" />
           <button type="button" role="menuitem" onClick={tu(onCsl)}>

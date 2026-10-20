@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { druckzeile } from '../format'
 import { abschnitte as listenAbschnitte } from '../listen'
+import { baum } from '../themen'
 import { leeresWerk } from '../model'
 import { aufloesung, planeImport, uebernimm } from './einlesen'
 import type { Lauf, OdtDokument, OdtEintrag } from './odt'
@@ -126,5 +127,39 @@ describe('Einträge vor dem ersten Absatz', () => {
     const r = uebernimm(plan, new Set([-1, 0]), 'L')
     expect(r.liste!.kapitel.map((k) => k.titel)).toEqual(['Kapitel'])
     expect(r.liste!.eintraege.map((e) => e.kapitelId)).toEqual(['', r.liste!.kapitel[0].id])
+  })
+})
+
+describe('Abschnitte als Themen', () => {
+  const vorhanden = { ...leeresWerk(), id: 'da', titel: 'Rundfunk als Hörkunst', personen: [{ vorname: 'Rudolf', nachname: 'Arnheim', rolle: 'autor' as const }] }
+  const plan = planeImport(dok, [vorhanden])
+  const auswahl = new Set(plan.abschnitte.filter((a) => a.vorschlag).map((a) => a.nr))
+
+  it('legt fehlende Themen nach den Kapiteln an und ordnet die Karten zu', () => {
+    const r = uebernimm(plan, auswahl, 'Medien', [])
+    expect(baum(r.themen!).map((k) => `${k.tiefe}:${k.thema.nummer}|${k.thema.titel}`)).toEqual(['0:V.|Medien als Bedingungen', '1:a)|Manipulation', '1:b)|Netzwerke'])
+    const a = r.themen!.find((t) => t.nummer === 'a)')!
+    const b = r.themen!.find((t) => t.nummer === 'b)')!
+    expect(r.werke.find((w) => w.titel === 'Film als Kunst')?.themen).toEqual([a.id])
+    // Iros steht in a) und b): eine Karte, beide Themen
+    expect(r.werke.find((w) => w.titel === 'Wesen und Dramaturgie des Films')?.themen).toEqual([a.id, b.id])
+    // Die schon vorhandene Karte bekommt ihr Thema über die Zuordnung
+    expect(r.zuordnung?.get('da')).toEqual([b.id])
+  })
+  it('nutzt gleichnamige Themen, auch mit leicht anderem Wortlaut', () => {
+    const bestand = [
+      { id: 'v', nummer: 'V.', titel: 'Medien', elternId: '' },
+      { id: 'a', nummer: 'a)', titel: 'Manipulation', elternId: 'v' },
+    ]
+    const r = uebernimm(plan, auswahl, null, bestand)
+    expect(r.themen!.map((t) => t.id).slice(0, 2)).toEqual(['v', 'a'])
+    expect(r.themen!).toHaveLength(3)
+    expect(r.themen!.find((t) => t.nummer === 'b)')?.elternId).toBe('v')
+    expect(r.werke.find((w) => w.titel === 'Film als Kunst')?.themen).toEqual(['a'])
+  })
+  it('ohne Themenbestand keine Zuordnung', () => {
+    const r = uebernimm(plan, auswahl, 'Medien')
+    expect(r.themen).toBeUndefined()
+    expect(r.werke.every((w) => w.themen.length === 0)).toBe(true)
   })
 })
