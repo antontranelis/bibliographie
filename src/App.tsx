@@ -3,6 +3,7 @@ import { TEXT_ARTEN, alleAuflagen, leeresWerk, mitAuflagen, type Datenstamm, typ
 import { Karteikarte } from './Karteikarte'
 import { Kartei, LEERE_SICHT, type KarteiSicht, type ListenVorgabe } from './Kartei'
 import { Liste } from './Liste'
+import { useSitzung } from './sitzung'
 import { ImportDialog } from './ImportDialog'
 import type { ImportPlan } from './import/einlesen'
 import { ALLE, hinzufuegen, neueListe } from './listen'
@@ -102,12 +103,23 @@ export default function App() {
   const [speicherVoll, setSpeicherVoll] = useState(false)
   const zuSpeichern = useRef(daten)
   zuSpeichern.current = daten
+  // Nur das Fenster mit Schreibrecht speichert; andere würden mit altem Stand überschreiben
+  const sofortSpeichern = () => {
+    const ok = speichereLokal(zuSpeichern.current)
+    setSpeicherVoll(!ok)
+    return ok
+  }
+  // Schreibrecht, Speichern und Versionswechsel entscheidet allein die Sitzung (sitzung.ts)
+  const fenster = useSitzung(sofortSpeichern, () => setDaten(ladeLokal() ?? { werke: [], verlage: [], listen: [] }))
+  const schreibend = fenster.recht === 'ja' && !fenster.wechselt
+  const darfSchreiben = useRef(false)
+  darfSchreiben.current = schreibend
   useEffect(() => {
-    const t = setTimeout(() => setSpeicherVoll(!speichereLokal(daten)), 400)
+    const t = setTimeout(() => darfSchreiben.current && setSpeicherVoll(!speichereLokal(daten)), 400)
     return () => clearTimeout(t)
   }, [daten])
   useEffect(() => {
-    const sofort = () => speichereLokal(zuSpeichern.current)
+    const sofort = () => darfSchreiben.current && speichereLokal(zuSpeichern.current)
     window.addEventListener('pagehide', sofort)
     return () => window.removeEventListener('pagehide', sofort)
   }, [])
@@ -330,6 +342,7 @@ export default function App() {
   // Tastatur für die Serienerfassung
   const tastenRef = useRef<(e: KeyboardEvent) => void>(() => {})
   tastenRef.current = (e: KeyboardEvent) => {
+    if (!darfSchreiben.current) return
     const wechsel: Record<string, Ansicht> = { F2: 'erfassen', F3: 'kartei', F4: 'liste', F5: 'verlage' }
     if (wechsel[e.key] && !e.ctrlKey && !e.altKey) {
       e.preventDefault()
@@ -356,6 +369,8 @@ export default function App() {
 
   return (
     <div className="app">
+      {/* Ohne Schreibrecht und während eines Versionswechsels ist alles darunter gesperrt, auch für die Tastatur */}
+      <div className="app-inhalt" inert={!schreibend}>
       <header className="kopf">
         <div className="kopf-innen">
           <span className="marke">Bibliographie</span>
@@ -420,6 +435,16 @@ export default function App() {
         </div>
       </header>
 
+      {fenster.neueVersion && schreibend && (
+        <div className="speicher-warnung neue-version" role="status">
+          {fenster.nichtGespeichert
+            ? 'Die neue Version wartet: Der Speicher des Browsers ist voll. Bitte erst über „Ablage“ → „Sichern“ eine Datei speichern, dann erneut aktualisieren.'
+            : 'Eine neue Version des Programms ist bereit. Beim Aktualisieren laden alle offenen Fenster des Programms neu, Ihre Daten bleiben erhalten.'}{' '}
+          <button type="button" className="textknopf" onClick={fenster.aktualisieren}>
+            Jetzt aktualisieren
+          </button>
+        </div>
+      )}
       {speicherVoll && (
         <div className="speicher-warnung" role="alert">
           Der Speicher des Browsers ist voll, die letzten Änderungen sind nur in diesem Fenster. Bitte über „Ablage“ → „Sichern“ eine Datei speichern.
@@ -505,6 +530,37 @@ export default function App() {
         )}
         {ansicht === 'verlage' && <Verlage verlage={daten.verlage} werke={daten.werke} onAendern={aendereVerlage} onZurueck={() => setAnsicht('erfassen')} />}
       </main>
+      </div>
+      {fenster.recht === 'nein' && (
+        <div className="ueberlagerung schreibrecht" role="dialog" aria-modal="true" aria-label="In einem anderen Fenster geöffnet">
+          <div className="papier schreibrecht-kasten">
+            <h2>Das Programm ist schon in einem anderen Fenster geöffnet</h2>
+            <p>Damit sich die Fenster nicht gegenseitig überschreiben, wird immer nur in einem gearbeitet. Wird das andere Fenster geschlossen, geht es hier von selbst weiter.</p>
+            {fenster.absage === 'verweigert' && (
+              <p className="warnfarbe" role="alert">
+                Das andere Fenster kann gerade nicht speichern, weil der Speicher des Browsers voll ist. Bitte dort über „Ablage“ → „Sichern“ eine Datei speichern.
+              </p>
+            )}
+            {fenster.absage === 'antwortet-nicht' && (
+              <p className="warnfarbe" role="alert">
+                Das andere Fenster antwortet nicht. Bitte es schließen; dann geht es hier von selbst weiter.
+              </p>
+            )}
+            {fenster.neueVersion && <p className="leise">Eine neue Version ist bereit; sie wird im schreibenden Fenster aktualisiert.</p>}
+            <button type="button" className="knopf haupt" onClick={fenster.uebernehmen}>
+              Hier weiterarbeiten
+            </button>
+          </div>
+        </div>
+      )}
+      {fenster.wechselt && (
+        <div className="ueberlagerung schreibrecht" role="status" aria-label="Neue Version wird geladen">
+          <div className="papier schreibrecht-kasten">
+            <h2>Neue Version wird geladen …</h2>
+            <p>Ihre Daten sind gespeichert.</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

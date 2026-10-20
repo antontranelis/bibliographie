@@ -1,0 +1,252 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { schalteScharf, verbinde } from './aktualisierung'
+
+// Die Sitzung entscheidet allein über Schreibrecht, Speichern und Versionswechsel. Eine Regel:
+// Nur der aktuelle Schreiber darf einen Versionswechsel auslösen, und nur nach erfolgreichem Speichern;
+// ab dann ist das Fenster eingefroren, bis es neu lädt. Ohne erfolgreiches Speichern wartet die neue Version.
+// Fenster ohne Schreibrecht laden bei einem Wechsel einfach neu; sie haben nichts zu speichern.
+//
+// Nur ein Fenster schreibt. Jedes Fenster hält den ganzen Datenstand und schreibt ihn komplett zurück;
+// zwei schreibende Fenster würden sich gegenseitig überschreiben. Das Schreibrecht ist eine Sperre des
+// Browsers (Web Locks). Wer es nicht hat, schreibt nie und steht in der Schlange; schließt das schreibende
+// Fenster, rückt das nächste nach und lädt den gespeicherten Stand.
+// „Hier weiterarbeiten“: Das schreibende Fenster speichert, hört auf zu schreiben und meldet „abgegeben“;
+// dann nimmt das bittende Fenster die Sperre (steal). Kommt keiner, schreibt das erste weiter.
+// Gelingt das Speichern nicht (Speicher voll), meldet es „verweigert“ und schreibt weiter. Antwortet das
+// schreibende Fenster gar nicht, wird nur übernommen, wenn die Sperre wirklich frei ist.
+
+const SPERRE = 'bibliographie-schreibrecht'
+const KANAL = 'bibliographie-schreibrecht'
+/** So lange wartet ein abgebendes Fenster auf die Übernahme */
+const UEBERGABE = 3000
+
+export type Schreibrecht = 'pruefen' | 'ja' | 'nein'
+
+/** Warum eine Übernahme nicht geklappt hat */
+export type Absage = '' | 'verweigert' | 'antwortet-nicht'
+
+/** Ergebnis eines Versuchs, die neue Version zu übernehmen */
+export type Wechsel = 'laeuft' | 'nicht-gespeichert' | 'nicht-erlaubt'
+
+export interface Sitzung {
+  recht: Schreibrecht
+  /** Versionswechsel freigegeben, Fenster eingefroren bis zum Neuladen */
+  wechselt: boolean
+  /** Eine neue Version wartet */
+  neueVersion: boolean
+  /** Ein Wechsel ist am Speichern gescheitert; die neue Version wartet weiter */
+  nichtGespeichert: boolean
+  absage: Absage
+  uebernehmen: () => void
+  aktualisieren: () => Wechsel
+}
+
+/** So lange nach dem Öffnen darf eine „beim Start“ gemeldete Version noch von selbst übernehmen */
+const STARTFENSTER = 10_000
+
+/**
+ * @param speichern schreibt den aktuellen Stand sofort; falsch, wenn das nicht gelingt
+ * @param neuLaden holt den Stand aus dem Speicher, wenn das Schreibrecht hierher wechselt
+ */
+export function useSitzung(speichern: () => boolean, neuLaden: () => void): Sitzung {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined
+  const [recht, setRechtZustand] = useState<Schreibrecht>(locks ? 'pruefen' : 'ja')
+  const [absage, setAbsage] = useState<Absage>('')
+  const [wechselt, setWechselt] = useState(false)
+  const [neueVersion, setNeueVersion] = useState(false)
+  const [nichtGespeichert, setNichtGespeichert] = useState(false)
+  const rueckruf = useRef({ speichern, neuLaden })
+  rueckruf.current = { speichern, neuLaden }
+  // generation: zählt jeden Erwerb; nur das Ende des aktuellen Haltens zählt
+  const z = useRef({
+    /** Spiegel des Zustands für Entscheidungen im selben Augenblick */
+    recht: (locks ? 'pruefen' : 'ja') as Schreibrecht,
+    wechselt: false,
+    startWunschBis: 0,
+    generation: 0,
+    halte: false,
+    loslassen: null as (() => void) | null,
+    schlange: null as AbortController | null,
+    kanal: null as BroadcastChannel | null,
+  }).current
+
+  const setRecht = useCallback(
+    (r: Schreibrecht) => {
+      z.recht = r
+      setRechtZustand(r)
+    },
+    [z],
+  )
+
+  /** Neue Version übernehmen: nur als Schreiber, nur nach erfolgreichem Speichern; danach eingefroren. */
+  const aktualisieren = useCallback((): Wechsel => {
+    if (z.recht !== 'ja' || z.wechselt) return 'nicht-erlaubt'
+    z.wechselt = true
+    setWechselt(true)
+    if (!rueckruf.current.speichern()) {
+      z.wechselt = false
+      setWechselt(false)
+      setNichtGespeichert(true)
+      return 'nicht-gespeichert'
+    }
+    setNichtGespeichert(false)
+    if (!schalteScharf()) {
+      z.wechselt = false
+      setWechselt(false)
+      return 'nicht-erlaubt'
+    }
+    return 'laeuft'
+  }, [z])
+
+  /** Beim Start gemeldete Version übernimmt von selbst, sobald dieses Fenster schreibt. */
+  const startVersuchen = useCallback(() => {
+    if (Date.now() < z.startWunschBis && z.recht === 'ja') {
+      z.startWunschBis = 0
+      aktualisieren()
+    }
+  }, [z, aktualisieren])
+
+  useEffect(
+    () =>
+      verbinde({
+        neueVersion: (beimStart) => {
+          setNeueVersion(true)
+          if (beimStart) {
+            z.startWunschBis = Date.now() + STARTFENSTER
+            startVersuchen()
+          }
+        },
+        uebernommen: () => {
+          // Selbst freigegeben oder ohne Schreibrecht: nichts zu verlieren
+          if (z.wechselt || z.recht !== 'ja') return location.reload()
+          // Unerwartet als Schreiber: nur neu laden, wenn gespeichert ist
+          z.wechselt = true
+          setWechselt(true)
+          if (rueckruf.current.speichern()) return location.reload()
+          z.wechselt = false
+          setWechselt(false)
+          setNichtGespeichert(true)
+        },
+      }),
+    [z, startVersuchen],
+  )
+
+  useEffect(() => {
+    if (recht === 'ja') startVersuchen()
+  }, [recht, startVersuchen])
+
+  /** Sperre anfragen und halten, bis sie weggenommen wird oder das Fenster schließt. */
+  const erwerben = useCallback(
+    (optionen: LockOptions, zuvorLesend: boolean): Promise<boolean> => {
+      if (!locks) return Promise.resolve(false)
+      let meine = 0
+      return locks
+        .request(SPERRE, optionen, (sperre) => {
+          if (!sperre) return null
+          meine = ++z.generation
+          z.halte = true
+          if (zuvorLesend) rueckruf.current.neuLaden()
+          setRecht('ja')
+          // Gehalten bis steal, Schließen des Fensters oder Abbau der Komponente
+          return new Promise<void>((fertig) => {
+            z.loslassen = fertig
+          })
+        })
+        .catch(() => {})
+        .then(() => {
+          if (meine && z.generation === meine) {
+            // Weggenommen: lesend weiter, wieder anstellen
+            z.halte = false
+            setRecht('nein')
+            anstellenRef.current()
+          }
+          return meine > 0
+        })
+    },
+    [locks, z, setRecht],
+  )
+
+  const anstellenRef = useRef(() => {})
+  anstellenRef.current = () => {
+    if (!locks || z.schlange || z.halte) return
+    const abbruch = new AbortController()
+    z.schlange = abbruch
+    erwerben({ signal: abbruch.signal }, true).finally(() => {
+      if (z.schlange === abbruch) z.schlange = null
+    })
+  }
+
+  useEffect(() => {
+    if (!locks) return
+    const k = new BroadcastChannel(KANAL)
+    z.kanal = k
+    let weiter: ReturnType<typeof setTimeout> | undefined
+    k.onmessage = (e) => {
+      if (e.data !== 'gib-ab' || !z.halte) return
+      // Nur abgeben, was sicher gespeichert ist; während eines Versionswechsels gar nicht
+      if (z.wechselt || !rueckruf.current.speichern()) {
+        k.postMessage('verweigert')
+        return
+      }
+      setRecht('nein')
+      const g = z.generation
+      k.postMessage('abgegeben')
+      // Übernimmt niemand, bleibt das Schreibrecht hier
+      weiter = setTimeout(() => z.halte && z.generation === g && setRecht('ja'), UEBERGABE)
+    }
+    let aktiv = true
+    // Beim Start: frei → schreiben; sonst lesend in die Schlange
+    erwerben({ ifAvailable: true }, false).then((ok) => {
+      if (ok || !aktiv) return
+      setRecht('nein')
+      anstellenRef.current()
+    })
+    return () => {
+      aktiv = false
+      clearTimeout(weiter)
+      k.close()
+      // Abbau: Sperre freigeben, ohne dass das als „weggenommen“ zählt
+      z.generation++
+      z.halte = false
+      z.loslassen?.()
+      z.loslassen = null
+      z.schlange?.abort()
+      z.schlange = null
+    }
+  }, [locks, erwerben, z, setRecht])
+
+  /** Das schreibende Fenster bitten, zu speichern und abzugeben; dann übernehmen. */
+  const uebernehmen = useCallback(() => {
+    const k = z.kanal
+    if (!locks || !k || z.halte) return
+    setAbsage('')
+    let erledigt = false
+    const ende = () => {
+      if (erledigt) return false
+      erledigt = true
+      clearTimeout(t)
+      k.removeEventListener('message', antwort)
+      return true
+    }
+    const nehmen = (optionen: LockOptions) => {
+      z.schlange?.abort()
+      z.schlange = null
+      erwerben(optionen, true).then((ok) => ok || anstellenRef.current())
+    }
+    const antwort = (e: MessageEvent) => {
+      if (e.data === 'abgegeben' && ende()) nehmen({ steal: true })
+      if (e.data === 'verweigert' && ende()) setAbsage('verweigert')
+    }
+    // Antwortet niemand: nur übernehmen, wenn die Sperre wirklich frei ist
+    const t = setTimeout(async () => {
+      if (!ende()) return
+      const stand = await locks.query()
+      if (stand.held?.some((s) => s.name === SPERRE)) setAbsage('antwortet-nicht')
+      else nehmen({ ifAvailable: true })
+    }, 1500)
+    k.addEventListener('message', antwort)
+    k.postMessage('gib-ab')
+  }, [locks, erwerben, z])
+
+  return { recht, wechselt, neueVersion, nichtGespeichert, absage, uebernehmen, aktualisieren }
+}
