@@ -1,9 +1,9 @@
 import { STANDARD_STIL } from './format'
 import { ALLE } from './listen'
-import { leereAusgabe, neueId, type Auflage, type Ausgabe, type Datenstamm, type Verlag, type Werk } from './model'
+import { leereAusgabe, neueId, type Auflage, type Ausgabe, type Datenstamm, type Literaturliste, type Verlag, type Werk } from './model'
 
 export const FORMAT = 'bibliographie-datenstamm'
-export const VERSION = 6
+export const VERSION = 7
 
 export interface Exportdatei extends Datenstamm {
   format: typeof FORMAT
@@ -34,7 +34,8 @@ export function importiere(text: string): Datenstamm {
  * Bringt Daten auf den Stand von Version 4. Version 1 kannte pro Verlag nur einen Namen,
  * und Auflagen verwiesen über den Namenstext auf ihn. Bis Version 2 hingen die Auflagen direkt am Werk;
  * sie werden zur ersten Ausgabe. Seit Version 4 gibt es gespeicherte Listen, seit Version 5 die Vorlage aus dem Import,
- * seit Version 6 die Themenordnung.
+ * seit Version 6 die Themenordnung. Bis Version 6 konnten Listen eigene Kapitel haben; sie entfallen,
+ * die Einträge bleiben in der Liste.
  */
 export function migriere(d: Datenstamm): Datenstamm {
   const verlage: Verlag[] = d.verlage.map((v) => {
@@ -67,13 +68,16 @@ export function migriere(d: Datenstamm): Datenstamm {
       ausgaben: ausgaben.map((a) => ({ ...leereAusgabe(), ...a, auflagen: a.auflagen.map(auflage) })),
     }
   })
-  const listen = (d.listen ?? []).map((l) => ({
-    ...l,
-    stil: { ...STANDARD_STIL, ...l.stil },
-    gliederung: l.gliederung ?? 'kapitel',
-    kapitelNummern: l.kapitelNummern ?? true,
-    regel: l.regel && { ...ALLE, ...l.regel },
-  }))
+  const listen = (d.listen ?? []).map((alt): Literaturliste => {
+    const { kapitel: _kapitel, kapitelNummern: _nummern, ...l } = alt as Literaturliste & { kapitel?: unknown; kapitelNummern?: unknown }
+    return {
+      ...l,
+      eintraege: l.eintraege.map((e) => ({ werkId: e.werkId })),
+      stil: { ...STANDARD_STIL, ...l.stil },
+      gliederung: l.gliederung === 'themen' ? 'themen' : 'keine',
+      regel: l.regel && { ...ALLE, ...l.regel },
+    }
+  })
   return { werke, verlage, listen, themen: d.themen ?? [] }
 }
 

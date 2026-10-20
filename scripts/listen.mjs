@@ -45,23 +45,30 @@ await reiter('Liste').click()
 await page.locator('.listen-wahl select').selectOption({ label: 'Freiheit' })
 pruefe('Von Hand aufgenommene Karte steht in der Liste', (await eintraege()).length === 1)
 
-// Kapitel anlegen und die Karte hineinlegen
-await page.getByRole('button', { name: '+ Kapitel' }).click()
-await page.getByLabel('Kapitel 1', { exact: true }).fill('Frühwerk')
-await page.getByLabel('Kapitel', { exact: true }).selectOption({ label: '1 Frühwerk' })
+// Zweite Karte von Hand, Reihenfolge von Hand
+await reiter('Kartei').click()
+await page.locator('.kartei-karte', { hasText: 'Die Erziehung des Kindes' }).dblclick()
+await page.getByLabel('In Liste aufnehmen').selectOption({ label: 'Freiheit' })
+await reiter('Liste').click()
+await page.locator('.listen-wahl select').selectOption({ label: 'Freiheit' })
+await page.getByRole('radio', { name: 'von Hand' }).click()
+await page.locator('.eintraege .eintrag').nth(1).getByRole('button', { name: 'nach oben' }).click()
+const reihe = (await eintraege()).map((t) => (t.includes('Erziehung') ? 'Erziehung' : 'Freiheit'))
+pruefe('Reihenfolge von Hand', reihe.join(',') === 'Erziehung,Freiheit', reihe.join(','))
+pruefe('Keine eigenen Kapitel mehr in der Liste', (await page.getByRole('button', { name: '+ Kapitel' }).count()) === 0 && (await page.getByLabel('Kapitel', { exact: true }).count()) === 0)
 await page.getByRole('button', { name: 'Blattvorschau ansehen' }).click()
 const blatt = await page.locator('.blatt').innerText()
-pruefe('Blatt zeigt Kapitel mit Nummer und Eintrag darunter', /1 Frühwerk\s*\n\s*Rudolf Steiner: Die Philosophie der Freiheit/.test(blatt), blatt.slice(0, 120).replace(/\n/g, ' | '))
+pruefe('Blatt in der Reihenfolge der Liste', /Freiheit\s*\n\s*Rudolf Steiner: Die Erziehung des Kindes[\s\S]*Die Philosophie der Freiheit/.test(blatt), blatt.slice(0, 120).replace(/\n/g, ' | '))
 if (aus) await page.screenshot({ path: `${aus}/listen-blatt.png` })
 await page.keyboard.press('Escape')
 
 // Bleibt nach dem Neuladen erhalten
 await page.reload()
+await page.waitForTimeout(500)
 await reiter('Liste').click()
 await page.locator('.listen-wahl select').selectOption({ label: 'Freiheit' })
 const l = (await daten()).listen.find((x) => x.name === 'Freiheit')
-pruefe('Liste mit Kapitel und Eintrag gespeichert', l && l.regel === null && l.kapitel[0]?.titel === 'Frühwerk' && l.eintraege[0]?.kapitelId === l.kapitel[0].id)
-pruefe('Kapitel erscheint nach dem Neuladen', (await page.locator('.kapitel-kopf input').inputValue()) === 'Frühwerk')
+pruefe('Liste mit Einträgen in ihrer Reihenfolge gespeichert', l && l.regel === null && l.sortierung === 'hand' && l.eintraege.length === 2 && !('kapitel' in l))
 if (aus) await page.screenshot({ path: `${aus}/listen.png`, fullPage: true })
 
 // Zeile kopieren
@@ -70,8 +77,8 @@ await page.getByRole('button', { name: 'kopieren' }).first().click()
 await page.getByRole('button', { name: 'kopiert' }).waitFor({ timeout: 5000 }).catch(() => {})
 const kopie = await page.evaluate(() => navigator.clipboard.readText())
 const html = await page.evaluate(async () => { const [i] = await navigator.clipboard.read(); return i.types.includes('text/html') ? (await i.getType('text/html')).text() : '' })
-pruefe('Zeile in der Zwischenablage', kopie.startsWith('Rudolf Steiner: Die Philosophie der Freiheit'), kopie.slice(0, 60))
-pruefe('Titel fett in der Zwischenablage', html.includes('<b>Die Philosophie der Freiheit</b>'), html.slice(0, 80))
+pruefe('Zeile in der Zwischenablage', kopie.startsWith('Rudolf Steiner: Die Erziehung des Kindes'), kopie.slice(0, 60))
+pruefe('Titel fett in der Zwischenablage', html.includes('<b>Die Erziehung des Kindes vom Gesichtspunkte der Geisteswissenschaft</b>'), html.slice(0, 80))
 
 // Aus der Kartei eine Liste nach Schlagwort anlegen
 await reiter('Kartei').click()
@@ -91,7 +98,7 @@ pruefe('Liste gelöscht, Karten bleiben', (await daten()).listen.length === 2 &&
   const vorlage = (await daten()).werke[0]
   const werk = (id, personen) => ({ ...vorlage, id, titel: id, untertitel: '', status: 'fest', personen, schlagwoerter: [], ausgaben: [{ ...vorlage.ausgaben[0], auflagen: [{ ...vorlage.ausgaben[0].auflagen[0], jahr: '1990', ort: 'Basel', gedrucktesJahr: '' }] }] })
   const p = (vorname, nachname) => ({ vorname, nachname, rolle: 'autor' })
-  const liste = { ...(await daten()).listen[0], id: 'personen', name: 'Personen', regel: { person: '', schlagwort: '', nurPrimaer: false, nurFest: false }, kapitel: [], eintraege: [], ausgenommen: [], sortierung: 'name', jedePerson: true }
+  const liste = { ...(await daten()).listen[0], id: 'personen', name: 'Personen', regel: { person: '', schlagwort: '', nurPrimaer: false, nurFest: false }, eintraege: [], ausgenommen: [], sortierung: 'name', jedePerson: true }
   const neu = { werke: [werk('Gemeinschaftswerk', [p('Anna', 'Adler'), p('Zoe', 'Zebra')]), werk('Mittelwerk', [p('Max', 'Mitte')])], verlage: [], listen: [liste] }
   await spieleEin(page, neu)
   await reiter('Liste').click()
@@ -109,7 +116,7 @@ pruefe('Liste gelöscht, Karten bleiben', (await daten()).listen.length === 2 &&
 {
   const vorlage = (await daten()).werke[0]
   const werke = Array.from({ length: 80 }, (_, i) => ({ ...vorlage, id: `lang-${i}`, titel: `Titel ${String(i).padStart(2, '0')}`, untertitel: '' }))
-  await spieleEin(page, { werke, verlage: [], listen: [{ ...(await daten()).listen[0], id: 'lang', name: 'Lang', regel: { person: '', schlagwort: '', nurPrimaer: false, nurFest: false, thema: '', mitUnterthemen: true }, kapitel: [], eintraege: [], ausgenommen: [], gliederung: 'kapitel' }], themen: [] })
+  await spieleEin(page, { werke, verlage: [], listen: [{ ...(await daten()).listen[0], id: 'lang', name: 'Lang', regel: { person: '', schlagwort: '', nurPrimaer: false, nurFest: false, thema: '', mitUnterthemen: true }, eintraege: [], ausgenommen: [], gliederung: 'keine' }], themen: [] })
   await reiter('Liste').click()
   await page.getByRole('button', { name: 'Blattvorschau ansehen' }).click()
   const blatt = await page.locator('.blatt').evaluate((b) => ({ hoehe: b.clientHeight, inhalt: b.scrollHeight, absaetze: b.querySelectorAll('p').length }))

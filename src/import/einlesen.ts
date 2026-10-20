@@ -1,5 +1,5 @@
 import { neueListe } from '../listen'
-import { leeresWerk, neueId, type Kapitel, type ListenEintrag, type Literaturliste, type Thema, type Werk } from '../model'
+import { leeresWerk, neueId, type ListenEintrag, type Literaturliste, type Thema, type Werk } from '../model'
 import { gleichesThema, neuesNach } from '../themen'
 import { nummerUndTitel } from './geruest'
 import { KOMMENTARFARBE, rueckprobe, zerlegeEintrag, zerlegePersonen } from './eintrag'
@@ -130,20 +130,27 @@ export interface Uebernahme {
   zuordnung?: Map<string, string[]>
 }
 
+/** Überschrift der Datei beim Einlesen; aufeinanderfolgende ohne Einträge sind eine, die folgenden darunter. */
+interface Gliederungspunkt {
+  id: string
+  titel: string
+  ebene: 1 | 2
+}
+
 /**
  * Legt die Karten an und, wenn ein Name gegeben ist, eine Liste in der Reihenfolge der Datei.
- * Aufeinanderfolgende Abschnitte ohne Einträge werden zu einem Kapitel, die folgenden zu Unterkapiteln.
- * Mit einem Themenbestand werden die Kapitel zu Themen (gleichnamige genutzt, fehlende angelegt)
- * und jede Karte bekommt das Thema ihres Abschnitts; steht sie in mehreren, alle.
+ * Mit einem Themenbestand werden die Überschriften zu Themen (gleichnamige genutzt, fehlende angelegt),
+ * jede Karte bekommt das Thema ihres Abschnitts, steht sie in mehreren, alle; die Liste ist dann nach
+ * Themen gegliedert und behält unter jedem Thema die Reihenfolge der Datei.
  */
 export function uebernimm(plan: ImportPlan, auswahl: Set<number>, listenName: string | null, themenBestand?: Thema[]): Uebernahme {
   const gewaehlt = aufloesung(plan, auswahl)
 
-  // Gliederung: Kapitel, ihr Oberkapitel und welcher Abschnitt in welches Kapitel gehört
-  const kapitel: Kapitel[] = []
+  // Gliederung der Datei: Überschriften, ihre Oberüberschrift und welcher Abschnitt wohin gehört
+  const kapitel: Gliederungspunkt[] = []
   const kapitelVon = new Map<number, string>()
   const obenVon = new Map<string, string>()
-  let oben: Kapitel | null = null
+  let oben: Gliederungspunkt | null = null
   let letzterLeer = false
   // Einträge vor dem ersten Absatz stehen in der Liste vor den Kapiteln
   for (const a of plan.abschnitte.filter((x) => auswahl.has(x.nr) && x.nr !== VOR_DEM_ERSTEN)) {
@@ -156,14 +163,14 @@ export function uebernimm(plan: ImportPlan, auswahl: Set<number>, listenName: st
       letzterLeer = true
       continue
     }
-    const k: Kapitel = { id: neueId(), titel: a.titel, ebene: oben ? 2 : 1 }
+    const k: Gliederungspunkt = { id: neueId(), titel: a.titel, ebene: oben ? 2 : 1 }
     kapitel.push(k)
     kapitelVon.set(a.nr, k.id)
     if (oben) obenVon.set(k.id, oben.id)
     letzterLeer = false
   }
 
-  // Kapitel als Themen
+  // Überschriften als Themen
   let themen: Thema[] | undefined
   const themaVon = new Map<string, string>()
   if (themenBestand) {
@@ -215,11 +222,11 @@ export function uebernimm(plan: ImportPlan, auswahl: Set<number>, listenName: st
 
   const eintraege: ListenEintrag[] = []
   const drin = new Set<string>()
-  for (const { posten, i } of gewaehlt) {
+  for (const { i } of gewaehlt) {
     const werkId = ids.get(i)!
     if (drin.has(werkId)) continue
     drin.add(werkId)
-    eintraege.push({ werkId, kapitelId: kapitelVon.get(posten.abschnittNr) ?? '' })
+    eintraege.push({ werkId })
   }
-  return { werke, liste: { ...neueListe(listenName, null), kapitel, eintraege, sortierung: 'hand', kapitelNummern: false }, ...themenTeil }
+  return { werke, liste: { ...neueListe(listenName, null), eintraege, sortierung: 'hand', gliederung: themen ? 'themen' : 'keine' }, ...themenTeil }
 }

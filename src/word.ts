@@ -3,7 +3,7 @@ import type { Druckabschnitt } from './Liste'
 
 const SCHRIFT = 'Times New Roman'
 
-/** Literaturliste als Word-Datei (.docx) mit Kapiteln und hängendem Einzug; halbfett wird fett. */
+/** Literaturliste als Word-Datei (.docx) mit Überschriften und hängendem Einzug; halbfett wird fett. */
 export async function wordDatei(titel: string, abschnitte: Druckabschnitt[]): Promise<Blob> {
   const absaetze = abschnitte.flatMap((a) => [
     ...(a.ebene > 0

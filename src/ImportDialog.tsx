@@ -103,7 +103,7 @@ export function ImportDialog({
         </p>
 
         <label className="haken">
-          <input type="checkbox" checked={alsListe} onChange={(e) => setAlsListe(e.target.checked)} /> Zusätzlich als Liste mit Kapiteln anlegen
+          <input type="checkbox" checked={alsListe} onChange={(e) => setAlsListe(e.target.checked)} /> Zusätzlich als Liste anlegen, in der Reihenfolge der Datei
         </label>
         {alsListe && (
           <label className="import-name">

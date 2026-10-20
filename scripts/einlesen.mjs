@@ -60,10 +60,14 @@ await page.getByRole('button', { name: /4 Karten anlegen/ }).click()
 let d = await daten()
 pruefe('Vier vorläufige Karten angelegt', d.werke.length === 4 && d.werke.every((w) => w.status === 'vorlaeufig'), String(d.werke.length))
 const l = d.listen.find((x) => x.name === 'Medien')
-pruefe('Liste mit Kapiteln angelegt', l && l.kapitel.map((k) => `${k.ebene}:${k.titel}`).join('|') === '1:V. Medien und Technik|2:a) Film|2:b) Rundfunk', l?.kapitel.map((k) => k.titel).join('|'))
+const themenTitel = d.themen.map((t) => `${t.elternId ? 2 : 1}:${t.nummer} ${t.titel}`).join('|')
+pruefe('Überschriften als Themen angelegt', themenTitel === '1:V. Medien und Technik|2:a) Film|2:b) Rundfunk', themenTitel)
+pruefe('Liste nach Themen gegliedert, Reihenfolge der Datei', l?.gliederung === 'themen' && l.sortierung === 'hand' && l.eintraege.length === 4)
 pruefe('Liste ist geöffnet', (await page.locator('#listen-name').inputValue()) === 'Medien')
+const koepfeKlein = await page.locator('.eintraege .thema-kopf').allInnerTexts()
 const blattzeilen = await page.locator('.eintraege .eintrag').count()
-pruefe('Liste zeigt jede Karte einmal', blattzeilen === 4, String(blattzeilen))
+// Iros steht in a) und b) der Datei: eine Karte, unter beiden Themen
+pruefe('Liste zeigt die Überschriften der Datei, Iros unter beiden', koepfeKlein.join(' | ') === 'V. Medien und Technik | a) Film | b) Rundfunk' && blattzeilen === 5, `${koepfeKlein.join(' | ')}, ${blattzeilen} Zeilen`)
 if (aus) await page.screenshot({ path: `${aus}/einlesen-liste.png`, fullPage: true })
 
 // Kartei: nur Karten mit Vorlage
@@ -112,7 +116,11 @@ await page.getByRole('button', { name: /Abbrechen/ }).click()
   const d2 = await daten()
   pruefe('Zwei Karten, Iros nur einmal', d2.werke.length === 2 && d2.werke.filter((w) => w.titel.startsWith('Wesen')).length === 1, String(d2.werke.length))
   const l2 = d2.listen.find((x) => x.name === 'Zweite')
-  pruefe('Arnheim vor den Kapiteln, Iros in B', l2 && l2.eintraege.length === 2 && l2.eintraege[0].kapitelId === '' && l2.kapitel.find((k) => k.id === l2.eintraege[1].kapitelId)?.titel === 'B', JSON.stringify(l2?.kapitel.map((k) => k.titel)))
+  const themaB = d2.themen.find((t) => t.titel === 'B')?.id
+  const themaC = d2.themen.find((t) => t.titel === 'C')?.id
+  const irosKarte = d2.werke.find((w) => w.titel.startsWith('Wesen'))
+  const arnheimKarte = d2.werke.find((w) => w.titel === 'Film als Kunst')
+  pruefe('Arnheim ohne Thema, Iros unter B und C', l2 && l2.eintraege.length === 2 && arnheimKarte?.themen.length === 0 && irosKarte?.themen.join() === `${themaB},${themaC}`, `${arnheimKarte?.themen.length} / ${irosKarte?.themen.join()}`)
 }
 
 // Echte Liste, wenn angegeben
@@ -133,16 +141,17 @@ if (process.env.ODT_DATEI) {
     await new Promise((r) => setTimeout(r, 800))
     return (localStorage.getItem('bibliographie:datenstamm:v1') ?? '').length
   })
-  const koepfe = await page.locator('.eintraege .kapitel-kopf').count()
+  const koepfe = await page.locator('.eintraege .thema-kopf').count()
   const weitere = await page.locator('.weitere-eintraege').innerText()
-  pruefe('Gekürzte Ansicht endet ganz: keine Überschrift ohne ihre Einträge', koepfe === 2 && /in 1 weiteren Kapitel/.test(weitere), `${koepfe} Überschriften, „${weitere}“`)
-  pruefe('Eingelesene Liste ohne laufende Kapitelnummern', (await page.locator('.kapitel-nr').count()) === 0)
+  pruefe('Gekürzte Ansicht endet ganz: keine Überschrift ohne ihre Einträge', koepfe === 2 && /unter 1 weiteren Thema/.test(weitere), `${koepfe} Überschriften, „${weitere}“`)
   await page.getByRole('button', { name: 'Blattvorschau ansehen' }).click()
   pruefe('Mit Blattvorschau scrollt nur sie', (await page.evaluate(() => getComputedStyle(document.documentElement).overflow)) === 'hidden')
   await page.keyboard.press('Escape')
   pruefe('Ohne Blattvorschau scrollt die Seite wieder', (await page.evaluate(() => getComputedStyle(document.documentElement).overflow)) !== 'hidden')
-  const optionen = await page.locator('.eintraege select[aria-label="Kapitel"]').first().locator('option').allInnerTexts()
-  pruefe('Lange Kapitelüberschriften in der Auswahl gekürzt', optionen.length > 1 && optionen.every((o) => o.length <= 48), String(Math.max(...optionen.map((o) => o.length))))
+  await page.getByLabel(/von\s+selbst aufnehmen/).check()
+  const optionen = await page.locator('.bedingung', { hasText: 'Thema' }).locator('option').allInnerTexts()
+  pruefe('Lange Themen in der Auswahl gekürzt', optionen.length > 1 && optionen.every((o) => o.trim().length <= 48), String(Math.max(...optionen.map((o) => o.trim().length))))
+  await page.getByLabel(/von\s+selbst aufnehmen/).uncheck()
   const voll = await page.locator('.speicher-warnung').count()
   pruefe('Echte Liste eingelesen und gespeichert', voll === 0 && groesse > 1e6 && echt[3] === '0', `${echt.join(',')} · ${beschriftung} · Dialog ${dialog} ms, Anlegen ${anlegen} ms, ${Math.round(groesse / 1024)} kB`)
   const t3 = Date.now()

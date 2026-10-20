@@ -62,7 +62,7 @@ try {
   const nachher = await page.locator('.eintraege .eintrag').count()
   const koepfeFilm = await page.locator('.thema-kopf').allInnerTexts()
   pruefe('Von Hand Aufgenommenes bleibt in der Themengliederung', vorher === 2 && nachher === 2 && koepfeFilm.includes('Weitere Titel'), `${vorher} → ${nachher}, ${koepfeFilm.join(' | ')}`)
-  await page.getByRole('radio', { name: 'eigene Kapitel' }).click()
+  await page.getByRole('radio', { name: 'keine', exact: true }).click()
 
   // Themenkartei als eine Liste
   await page.getByRole('button', { name: '+ Neue Liste' }).click()
