@@ -26,12 +26,12 @@ describe('Import und Export', () => {
   })
   it('ergänzt älteren Daten Themen und die Gliederung der Listen', () => {
     const { themen: _themen, ...karte } = leeresWerk()
-    const { gliederung: _gliederung, ...liste } = neueListe('Alt')
+    const { gliederung: _gliederung, kapitelNummern: _nummern, ...liste } = neueListe('Alt')
     const v5 = { format: 'bibliographie-datenstamm', version: 5, verlage: [], werke: [karte], listen: [{ ...liste, regel: { person: '', schlagwort: '', nurPrimaer: false, nurFest: false } }] }
     const d = importiere(JSON.stringify(v5))
     expect(d.themen).toEqual([])
     expect(d.werke[0].themen).toEqual([])
-    expect(d.listen[0]).toMatchObject({ gliederung: 'kapitel', regel: { thema: '', mitUnterthemen: true } })
+    expect(d.listen[0]).toMatchObject({ gliederung: 'kapitel', kapitelNummern: true, regel: { thema: '', mitUnterthemen: true } })
   })
   it('ergänzt älteren Karten eine leere Vorlage', () => {
     const { vorlage: _vorlage, ...ohne } = leeresWerk()

@@ -261,6 +261,8 @@ export interface Literaturliste {
   jedePerson: boolean
   /** 'kapitel': eigene Kapitel der Liste; 'themen': Kapitel aus der Themenordnung, ein Werk unter jedem seiner Themen */
   gliederung: 'kapitel' | 'themen'
+  /** Eigene Kapitel mit laufender Nummer drucken; aus bei Überschriften, die ihre Nummer selbst tragen */
+  kapitelNummern: boolean
   angelegt: string
   geaendert: string
 }

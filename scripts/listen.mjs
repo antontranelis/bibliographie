@@ -105,6 +105,18 @@ pruefe('Liste gelöscht, Karten bleiben', (await daten()).listen.length === 2 &&
   pruefe('Karte behält ihre Personenfolge', karte.personen.map((x) => x.nachname).join('/') === 'Adler/Zebra')
 }
 
+// Lange Liste: das Blatt wächst mit, kein Text läuft über seinen Rand hinaus
+{
+  const vorlage = (await daten()).werke[0]
+  const werke = Array.from({ length: 80 }, (_, i) => ({ ...vorlage, id: `lang-${i}`, titel: `Titel ${String(i).padStart(2, '0')}`, untertitel: '' }))
+  await spieleEin(page, { werke, verlage: [], listen: [{ ...(await daten()).listen[0], id: 'lang', name: 'Lang', regel: { person: '', schlagwort: '', nurPrimaer: false, nurFest: false, thema: '', mitUnterthemen: true }, kapitel: [], eintraege: [], ausgenommen: [], gliederung: 'kapitel' }], themen: [] })
+  await reiter('Liste').click()
+  await page.getByRole('button', { name: 'Blattvorschau ansehen' }).click()
+  const blatt = await page.locator('.blatt').evaluate((b) => ({ hoehe: b.clientHeight, inhalt: b.scrollHeight, absaetze: b.querySelectorAll('p').length }))
+  pruefe('Langes Blatt wächst mit dem Inhalt', blatt.absaetze >= 80 && blatt.inhalt <= blatt.hoehe + 1, `${blatt.absaetze} Zeilen, Höhe ${blatt.hoehe}, Inhalt ${blatt.inhalt}`)
+  await page.keyboard.press('Escape')
+}
+
 // Schmal
 await page.setViewportSize({ width: 390, height: 844 })
 pruefe('Liste ohne Querscrollen auf dem Telefon', (await page.evaluate(() => document.documentElement.scrollWidth)) <= 390)

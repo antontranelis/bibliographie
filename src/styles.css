@@ -429,6 +429,7 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
 .kapitel-kopf.ebene-2 .eingabe { font-size: 17px; }
 .kapitel-nr { font: 600 17px/1 var(--serif); color: var(--lab); min-width: 28px; }
 .kapitel-knoepfe { padding-top: 12px; }
+.weitere-eintraege { padding: 12px 0 4px; border-bottom: 1px solid var(--zart); }
 .zeile-knoepfe { margin-top: 8px; }
 .vorlage { margin-top: 14px; padding: 12px 14px; background: var(--ocker-hell); border-left: 3px solid var(--ocker); border-radius: 4px; }
 .vorlage p { margin: 4px 0 6px; font-family: var(--serif); }
@@ -484,6 +485,11 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
   position: fixed; inset: 0; z-index: 50; background: rgba(40, 36, 30, 0.55); overflow-y: auto;
   display: flex; flex-direction: column; align-items: center; padding: 0 16px 48px;
 }
+/* Blatt und Dialoge wachsen mit ihrem Inhalt; die Überlagerung scrollt, statt sie zu stauchen */
+.ueberlagerung > * { flex-shrink: 0; }
+/* Solange eine Überlagerung offen ist, scrollt nur sie: eine Bildlaufleiste, nicht zwei */
+html:has(.ueberlagerung) { overflow: hidden; }
+.ueberlagerung { overscroll-behavior: contain; }
 .vorschau-leiste {
   position: sticky; top: 0; z-index: 1; width: 100%; max-width: 900px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
   background: var(--kopf); border-radius: 0 0 8px 8px; padding: 12px 16px; margin-bottom: 24px; box-shadow: 0 8px 20px -10px rgba(0, 0, 0, 0.4);

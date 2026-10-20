@@ -221,5 +221,5 @@ export function uebernimm(plan: ImportPlan, auswahl: Set<number>, listenName: st
     drin.add(werkId)
     eintraege.push({ werkId, kapitelId: kapitelVon.get(posten.abschnittNr) ?? '' })
   }
-  return { werke, liste: { ...neueListe(listenName, null), kapitel, eintraege, sortierung: 'hand' }, ...themenTeil }
+  return { werke, liste: { ...neueListe(listenName, null), kapitel, eintraege, sortierung: 'hand', kapitelNummern: false }, ...themenTeil }
 }

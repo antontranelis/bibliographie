@@ -19,6 +19,7 @@ export function neueListe(name: string, regel: ListenRegel | null = ALLE): Liter
     sortierung: 'name',
     jedePerson: false,
     gliederung: 'kapitel',
+    kapitelNummern: true,
     angelegt: jetzt,
     geaendert: jetzt,
   }

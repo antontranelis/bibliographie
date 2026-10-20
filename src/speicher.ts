@@ -71,6 +71,7 @@ export function migriere(d: Datenstamm): Datenstamm {
     ...l,
     stil: { ...STANDARD_STIL, ...l.stil },
     gliederung: l.gliederung ?? 'kapitel',
+    kapitelNummern: l.kapitelNummern ?? true,
     regel: l.regel && { ...ALLE, ...l.regel },
   }))
   return { werke, verlage, listen, themen: d.themen ?? [] }

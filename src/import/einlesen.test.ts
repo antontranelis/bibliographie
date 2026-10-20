@@ -75,6 +75,8 @@ describe('uebernimm', () => {
     expect(l.name).toBe('Medien')
     expect(l.regel).toBeNull()
     expect(l.sortierung).toBe('hand')
+    // Seine Überschriften tragen ihre Nummern selbst
+    expect(l.kapitelNummern).toBe(false)
     expect(l.kapitel.map((k) => [k.titel, k.ebene])).toEqual([
       ['V. Medien als Bedingungen', 1],
       ['a) Manipulation', 2],
