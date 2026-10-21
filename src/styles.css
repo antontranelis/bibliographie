@@ -424,11 +424,7 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
 .eintrag-knoepfe .klein-knopf { border-color: var(--linie2); padding: 5px 8px; }
 .listen-wahl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
 .kapitel-kopf { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 18px 0 8px; border-bottom: 1px solid var(--linie); }
-.kapitel-kopf .eingabe { flex: 1 1 260px; font-size: 19px; font-weight: 600; }
-.kapitel-kopf.ebene-2 { padding-left: 20px; }
-.kapitel-kopf.ebene-2 .eingabe { font-size: 17px; }
-.kapitel-nr { font: 600 17px/1 var(--serif); color: var(--lab); min-width: 28px; }
-.kapitel-knoepfe { padding-top: 12px; }
+.weitere-eintraege { padding: 12px 0 4px; border-bottom: 1px solid var(--zart); }
 .zeile-knoepfe { margin-top: 8px; }
 .vorlage { margin-top: 14px; padding: 12px 14px; background: var(--ocker-hell); border-left: 3px solid var(--ocker); border-radius: 4px; }
 .vorlage p { margin: 4px 0 6px; font-family: var(--serif); }
@@ -462,6 +458,11 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
 .import-zahlen { display: flex; flex-wrap: wrap; gap: 10px 28px; margin: 0; }
 .import-zahlen dt { font: 600 11px/1.2 var(--sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--lab); }
 .import-zahlen dd { margin: 2px 0 0; font: 600 22px/1.2 var(--serif); }
+.geruest-vorschau { max-height: 55vh; overflow-y: auto; box-shadow: none; border: 1px solid var(--linie); }
+.geruest-vorschau .thema-zeile { cursor: pointer; font-family: var(--serif); }
+.geruest-vorschau .thema-zeile.abgewaehlt { color: var(--blass); text-decoration: line-through; }
+.geruest-nummer { min-width: 44px; color: var(--lab); }
+.import-hinweis { margin: -6px 0 0 26px; }
 .import-name { display: grid; gap: 4px; max-width: 420px; }
 .klein-wahl { font: 600 13px/1 var(--sans); border: 1px solid var(--linie2); background: #fff; border-radius: 5px; padding: 6px 8px; }
 .eintrag input { margin-top: 6px; align-self: start; width: 16px; height: 16px; }
@@ -479,6 +480,11 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
   position: fixed; inset: 0; z-index: 50; background: rgba(40, 36, 30, 0.55); overflow-y: auto;
   display: flex; flex-direction: column; align-items: center; padding: 0 16px 48px;
 }
+/* Blatt und Dialoge wachsen mit ihrem Inhalt; die Überlagerung scrollt, statt sie zu stauchen */
+.ueberlagerung > * { flex-shrink: 0; }
+/* Solange eine Überlagerung offen ist, scrollt nur sie: eine Bildlaufleiste, nicht zwei */
+html:has(.ueberlagerung) { overflow: hidden; }
+.ueberlagerung { overscroll-behavior: contain; }
 .vorschau-leiste {
   position: sticky; top: 0; z-index: 1; width: 100%; max-width: 900px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
   background: var(--kopf); border-radius: 0 0 8px 8px; padding: 12px 16px; margin-bottom: 24px; box-shadow: 0 8px 20px -10px rgba(0, 0, 0, 0.4);

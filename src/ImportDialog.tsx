@@ -10,11 +10,12 @@ export function ImportDialog({
 }: {
   dateiname: string
   plan: ImportPlan
-  onUebernehmen: (auswahl: Set<number>, listenName: string | null) => void
+  onUebernehmen: (auswahl: Set<number>, listenName: string | null, alsThemen: boolean) => void
   onAbbrechen: () => void
 }) {
   const [auswahl, setAuswahl] = useState(() => new Set(plan.abschnitte.filter((a) => a.vorschlag).map((a) => a.nr)))
   const [alsListe, setAlsListe] = useState(true)
+  const [alsThemen, setAlsThemen] = useState(true)
   const [name, setName] = useState(dateiname.replace(/\.odt$/i, ''))
   const abbrechen = useRef<HTMLButtonElement>(null)
   useEffect(() => {
@@ -102,7 +103,7 @@ export function ImportDialog({
         </p>
 
         <label className="haken">
-          <input type="checkbox" checked={alsListe} onChange={(e) => setAlsListe(e.target.checked)} /> Zusätzlich als Liste mit Kapiteln anlegen
+          <input type="checkbox" checked={alsListe} onChange={(e) => setAlsListe(e.target.checked)} /> Zusätzlich als Liste anlegen, in der Reihenfolge der Datei
         </label>
         {alsListe && (
           <label className="import-name">
@@ -111,8 +112,13 @@ export function ImportDialog({
           </label>
         )}
 
+        <label className="haken">
+          <input type="checkbox" checked={alsThemen} onChange={(e) => setAlsThemen(e.target.checked)} /> Überschriften als Themen zuordnen
+        </label>
+        {alsThemen && <p className="klein leise import-hinweis">Gleichnamige Themen der Themenordnung werden genutzt, fehlende angelegt. Jede Karte bekommt das Thema ihres Abschnitts, auch schon vorhandene.</p>}
+
         <div className="knopfreihe">
-          <button type="button" className="knopf haupt" disabled={zahlen.alle === 0} onClick={() => onUebernehmen(auswahl, alsListe ? name.trim() || 'Eingelesene Liste' : null)}>
+          <button type="button" className="knopf haupt" disabled={zahlen.alle === 0} onClick={() => onUebernehmen(auswahl, alsListe ? name.trim() || 'Eingelesene Liste' : null, alsThemen)}>
             {zahlen.neu} {zahlen.neu === 1 ? 'Karte' : 'Karten'} anlegen
           </button>
           <button ref={abbrechen} type="button" className="knopf" onClick={onAbbrechen}>

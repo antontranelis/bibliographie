@@ -159,3 +159,33 @@ export function leseOdtDokument(bytes: Uint8Array): OdtDokument {
 }
 
 export const leseOdt = (bytes: Uint8Array): OdtEintrag[] => leseOdtDokument(bytes).eintraege
+
+/**
+ * Alle Absätze in Lesereihenfolge mit der Tiefe ihrer Aufzählung (0 = außerhalb einer Liste).
+ * Für Gliederungen wie ein Gesamtgerüst, bei denen nicht nur die oberste Listenebene zählt.
+ */
+export function leseAbsaetze(bytes: Uint8Array): { text: string; tiefe: number }[] {
+  const dateien = unzipSync(bytes, { filter: (f) => f.name === 'content.xml' })
+  const content = strFromU8(dateien['content.xml'])
+  const koerper = content.match(/<office:text\b[^>]*>([\s\S]*)<\/office:text>/)?.[1] ?? content
+  const aus: { text: string; tiefe: number }[] = []
+  let listenTiefe = 0
+  let absatzTiefe = 0
+  let text = ''
+  for (const [, schliessend, tag, , selbst, inhalt] of koerper.matchAll(/<(\/?)([\w:-]+)([^>]*?)(\/?)>|([^<]+)/g)) {
+    if (inhalt !== undefined) {
+      if (absatzTiefe > 0) text += dekodiere(inhalt)
+      continue
+    }
+    if (tag === 'text:list') listenTiefe += !schliessend && !selbst ? 1 : schliessend ? -1 : 0
+    else if (tag === 'text:p' || tag === 'text:h') {
+      if (!schliessend && !selbst) {
+        if (absatzTiefe++ === 0) text = ''
+      } else if (schliessend && absatzTiefe > 0 && --absatzTiefe === 0) {
+        const t = text.replace(/\s+/g, ' ').trim()
+        if (t) aus.push({ text: t, tiefe: listenTiefe })
+      }
+    } else if (absatzTiefe > 0 && !schliessend && (tag === 'text:s' || tag === 'text:tab' || tag === 'text:line-break')) text += ' '
+  }
+  return aus
+}

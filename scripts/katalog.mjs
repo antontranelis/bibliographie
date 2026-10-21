@@ -1,6 +1,12 @@
 // Prüft die Katalogsuche, wenn lobid ausfällt und die DNB Aussetzer hat. Aufruf: node scripts/katalog.mjs <url>
-// Die DNB-Antworten kommen aus dem echten Katalog; Ausfälle werden simuliert.
+// Die DNB-Antworten sind aus dem echten Katalog aufgezeichnet (fixtures/dnb-seite.xml, 165 Treffer gemeldet,
+// also zwei Seiten); Ausfälle werden simuliert. So hängt die Prüfung nicht an der Verbindung.
+import { readFileSync } from 'node:fs'
 import { chromium } from 'playwright-core'
+
+const DNB = readFileSync(new URL('./fixtures/dnb-seite.xml', import.meta.url), 'utf8')
+const antwort = (r) => r.fulfill({ status: 200, contentType: 'application/xml', body: DNB })
+const seiteEins = (r) => new URL(r.request().url()).searchParams.get('startRecord') === '1'
 
 const [url = 'http://localhost:4321/'] = process.argv.slice(2)
 const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN })
@@ -13,6 +19,7 @@ async function suche(einrichten) {
   const p = await kontext.newPage()
   p.on('pageerror', (e) => fehler.push(e.message))
   await p.route('https://lobid.org/**', (r) => r.fulfill({ status: 404, body: 'Not Found' }))
+  await p.route('https://services.dnb.de/**', antwort)
   await einrichten?.(p)
   await p.goto(url)
   await p.getByLabel('Nachname, Person 1').fill('Steiner')
@@ -33,7 +40,7 @@ const vorschlaege = (p) => p.locator('.vorschlag-anzahl').first().waitFor({ time
 // 2. Zweite DNB-Seite scheitert beide Male: die erste Seite bleibt
 {
   const { p, kontext } = await suche((p) =>
-    p.route('https://services.dnb.de/**', (r) => (new URL(r.request().url()).searchParams.get('startRecord') === '1' ? r.continue() : r.abort('internetdisconnected'))),
+    p.route('https://services.dnb.de/**', (r) => (seiteEins(r) ? antwort(r) : r.abort('internetdisconnected'))),
   )
   const n = await vorschlaege(p)
   pruefe('Scheitert eine weitere DNB-Seite, bleibt die erste', n > 0, `${n} Werke`)
@@ -45,11 +52,11 @@ const vorschlaege = (p) => p.locator('.vorschlag-anzahl').first().waitFor({ time
   let erste = true
   const { p, kontext } = await suche((p) =>
     p.route('https://services.dnb.de/**', (r) => {
-      if (erste && new URL(r.request().url()).searchParams.get('startRecord') === '1') {
+      if (erste && seiteEins(r)) {
         erste = false
         return r.abort('internetdisconnected')
       }
-      return r.continue()
+      return antwort(r)
     }),
   )
   const n = await vorschlaege(p)
@@ -60,7 +67,7 @@ const vorschlaege = (p) => p.locator('.vorschlag-anzahl').first().waitFor({ time
 // 4. Gar kein Katalog: Meldung mit „Noch einmal versuchen“, danach Vorschläge
 {
   let gesperrt = true
-  const { p, kontext } = await suche((p) => p.route('https://services.dnb.de/**', (r) => (gesperrt ? r.abort('internetdisconnected') : r.continue())))
+  const { p, kontext } = await suche((p) => p.route('https://services.dnb.de/**', (r) => (gesperrt ? r.abort('internetdisconnected') : antwort(r))))
   const knopf = p.getByRole('button', { name: 'Noch einmal versuchen' })
   const da = await knopf.waitFor({ timeout: 20000 }).then(() => true).catch(() => false)
   pruefe('Kein Katalog: Meldung mit „Noch einmal versuchen“', da)

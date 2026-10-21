@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { druckzeile } from '../format'
 import { abschnitte as listenAbschnitte } from '../listen'
+import { baum } from '../themen'
 import { leeresWerk } from '../model'
 import { aufloesung, planeImport, uebernimm } from './einlesen'
 import type { Lauf, OdtDokument, OdtEintrag } from './odt'
@@ -69,18 +70,14 @@ describe('uebernimm', () => {
   it('legt nur neue Karten an, ohne Doppelte', () => {
     expect(r.werke.map((w) => w.titel)).toEqual(['Wesen und Dramaturgie des Films', 'Film als Kunst', 'Das Kunstwerk', ''])
   })
-  it('baut die Liste mit Kapiteln in der Reihenfolge der Datei nach', () => {
+  it('ohne Themen: eine Liste in der Reihenfolge der Datei, ohne Gliederung', () => {
     const l = r.liste!
     expect(l.name).toBe('Medien')
     expect(l.regel).toBeNull()
     expect(l.sortierung).toBe('hand')
-    expect(l.kapitel.map((k) => [k.titel, k.ebene])).toEqual([
-      ['V. Medien als Bedingungen', 1],
-      ['a) Manipulation', 2],
-      ['b) Netzwerke', 2],
-    ])
-    const druck = listenAbschnitte(l, [...r.werke, vorhanden]).map((a) => `${a.nummer}:${a.zeilen.map((z) => z.werk.titel || '?').join(',')}`)
-    expect(druck).toEqual([':', '1:', '1.1:Wesen und Dramaturgie des Films,Film als Kunst,Das Kunstwerk', '1.2:?,Rundfunk als Hörkunst'])
+    expect(l.gliederung).toBe('keine')
+    const druck = listenAbschnitte(l, [...r.werke, vorhanden]).map((a) => a.zeilen.map((z) => z.werk.titel || '?').join(','))
+    expect(druck).toEqual(['Wesen und Dramaturgie des Films,Film als Kunst,Das Kunstwerk,?,Rundfunk als Hörkunst'])
   })
   it('ein Werk, das in zwei Abschnitten steht, kommt in den ersten', () => {
     expect(r.liste!.eintraege.filter((e) => e.werkId === r.werke[0].id)).toHaveLength(1)
@@ -117,14 +114,72 @@ describe('Einträge vor dem ersten Absatz', () => {
     expect(plan.abschnitte.map((a) => [a.nr, a.eintraege, a.vorschlag])).toEqual([[-1, 1, true]])
     const r = uebernimm(plan, new Set([-1]), 'L')
     expect(r.werke).toHaveLength(1)
-    expect(r.liste!.kapitel).toEqual([])
-    expect(r.liste!.eintraege).toEqual([{ werkId: r.werke[0].id, kapitelId: '' }])
+    expect(r.liste!.eintraege).toEqual([{ werkId: r.werke[0].id }])
   })
-  it('gemischt: führende Einträge vor den Kapiteln, der Rest im Kapitel', () => {
-    const plan = planeImport({ abschnitte: ['Kapitel'], eintraege: [eintrag(-1, eintragA()), eintrag(0, eintragB())] }, [])
+  it('gemischt: führende Einträge ohne Thema, der Rest unter dem Thema der Überschrift', () => {
+    const plan = planeImport({ abschnitte: ['Film'], eintraege: [eintrag(-1, eintragA()), eintrag(0, eintragB())] }, [])
     expect(plan.abschnitte.map((a) => a.nr)).toEqual([-1, 0])
-    const r = uebernimm(plan, new Set([-1, 0]), 'L')
-    expect(r.liste!.kapitel.map((k) => k.titel)).toEqual(['Kapitel'])
-    expect(r.liste!.eintraege.map((e) => e.kapitelId)).toEqual(['', r.liste!.kapitel[0].id])
+    const r = uebernimm(plan, new Set([-1, 0]), 'L', [])
+    const druck = listenAbschnitte(r.liste!, r.werke, r.themen).map((a) => `${a.ueberschrift?.titel}:${a.zeilen.map((z) => z.werk.titel).join(',')}`)
+    expect(druck).toEqual(['Film:Film als Kunst', 'ohne Thema:Wesen und Dramaturgie des Films'])
+  })
+})
+
+describe('Abschnitte als Themen', () => {
+  const vorhanden = { ...leeresWerk(), id: 'da', titel: 'Rundfunk als Hörkunst', personen: [{ vorname: 'Rudolf', nachname: 'Arnheim', rolle: 'autor' as const }] }
+  const plan = planeImport(dok, [vorhanden])
+  const auswahl = new Set(plan.abschnitte.filter((a) => a.vorschlag).map((a) => a.nr))
+
+  it('mit Themen: Liste nach Themen gegliedert, unter jedem Thema in der Reihenfolge der Datei', () => {
+    const r = uebernimm(plan, auswahl, 'Medien', [])
+    expect(r.liste!).toMatchObject({ gliederung: 'themen', sortierung: 'hand' })
+    // Die schon vorhandene Karte bekommt ihr Thema über die Zuordnung, wie in der App
+    const mitThema = { ...vorhanden, themen: r.zuordnung?.get('da') ?? [] }
+    const druck = listenAbschnitte(r.liste!, [...r.werke, mitThema], r.themen).map((a) => `${a.ueberschrift?.titel}:${a.zeilen.map((z) => z.werk.titel || '?').join(',')}`)
+    expect(druck).toEqual([
+      'V. Medien als Bedingungen:',
+      'a) Manipulation:Wesen und Dramaturgie des Films,Film als Kunst,Das Kunstwerk',
+      'b) Netzwerke:Wesen und Dramaturgie des Films,?,Rundfunk als Hörkunst',
+    ])
+  })
+  it('legt fehlende Themen nach den Überschriften an und ordnet die Karten zu', () => {
+    const r = uebernimm(plan, auswahl, 'Medien', [])
+    expect(baum(r.themen!).map((k) => `${k.tiefe}:${k.thema.nummer}|${k.thema.titel}`)).toEqual(['0:V.|Medien als Bedingungen', '1:a)|Manipulation', '1:b)|Netzwerke'])
+    const a = r.themen!.find((t) => t.nummer === 'a)')!
+    const b = r.themen!.find((t) => t.nummer === 'b)')!
+    expect(r.werke.find((w) => w.titel === 'Film als Kunst')?.themen).toEqual([a.id])
+    // Iros steht in a) und b): eine Karte, beide Themen
+    expect(r.werke.find((w) => w.titel === 'Wesen und Dramaturgie des Films')?.themen).toEqual([a.id, b.id])
+    // Die schon vorhandene Karte bekommt ihr Thema über die Zuordnung
+    expect(r.zuordnung?.get('da')).toEqual([b.id])
+  })
+  it('nutzt gleichnamige Themen, auch mit leicht anderem Wortlaut', () => {
+    const bestand = [
+      { id: 'v', nummer: 'V.', titel: 'Medien', elternId: '' },
+      { id: 'a', nummer: 'a)', titel: 'Manipulation', elternId: 'v' },
+    ]
+    const r = uebernimm(plan, auswahl, null, bestand)
+    expect(r.themen!.map((t) => t.id).slice(0, 2)).toEqual(['v', 'a'])
+    expect(r.themen!).toHaveLength(3)
+    expect(r.themen!.find((t) => t.nummer === 'b)')?.elternId).toBe('v')
+    expect(r.werke.find((w) => w.titel === 'Film als Kunst')?.themen).toEqual(['a'])
+  })
+  it('ohne Themenbestand keine Zuordnung', () => {
+    const r = uebernimm(plan, auswahl, 'Medien')
+    expect(r.themen).toBeUndefined()
+    expect(r.werke.every((w) => w.themen.length === 0)).toBe(true)
+  })
+})
+
+describe('Reihenfolge je Abschnitt', () => {
+  const alpha = () => [n('Anna Alpha: '), f('Alpha'), n(', Basel 1990')]
+  const beta = () => [n('Bert Beta: '), f('Beta'), n(', Bern 1991')]
+  it('gemeinsame Werke behalten in jedem Abschnitt ihre Reihenfolge aus der Datei', () => {
+    const umgekehrt: OdtDokument = { abschnitte: ['A', 'B'], eintraege: [eintrag(0, alpha()), eintrag(0, beta()), eintrag(1, beta()), eintrag(1, alpha())] }
+    const plan = planeImport(umgekehrt, [])
+    const r = uebernimm(plan, new Set([0, 1]), 'L', [])
+    expect(r.werke).toHaveLength(2)
+    const druck = listenAbschnitte(r.liste!, r.werke, r.themen).map((a) => `${a.ueberschrift?.titel}:${a.zeilen.map((z) => z.werk.titel).join(',')}`)
+    expect(druck).toEqual(['A:Alpha,Beta', 'B:Beta,Alpha'])
   })
 })

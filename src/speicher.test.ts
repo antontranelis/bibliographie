@@ -6,7 +6,7 @@ import { leereAuflage, leereAusgabe, leeresWerk } from './model'
 describe('Import und Export', () => {
   const w = { ...leeresWerk(), titel: 'Wahrheit und Wissenschaft' }
   it('liest die eigene Exportdatei unverändert zurück', () => {
-    const liste = { ...neueListe('Steiner'), kapitel: [{ id: 'k', titel: 'Frühwerk', ebene: 1 as const }], eintraege: [{ werkId: w.id, kapitelId: 'k' }] }
+    const liste = { ...neueListe('Steiner'), gliederung: 'themen' as const, eintraege: [{ werkId: w.id }] }
     const d = { werke: [w], verlage: [{ id: 'v', kuerzel: 'goe', namen: [{ abJahr: '', name: 'Verlag am Goetheanum' }], orte: [], schreibweisen: [] }], listen: [liste], themen: [{ id: 't', nummer: 'I.', titel: 'Medien', elternId: '' }] }
     expect(importiere(exportiere(d))).toEqual(d)
   })
@@ -31,7 +31,21 @@ describe('Import und Export', () => {
     const d = importiere(JSON.stringify(v5))
     expect(d.themen).toEqual([])
     expect(d.werke[0].themen).toEqual([])
-    expect(d.listen[0]).toMatchObject({ gliederung: 'kapitel', regel: { thema: '', mitUnterthemen: true } })
+    expect(d.listen[0]).toMatchObject({ gliederung: 'keine', regel: { thema: '', mitUnterthemen: true } })
+  })
+  it('eigene Kapitel älterer Listen entfallen, die Einträge bleiben', () => {
+    const v6 = {
+      format: 'bibliographie-datenstamm',
+      version: 6,
+      verlage: [],
+      werke: [],
+      themen: [],
+      listen: [{ ...neueListe('Alt'), gliederung: 'kapitel', kapitelNummern: true, kapitel: [{ id: 'k', titel: 'Frühwerk', ebene: 1 }], eintraege: [{ werkId: 'w', kapitelId: 'k' }] }],
+    }
+    const l = importiere(JSON.stringify(v6)).listen[0]
+    expect(l.eintraege).toEqual([{ werkId: 'w' }])
+    expect(l.gliederung).toBe('keine')
+    expect('kapitel' in l || 'kapitelNummern' in l).toBe(false)
   })
   it('ergänzt älteren Karten eine leere Vorlage', () => {
     const { vorlage: _vorlage, ...ohne } = leeresWerk()

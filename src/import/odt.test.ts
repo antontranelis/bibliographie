@@ -1,7 +1,7 @@
 import { strToU8, zipSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
 import { zerlegeEintrag } from './eintrag'
-import { leseOdt, leseOdtDokument } from './odt'
+import { leseAbsaetze, leseOdt, leseOdtDokument } from './odt'
 
 const odt = (eintrag: string) => dokument(`<text:list><text:list-item><text:p>${eintrag}</text:p></text:list-item></text:list>`)
 
@@ -49,5 +49,25 @@ describe('leseOdtDokument', () => {
     const d = leseOdtDokument(dokument('<text:list><text:list-item><text:p>Erster</text:p></text:list-item></text:list>'))
     expect(d.abschnitte).toEqual([])
     expect(d.eintraege[0].abschnittNr).toBe(-1)
+  })
+})
+
+describe('leseAbsaetze', () => {
+  it('alle Absätze in Reihenfolge, mit der Tiefe ihrer Aufzählung', () => {
+    const a = leseAbsaetze(
+      dokument(
+        '<text:p>Gesamtgerüst</text:p>' +
+          '<text:list><text:list-item><text:p>V. Medien</text:p>' +
+          '<text:list><text:list-item><text:p>a) <text:span>Film</text:span></text:p></text:list-item><text:list-item><text:p>b) Rundfunk</text:p></text:list-item></text:list>' +
+          '</text:list-item><text:list-item><text:h>VI. Technik</text:h></text:list-item></text:list><text:p/>',
+      ),
+    )
+    expect(a).toEqual([
+      { text: 'Gesamtgerüst', tiefe: 0 },
+      { text: 'V. Medien', tiefe: 1 },
+      { text: 'a) Film', tiefe: 2 },
+      { text: 'b) Rundfunk', tiefe: 2 },
+      { text: 'VI. Technik', tiefe: 1 },
+    ])
   })
 })

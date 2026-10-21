@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { ALLE, abschnitte, druckWerk, entferne, hinzufuegen, kapitelEntfernen, neueListe, nummern, rueckeUm, umschalten, verschiebe } from './listen'
+import { ALLE, abschnitte, druckWerk, entferne, hinzufuegen, neueListe, rueckeUm, rueckeUmIn, umschalten } from './listen'
 import { druckzeile } from './format'
-import { leereAuflage, leereAusgabe, leeresWerk, type Kapitel, type Literaturliste, type Thema, type Werk } from './model'
+import { leereAuflage, leereAusgabe, leeresWerk, type Literaturliste, type Thema, type Werk } from './model'
 
 const p = (vorname: string, nachname: string) => ({ vorname, nachname, rolle: 'autor' as const })
 function werk(id: string, personen: ReturnType<typeof p>[], jahr: string, schlagwoerter: string[] = [], status: Werk['status'] = 'fest'): Werk {
@@ -19,8 +19,7 @@ const steiner = werk('pdf', [p('Rudolf', 'Steiner')], '1894', ['Freiheit'])
 const arnheim = werk('film', [p('Rudolf', 'Arnheim')], '1932', ['Film'])
 const beide = werk('briefe', [p('Marie', 'Steiner'), p('Rudolf', 'Steiner')], '1950', ['Freiheit'], 'vorlaeufig')
 const werke = [steiner, arnheim, beide]
-const ids = (l: ReturnType<typeof abschnitte>) => l.map((a) => `${a.nummer}:${a.zeilen.map((z) => z.werk.id + (z.drin ? '' : '-')).join(',')}`)
-const kap = (id: string, ebene: 1 | 2 = 1): Kapitel => ({ id, titel: id, ebene })
+const ids = (l: ReturnType<typeof abschnitte>) => l.map((a) => `${a.ueberschrift?.titel ?? ''}:${a.zeilen.map((z) => z.werk.id + (z.drin ? '' : '-')).join(',')}`)
 
 describe('abschnitte', () => {
   it('nimmt nach Regel auf und sortiert nach der ersten Person', () => {
@@ -38,19 +37,6 @@ describe('abschnitte', () => {
     const l = umschalten(neueListe('Alle'), 'pdf')
     expect(ids(abschnitte(l, werke))).toEqual([':film,briefe,pdf-'])
     expect(ids(abschnitte(umschalten(l, 'pdf'), werke))).toEqual([':film,briefe,pdf'])
-  })
-  it('Kapitel mit laufender Nummer, Einträge darin, Rest davor', () => {
-    let l: Literaturliste = { ...neueListe('Kapitel'), kapitel: [kap('a'), kap('a1', 2), kap('a2', 2), kap('b')] }
-    l = verschiebe(l, 'film', 'a1')
-    l = verschiebe(l, 'briefe', 'b')
-    expect(ids(abschnitte(l, werke))).toEqual([':pdf', '1:', '1.1:film', '1.2:', '2:briefe'])
-    expect([...nummern(l.kapitel).values()]).toEqual(['1', '1.1', '1.2', '2'])
-  })
-  it('ein entferntes Kapitel gibt seine Einträge nach vorn ab', () => {
-    let l: Literaturliste = { ...neueListe('Kapitel'), kapitel: [kap('a'), kap('b')] }
-    l = verschiebe(l, 'film', 'b')
-    l = kapitelEntfernen(l, 'b')
-    expect(ids(abschnitte(l, werke))).toEqual([':film,briefe,pdf', '1:'])
   })
   it('von Hand: Reihenfolge der Einträge, Regeltreffer danach nach Name', () => {
     let l: Literaturliste = { ...neueListe('Hand'), sortierung: 'hand' as const }
@@ -110,7 +96,7 @@ describe('Themen', () => {
   })
   it('Gliederung nach Themen: ein Werk unter jedem seiner Themen, leere Zweige entfallen, ohne Thema am Ende', () => {
     const a = abschnitte({ ...neueListe('Themenkartei'), gliederung: 'themen' }, alle, themen)
-    expect(a.map((x) => `${x.kapitel?.titel ?? ''}|${x.kapitel?.ebene ?? 0}:${x.zeilen.map((z) => z.werk.id).join(',')}`)).toEqual([
+    expect(a.map((x) => `${x.ueberschrift?.titel ?? ''}|${x.ueberschrift?.ebene ?? 0}:${x.zeilen.map((z) => z.werk.id).join(',')}`)).toEqual([
       'V. medien|1:',
       'a) film|2:arnheim,iros',
       'b) rundfunk|2:arnheim',
@@ -122,11 +108,31 @@ describe('Themen', () => {
     const zeilen = (x: Literaturliste) => abschnitte(x, alle, themen).flatMap((a) => a.zeilen.map((z) => z.werk.id)).sort()
     expect(zeilen(l)).toEqual(['arnheim', 'iros', 'ohne'])
     const t = abschnitte({ ...l, gliederung: 'themen' }, alle, themen)
-    expect(t.map((x) => `${x.kapitel?.titel}:${x.zeilen.map((z) => z.werk.id).join(',')}`)).toEqual(['b) rundfunk:arnheim', 'Weitere Titel:iros,ohne'])
+    expect(t.map((x) => `${x.ueberschrift?.titel}:${x.zeilen.map((z) => z.werk.id).join(',')}`)).toEqual(['b) rundfunk:arnheim', 'Weitere Titel:iros,ohne'])
+  })
+  it('Gliederung nach Themen, von Hand sortiert: Reihenfolge der Einträge unter jedem Thema', () => {
+    let l: Literaturliste = { ...neueListe('Datei'), regel: null, gliederung: 'themen', sortierung: 'hand' }
+    l = hinzufuegen(hinzufuegen(hinzufuegen(l, 'iros'), 'arnheim'), 'ohne')
+    const a = abschnitte(l, alle, themen)
+    expect(a.map((x) => `${x.ueberschrift?.titel}:${x.zeilen.map((z) => z.werk.id).join(',')}`)).toEqual([
+      'V. medien:',
+      'a) film:iros,arnheim',
+      'b) rundfunk:arnheim',
+      'ohne Thema:ohne',
+    ])
+  })
+  it('von Hand unter einem Thema verschieben ändert nur dieses Thema', () => {
+    let l: Literaturliste = { ...neueListe('Datei'), regel: null, gliederung: 'themen', sortierung: 'hand' }
+    l = hinzufuegen(hinzufuegen(l, 'iros'), 'arnheim')
+    const folge = (x: Literaturliste) => abschnitte(x, alle, themen).map((a) => `${a.ueberschrift?.titel}:${a.zeilen.map((z) => z.werk.id).join(',')}`)
+    expect(folge(l)).toEqual(['V. medien:', 'a) film:iros,arnheim', 'b) rundfunk:arnheim'])
+    l = rueckeUmIn(l, 'film', ['iros', 'arnheim'], 'arnheim', -1)
+    expect(folge(l)).toEqual(['V. medien:', 'a) film:arnheim,iros', 'b) rundfunk:arnheim'])
+    expect(l.eintraege.map((e) => e.werkId)).toEqual(['iros', 'arnheim'])
   })
   it('Gliederung nach Themen mit Themenregel: nur dieser Zweig', () => {
     const l = neueListe('Film')
     const a = abschnitte({ ...l, gliederung: 'themen', regel: { ...l.regel!, thema: 'rundfunk', mitUnterthemen: true } }, alle, themen)
-    expect(a.map((x) => `${x.kapitel?.titel}:${x.zeilen.map((z) => z.werk.id).join(',')}`)).toEqual(['b) rundfunk:arnheim'])
+    expect(a.map((x) => `${x.ueberschrift?.titel}:${x.zeilen.map((z) => z.werk.id).join(',')}`)).toEqual(['b) rundfunk:arnheim'])
   })
 })

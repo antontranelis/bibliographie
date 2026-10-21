@@ -1,0 +1,1200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<searchRetrieveResponse xmlns="http://www.loc.gov/zing/srw/"><version>1.1</version><numberOfRecords>165</numberOfRecords><records><record><recordSchema>MARC21-xml</recordSchema><recordPacking>xml</recordPacking><recordData><record xmlns="http://www.loc.gov/MARC21/slim" type="Bibliographic">
+    <leader>00000nam a22000008c 4500</leader>
+    <controlfield tag="001">1421360284</controlfield>
+    <controlfield tag="003">DE-101</controlfield>
+    <controlfield tag="005">20261014220137.0</controlfield>
+    <controlfield tag="007">tu</controlfield>
+    <controlfield tag="008">261006s2026    sz ||||| |||| 00||||ger  </controlfield>
+    <datafield tag="015" ind1=" " ind2=" ">
+      <subfield code="a">26,N42</subfield>
+      <subfield code="2">dnb</subfield>
+    </datafield>
+    <datafield tag="016" ind1="7" ind2=" ">
+      <subfield code="2">DE-101</subfield>
+      <subfield code="a">1421360284</subfield>
+    </datafield>
+    <datafield tag="020" ind1=" " ind2=" ">
+      <subfield code="a">9783727400421</subfield>
+      <subfield code="c">: EUR 49.00 (DE), EUR 50.40 (AT), CHF 49.00 (freier Preis)</subfield>
+      <subfield code="9">978-3-7274-0042-1</subfield>
+    </datafield>
+    <datafield tag="020" ind1=" " ind2=" ">
+      <subfield code="a">3727400420</subfield>
+      <subfield code="9">3-7274-0042-0</subfield>
+    </datafield>
+    <datafield tag="024" ind1="3" ind2=" ">
+      <subfield code="a">9783727400421</subfield>
+    </datafield>
+    <datafield tag="028" ind1="5" ind2="2">
+      <subfield code="a">Bestellnummer 00042</subfield>
+    </datafield>
+    <datafield tag="035" ind1=" " ind2=" ">
+      <subfield code="a">(DE-599)DNB1421360284</subfield>
+    </datafield>
+    <datafield tag="035" ind1=" " ind2=" ">
+      <subfield code="a">(OCoLC)1621471022</subfield>
+    </datafield>
+    <datafield tag="040" ind1=" " ind2=" ">
+      <subfield code="a">1145</subfield>
+      <subfield code="b">ger</subfield>
+      <subfield code="c">DE-101</subfield>
+      <subfield code="d">9999</subfield>
+    </datafield>
+    <datafield tag="041" ind1=" " ind2=" ">
+      <subfield code="a">ger</subfield>
+    </datafield>
+    <datafield tag="044" ind1=" " ind2=" ">
+      <subfield code="c">CH</subfield>
+    </datafield>
+    <datafield tag="082" ind1="7" ind2="4">
+      <subfield code="8">4\p</subfield>
+      <subfield code="a">290</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="2">23sdnb</subfield>
+    </datafield>
+    <datafield tag="100" ind1="1" ind2=" ">
+      <subfield code="8">1\p</subfield>
+      <subfield code="0">(DE-588)118617443</subfield>
+      <subfield code="0">https://d-nb.info/gnd/118617443</subfield>
+      <subfield code="0">(DE-101)118617443</subfield>
+      <subfield code="0">(isni)0000000120956016</subfield>
+      <subfield code="a">Steiner, Rudolf</subfield>
+      <subfield code="d">1861-1925</subfield>
+      <subfield code="e">Verfasser</subfield>
+      <subfield code="4">aut</subfield>
+      <subfield code="2">gnd</subfield>
+    </datafield>
+    <datafield tag="245" ind1="1" ind2="0">
+      <subfield code="a">&#152;Die&#156; Philosophie der Freiheit</subfield>
+      <subfield code="b">Grundzüge einer modernen Weltanschauung - Seelische Beobachtungsresultate nach naturwissenschaftlicher Methode</subfield>
+      <subfield code="c">Rudolf Steiner</subfield>
+    </datafield>
+    <datafield tag="250" ind1=" " ind2=" ">
+      <subfield code="a">18. Auflage</subfield>
+    </datafield>
+    <datafield tag="263" ind1=" " ind2=" ">
+      <subfield code="a">202611</subfield>
+    </datafield>
+    <datafield tag="264" ind1=" " ind2="1">
+      <subfield code="a">[S.l.] @</subfield>
+      <subfield code="b">Rudolf Steiner Verlag</subfield>
+      <subfield code="c">2026</subfield>
+    </datafield>
+    <datafield tag="300" ind1=" " ind2=" ">
+      <subfield code="a">400 Seiten</subfield>
+      <subfield code="c">20.5 cm</subfield>
+    </datafield>
+    <datafield tag="336" ind1=" " ind2=" ">
+      <subfield code="a">Text</subfield>
+      <subfield code="b">txt</subfield>
+      <subfield code="2">rdacontent</subfield>
+    </datafield>
+    <datafield tag="337" ind1=" " ind2=" ">
+      <subfield code="a">ohne Hilfsmittel zu benutzen</subfield>
+      <subfield code="b">n</subfield>
+      <subfield code="2">rdamedia</subfield>
+    </datafield>
+    <datafield tag="338" ind1=" " ind2=" ">
+      <subfield code="a">Band</subfield>
+      <subfield code="b">nc</subfield>
+      <subfield code="2">rdacarrier</subfield>
+    </datafield>
+    <datafield tag="490" ind1="1" ind2=" ">
+      <subfield code="a">Rudolf Steiner Gesamtausgabe. Schriften und Vorträge</subfield>
+      <subfield code="v">004</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(Produktform)Hardback</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(VLB-WN)1934: Hardcover, Softcover / Sachbücher/Anthroposophie</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Dornach</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Goetheanum</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Erkenntnistheorie</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Rudolf Steiner</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Anthroposophie</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">freier Wille</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Freiheit</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Mensch</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Philosophie</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Wahrnehmung</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Ethik</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Reinkarnation</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(VLB-Schlagwort)Anthroposophie</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(VLB-Schlagwort)Wahrnehmung</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(VLB-Schlagwort)Erkenntnistheorie</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(VLB-Schlagwort)Ethik</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(VLB-Schlagwort)Denken</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(VLB-Schlagwort)Philosophie</subfield>
+    </datafield>
+    <datafield tag="710" ind1="2" ind2=" ">
+      <subfield code="8">2\p</subfield>
+      <subfield code="0">(DE-588)5150326-8</subfield>
+      <subfield code="0">https://d-nb.info/gnd/5150326-8</subfield>
+      <subfield code="0">(DE-101)945498365</subfield>
+      <subfield code="a">Rudolf Steiner Verlag</subfield>
+      <subfield code="e">Verlag</subfield>
+      <subfield code="4">pbl</subfield>
+      <subfield code="2">gnd</subfield>
+    </datafield>
+    <datafield tag="710" ind1="2" ind2=" ">
+      <subfield code="8">3\p</subfield>
+      <subfield code="0">(isni)0000000119566010</subfield>
+      <subfield code="a">Rudolf Steiner Nachlassverwaltung</subfield>
+      <subfield code="e">Herausgebendes Organ</subfield>
+      <subfield code="4">isb</subfield>
+    </datafield>
+    <datafield tag="780" ind1="0" ind2="0">
+      <subfield code="i">Vorangegangen ist</subfield>
+      <subfield code="z">9783727400414</subfield>
+    </datafield>
+    <datafield tag="830" ind1=" " ind2="0">
+      <subfield code="a">Rudolf Steiner Gesamtausgabe. Schriften und Vorträge</subfield>
+      <subfield code="v">004</subfield>
+    </datafield>
+    <datafield tag="856" ind1="4" ind2="2">
+      <subfield code="m">X:MVB</subfield>
+      <subfield code="q">text/html</subfield>
+      <subfield code="u">https://services.dnb.de/plus/idn/1421360284/blurb/</subfield>
+      <subfield code="3">Inhaltstext</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">1\p</subfield>
+      <subfield code="a">vlb</subfield>
+      <subfield code="d">20261006</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#vlb</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">2\p</subfield>
+      <subfield code="a">adb</subfield>
+      <subfield code="d">20261006</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#adb</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">3\p</subfield>
+      <subfield code="a">vlb</subfield>
+      <subfield code="d">20261006</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#vlb</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">4\p</subfield>
+      <subfield code="a">vlb</subfield>
+      <subfield code="d">20261006</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#vlb</subfield>
+    </datafield>
+    <datafield tag="925" ind1="w" ind2=" ">
+      <subfield code="a">c</subfield>
+    </datafield>
+    <datafield tag="926" ind1="1" ind2=" ">
+      <subfield code="a">QRYC5</subfield>
+      <subfield code="o">93</subfield>
+      <subfield code="q">Publisher</subfield>
+      <subfield code="v">1.6</subfield>
+      <subfield code="x">Theosophie und Anthroposophie</subfield>
+    </datafield>
+  </record></recordData><recordPosition>1</recordPosition></record><record><recordSchema>MARC21-xml</recordSchema><recordPacking>xml</recordPacking><recordData><record xmlns="http://www.loc.gov/MARC21/slim" type="Bibliographic">
+    <leader>00000nam a2200000uc 4500</leader>
+    <controlfield tag="001">1388488787</controlfield>
+    <controlfield tag="003">DE-101</controlfield>
+    <controlfield tag="005">20260205111200.0</controlfield>
+    <controlfield tag="007">cr||||||||||||</controlfield>
+    <controlfield tag="008">260130s2026    gw |||||o|||| 00||||ger  </controlfield>
+    <datafield tag="015" ind1=" " ind2=" ">
+      <subfield code="a">26,O02</subfield>
+      <subfield code="2">dnb</subfield>
+    </datafield>
+    <datafield tag="016" ind1="7" ind2=" ">
+      <subfield code="2">DE-101</subfield>
+      <subfield code="a">1388488787</subfield>
+    </datafield>
+    <datafield tag="020" ind1=" " ind2=" ">
+      <subfield code="a">9783847857631</subfield>
+      <subfield code="9">978-3-8478-5763-1</subfield>
+    </datafield>
+    <datafield tag="024" ind1="3" ind2=" ">
+      <subfield code="a">9783847857631</subfield>
+    </datafield>
+    <datafield tag="024" ind1="7" ind2=" ">
+      <subfield code="2">urn</subfield>
+      <subfield code="a">urn:nbn:de:101:1-2601301542531.927464001866</subfield>
+    </datafield>
+    <datafield tag="035" ind1=" " ind2=" ">
+      <subfield code="a">(DE-599)DNB1388488787</subfield>
+    </datafield>
+    <datafield tag="035" ind1=" " ind2=" ">
+      <subfield code="a">(OCoLC)1571156523</subfield>
+    </datafield>
+    <datafield tag="040" ind1=" " ind2=" ">
+      <subfield code="a">1140</subfield>
+      <subfield code="b">ger</subfield>
+      <subfield code="c">DE-101</subfield>
+      <subfield code="d">9999</subfield>
+    </datafield>
+    <datafield tag="041" ind1=" " ind2=" ">
+      <subfield code="8">1\p</subfield>
+      <subfield code="a">ger</subfield>
+    </datafield>
+    <datafield tag="044" ind1=" " ind2=" ">
+      <subfield code="c">XA-DE-BE</subfield>
+    </datafield>
+    <datafield tag="082" ind1="7" ind2="4">
+      <subfield code="8">6\p</subfield>
+      <subfield code="a">100</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="2">23sdnb</subfield>
+    </datafield>
+    <datafield tag="100" ind1="1" ind2=" ">
+      <subfield code="8">2\p</subfield>
+      <subfield code="0">(DE-588)118617443</subfield>
+      <subfield code="0">https://d-nb.info/gnd/118617443</subfield>
+      <subfield code="0">(DE-101)118617443</subfield>
+      <subfield code="a">Steiner, Rudolf</subfield>
+      <subfield code="d">1861-1925</subfield>
+      <subfield code="e">Verfasser</subfield>
+      <subfield code="4">aut</subfield>
+      <subfield code="2">gnd</subfield>
+    </datafield>
+    <datafield tag="245" ind1="1" ind2="0">
+      <subfield code="a">&#152;Die&#156; Philosophie der Freiheit (Großdruck)</subfield>
+      <subfield code="b">Grundzüge einer modernen Weltanschauung Der Text der Originalausgabe von 1893</subfield>
+      <subfield code="c">Rudolf Steiner</subfield>
+    </datafield>
+    <datafield tag="250" ind1=" " ind2=" ">
+      <subfield code="a">1. Auflage</subfield>
+    </datafield>
+    <datafield tag="264" ind1=" " ind2="1">
+      <subfield code="a">Berlin</subfield>
+      <subfield code="b">Henricus - Edition Deutsche Klassik GmbH</subfield>
+      <subfield code="c">2026</subfield>
+    </datafield>
+    <datafield tag="264" ind1=" " ind2="1">
+      <subfield code="b">Henricus</subfield>
+      <subfield code="c">2026</subfield>
+    </datafield>
+    <datafield tag="300" ind1=" " ind2=" ">
+      <subfield code="a">Online-Ressource</subfield>
+    </datafield>
+    <datafield tag="336" ind1=" " ind2=" ">
+      <subfield code="a">Text</subfield>
+      <subfield code="b">txt</subfield>
+      <subfield code="2">rdacontent</subfield>
+    </datafield>
+    <datafield tag="337" ind1=" " ind2=" ">
+      <subfield code="a">Computermedien</subfield>
+      <subfield code="b">c</subfield>
+      <subfield code="2">rdamedia</subfield>
+    </datafield>
+    <datafield tag="338" ind1=" " ind2=" ">
+      <subfield code="a">Online-Ressource</subfield>
+      <subfield code="b">cr</subfield>
+      <subfield code="2">rdacarrier</subfield>
+    </datafield>
+    <datafield tag="500" ind1=" " ind2=" ">
+      <subfield code="a">Vom Verlag als Druckwerk on demand und/oder als E-Book angeboten</subfield>
+    </datafield>
+    <datafield tag="583" ind1="1" ind2=" ">
+      <subfield code="a">Archivierung/Langzeitarchivierung gewährleistet</subfield>
+      <subfield code="5">DE-101</subfield>
+      <subfield code="2">pdager</subfield>
+    </datafield>
+    <datafield tag="650" ind1=" " ind2="7">
+      <subfield code="8">4\p</subfield>
+      <subfield code="0">(DE-588)4045791-6</subfield>
+      <subfield code="0">https://d-nb.info/gnd/4045791-6</subfield>
+      <subfield code="0">(DE-101)040457915</subfield>
+      <subfield code="a">Philosophie</subfield>
+      <subfield code="2">gnd</subfield>
+    </datafield>
+    <datafield tag="650" ind1=" " ind2="7">
+      <subfield code="8">5\p</subfield>
+      <subfield code="0">(DE-588)4018326-9</subfield>
+      <subfield code="0">https://d-nb.info/gnd/4018326-9</subfield>
+      <subfield code="0">(DE-101)040183262</subfield>
+      <subfield code="a">Freiheit</subfield>
+      <subfield code="2">gnd</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(Produktform)Electronic book text</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(VLB-WN)1525</subfield>
+    </datafield>
+    <datafield tag="700" ind1="1" ind2=" ">
+      <subfield code="8">3\p</subfield>
+      <subfield code="a">Borken, Theodor</subfield>
+      <subfield code="e">Herausgeber</subfield>
+      <subfield code="4">edt</subfield>
+    </datafield>
+    <datafield tag="850" ind1=" " ind2=" ">
+      <subfield code="a">DE-101a</subfield>
+    </datafield>
+    <datafield tag="856" ind1="4" ind2="0">
+      <subfield code="u">https://nbn-resolving.org/urn:nbn:de:101:1-2601301542531.927464001866</subfield>
+      <subfield code="x">Resolving-System</subfield>
+    </datafield>
+    <datafield tag="856" ind1=" " ind2="0">
+      <subfield code="u">https://d-nb.info/1388488787/34</subfield>
+      <subfield code="x">Langzeitarchivierung Nationalbibliothek</subfield>
+    </datafield>
+    <datafield tag="856" ind1="4" ind2=" ">
+      <subfield code="q">application/pdf</subfield>
+      <subfield code="u">http://www.zeno.org</subfield>
+      <subfield code="x">Verlag</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">1\p</subfield>
+      <subfield code="a">npi</subfield>
+      <subfield code="d">20260130</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#npi</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">2\p</subfield>
+      <subfield code="a">npi</subfield>
+      <subfield code="d">20260130</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#npi</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">3\p</subfield>
+      <subfield code="a">npi</subfield>
+      <subfield code="d">20260130</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#npi</subfield>
+    </datafield>
+    <datafield tag="883" ind1="0" ind2=" ">
+      <subfield code="8">4\p</subfield>
+      <subfield code="a">emagnd</subfield>
+      <subfield code="c">0,34995</subfield>
+      <subfield code="d">20260131</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#emagnd</subfield>
+    </datafield>
+    <datafield tag="883" ind1="0" ind2=" ">
+      <subfield code="8">5\p</subfield>
+      <subfield code="a">emagnd</subfield>
+      <subfield code="c">0,07260</subfield>
+      <subfield code="d">20260131</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#emagnd</subfield>
+    </datafield>
+    <datafield tag="883" ind1="0" ind2=" ">
+      <subfield code="8">6\p</subfield>
+      <subfield code="a">emasg</subfield>
+      <subfield code="c">0,56235</subfield>
+      <subfield code="d">20260131</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#emasg</subfield>
+    </datafield>
+    <datafield tag="925" ind1="r" ind2=" ">
+      <subfield code="a">ro</subfield>
+      <subfield code="a">ra</subfield>
+    </datafield>
+    <datafield tag="925" ind1="p" ind2=" ">
+      <subfield code="a">pd</subfield>
+    </datafield>
+    <datafield tag="927" ind1=" " ind2=" ">
+      <subfield code="a">563413000</subfield>
+    </datafield>
+  </record></recordData><recordPosition>2</recordPosition></record><record><recordSchema>MARC21-xml</recordSchema><recordPacking>xml</recordPacking><recordData><record xmlns="http://www.loc.gov/MARC21/slim" type="Bibliographic">
+    <leader>00000nam a2200000uc 4500</leader>
+    <controlfield tag="001">1388734885</controlfield>
+    <controlfield tag="003">DE-101</controlfield>
+    <controlfield tag="005">20260304232532.0</controlfield>
+    <controlfield tag="007">cr||||||||||||</controlfield>
+    <controlfield tag="008">260202s2026    gw |||||o|||| 00||||ger  </controlfield>
+    <datafield tag="015" ind1=" " ind2=" ">
+      <subfield code="a">26,O03</subfield>
+      <subfield code="2">dnb</subfield>
+    </datafield>
+    <datafield tag="016" ind1="7" ind2=" ">
+      <subfield code="2">DE-101</subfield>
+      <subfield code="a">1388734885</subfield>
+    </datafield>
+    <datafield tag="020" ind1=" " ind2=" ">
+      <subfield code="a">9783847857624</subfield>
+      <subfield code="9">978-3-8478-5762-4</subfield>
+    </datafield>
+    <datafield tag="024" ind1="3" ind2=" ">
+      <subfield code="a">9783847857624</subfield>
+    </datafield>
+    <datafield tag="024" ind1="7" ind2=" ">
+      <subfield code="2">urn</subfield>
+      <subfield code="a">urn:nbn:de:101:1-2602020727229.803968148424</subfield>
+    </datafield>
+    <datafield tag="035" ind1=" " ind2=" ">
+      <subfield code="a">(DE-599)DNB1388734885</subfield>
+    </datafield>
+    <datafield tag="035" ind1=" " ind2=" ">
+      <subfield code="a">(OCoLC)1571156523</subfield>
+    </datafield>
+    <datafield tag="040" ind1=" " ind2=" ">
+      <subfield code="a">1140</subfield>
+      <subfield code="b">ger</subfield>
+      <subfield code="c">DE-101</subfield>
+      <subfield code="d">9999</subfield>
+    </datafield>
+    <datafield tag="041" ind1=" " ind2=" ">
+      <subfield code="8">1\p</subfield>
+      <subfield code="a">ger</subfield>
+    </datafield>
+    <datafield tag="044" ind1=" " ind2=" ">
+      <subfield code="c">XA-DE-BE</subfield>
+    </datafield>
+    <datafield tag="082" ind1="7" ind2="4">
+      <subfield code="8">6\p</subfield>
+      <subfield code="a">100</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="2">23sdnb</subfield>
+    </datafield>
+    <datafield tag="100" ind1="1" ind2=" ">
+      <subfield code="8">2\p</subfield>
+      <subfield code="0">(DE-588)118617443</subfield>
+      <subfield code="0">https://d-nb.info/gnd/118617443</subfield>
+      <subfield code="0">(DE-101)118617443</subfield>
+      <subfield code="a">Steiner, Rudolf</subfield>
+      <subfield code="d">1861-1925</subfield>
+      <subfield code="e">Verfasser</subfield>
+      <subfield code="4">aut</subfield>
+      <subfield code="2">gnd</subfield>
+    </datafield>
+    <datafield tag="245" ind1="1" ind2="0">
+      <subfield code="a">&#152;Die&#156; Philosophie der Freiheit (Großdruck)</subfield>
+      <subfield code="b">Grundzüge einer modernen Weltanschauung Der Text der Originalausgabe von 1893</subfield>
+      <subfield code="c">Rudolf Steiner</subfield>
+    </datafield>
+    <datafield tag="250" ind1=" " ind2=" ">
+      <subfield code="a">1. Auflage</subfield>
+    </datafield>
+    <datafield tag="264" ind1=" " ind2="1">
+      <subfield code="a">Berlin</subfield>
+      <subfield code="b">Henricus - Edition Deutsche Klassik GmbH</subfield>
+      <subfield code="c">2026</subfield>
+    </datafield>
+    <datafield tag="264" ind1=" " ind2="1">
+      <subfield code="b">Henricus</subfield>
+      <subfield code="c">2026</subfield>
+    </datafield>
+    <datafield tag="300" ind1=" " ind2=" ">
+      <subfield code="a">Online-Ressource</subfield>
+    </datafield>
+    <datafield tag="336" ind1=" " ind2=" ">
+      <subfield code="a">Text</subfield>
+      <subfield code="b">txt</subfield>
+      <subfield code="2">rdacontent</subfield>
+    </datafield>
+    <datafield tag="337" ind1=" " ind2=" ">
+      <subfield code="a">Computermedien</subfield>
+      <subfield code="b">c</subfield>
+      <subfield code="2">rdamedia</subfield>
+    </datafield>
+    <datafield tag="338" ind1=" " ind2=" ">
+      <subfield code="a">Online-Ressource</subfield>
+      <subfield code="b">cr</subfield>
+      <subfield code="2">rdacarrier</subfield>
+    </datafield>
+    <datafield tag="500" ind1=" " ind2=" ">
+      <subfield code="a">Vom Verlag als Druckwerk on demand und/oder als E-Book angeboten</subfield>
+    </datafield>
+    <datafield tag="583" ind1="1" ind2=" ">
+      <subfield code="a">Archivierung/Langzeitarchivierung gewährleistet</subfield>
+      <subfield code="5">DE-101</subfield>
+      <subfield code="2">pdager</subfield>
+    </datafield>
+    <datafield tag="650" ind1=" " ind2="7">
+      <subfield code="8">4\p</subfield>
+      <subfield code="0">(DE-588)4045791-6</subfield>
+      <subfield code="0">https://d-nb.info/gnd/4045791-6</subfield>
+      <subfield code="0">(DE-101)040457915</subfield>
+      <subfield code="a">Philosophie</subfield>
+      <subfield code="2">gnd</subfield>
+    </datafield>
+    <datafield tag="650" ind1=" " ind2="7">
+      <subfield code="8">5\p</subfield>
+      <subfield code="0">(DE-588)4018326-9</subfield>
+      <subfield code="0">https://d-nb.info/gnd/4018326-9</subfield>
+      <subfield code="0">(DE-101)040183262</subfield>
+      <subfield code="a">Freiheit</subfield>
+      <subfield code="2">gnd</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(Produktform)Electronic book text</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(VLB-WN)1525</subfield>
+    </datafield>
+    <datafield tag="700" ind1="1" ind2=" ">
+      <subfield code="8">3\p</subfield>
+      <subfield code="a">Borken, Theodor</subfield>
+      <subfield code="e">Herausgeber</subfield>
+      <subfield code="4">edt</subfield>
+    </datafield>
+    <datafield tag="850" ind1=" " ind2=" ">
+      <subfield code="a">DE-101a</subfield>
+    </datafield>
+    <datafield tag="856" ind1="4" ind2="0">
+      <subfield code="u">https://nbn-resolving.org/urn:nbn:de:101:1-2602020727229.803968148424</subfield>
+      <subfield code="x">Resolving-System</subfield>
+    </datafield>
+    <datafield tag="856" ind1=" " ind2="0">
+      <subfield code="u">https://d-nb.info/1388734885/34</subfield>
+      <subfield code="x">Langzeitarchivierung Nationalbibliothek</subfield>
+    </datafield>
+    <datafield tag="856" ind1="4" ind2=" ">
+      <subfield code="q">application/pdf</subfield>
+      <subfield code="u">http://www.zeno.org</subfield>
+      <subfield code="x">Verlag</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">1\p</subfield>
+      <subfield code="a">npi</subfield>
+      <subfield code="d">20260130</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#npi</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">2\p</subfield>
+      <subfield code="a">npi</subfield>
+      <subfield code="d">20260130</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#npi</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">3\p</subfield>
+      <subfield code="a">npi</subfield>
+      <subfield code="d">20260130</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#npi</subfield>
+    </datafield>
+    <datafield tag="883" ind1="0" ind2=" ">
+      <subfield code="8">4\p</subfield>
+      <subfield code="a">emagnd</subfield>
+      <subfield code="c">0,34995</subfield>
+      <subfield code="d">20260203</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#emagnd</subfield>
+    </datafield>
+    <datafield tag="883" ind1="0" ind2=" ">
+      <subfield code="8">5\p</subfield>
+      <subfield code="a">emagnd</subfield>
+      <subfield code="c">0,07260</subfield>
+      <subfield code="d">20260203</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#emagnd</subfield>
+    </datafield>
+    <datafield tag="883" ind1="0" ind2=" ">
+      <subfield code="8">6\p</subfield>
+      <subfield code="a">emasg</subfield>
+      <subfield code="c">0,56235</subfield>
+      <subfield code="d">20260203</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#emasg</subfield>
+    </datafield>
+    <datafield tag="925" ind1="r" ind2=" ">
+      <subfield code="a">ro</subfield>
+      <subfield code="a">ra</subfield>
+    </datafield>
+    <datafield tag="925" ind1="p" ind2=" ">
+      <subfield code="a">pd</subfield>
+    </datafield>
+    <datafield tag="927" ind1=" " ind2=" ">
+      <subfield code="a">563413000</subfield>
+    </datafield>
+  </record></recordData><recordPosition>3</recordPosition></record><record><recordSchema>MARC21-xml</recordSchema><recordPacking>xml</recordPacking><recordData><record xmlns="http://www.loc.gov/MARC21/slim" type="Bibliographic">
+    <leader>00000nam a2200000uc 4500</leader>
+    <controlfield tag="001">1375019864</controlfield>
+    <controlfield tag="003">DE-101</controlfield>
+    <controlfield tag="005">20250903224204.0</controlfield>
+    <controlfield tag="007">cr||||||||||||</controlfield>
+    <controlfield tag="008">250828s2025    gw |||||o|||| 00||||ger  </controlfield>
+    <datafield tag="015" ind1=" " ind2=" ">
+      <subfield code="a">25,O09</subfield>
+      <subfield code="2">dnb</subfield>
+    </datafield>
+    <datafield tag="016" ind1="7" ind2=" ">
+      <subfield code="2">DE-101</subfield>
+      <subfield code="a">1375019864</subfield>
+    </datafield>
+    <datafield tag="020" ind1=" " ind2=" ">
+      <subfield code="a">9783818785734</subfield>
+      <subfield code="9">978-3-8187-8573-4</subfield>
+    </datafield>
+    <datafield tag="024" ind1="7" ind2=" ">
+      <subfield code="2">urn</subfield>
+      <subfield code="a">urn:nbn:de:101:1-2508281937227.319919213183</subfield>
+    </datafield>
+    <datafield tag="035" ind1=" " ind2=" ">
+      <subfield code="a">(DE-599)DNB1375019864</subfield>
+    </datafield>
+    <datafield tag="035" ind1=" " ind2=" ">
+      <subfield code="a">(OCoLC)1535191515</subfield>
+    </datafield>
+    <datafield tag="040" ind1=" " ind2=" ">
+      <subfield code="a">1140</subfield>
+      <subfield code="b">ger</subfield>
+      <subfield code="c">DE-101</subfield>
+      <subfield code="d">9999</subfield>
+    </datafield>
+    <datafield tag="041" ind1=" " ind2=" ">
+      <subfield code="8">1\p</subfield>
+      <subfield code="a">ger</subfield>
+    </datafield>
+    <datafield tag="044" ind1=" " ind2=" ">
+      <subfield code="c">XA-DE-BE</subfield>
+    </datafield>
+    <datafield tag="082" ind1="7" ind2="4">
+      <subfield code="8">6\p</subfield>
+      <subfield code="a">100</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="2">23sdnb</subfield>
+    </datafield>
+    <datafield tag="100" ind1="1" ind2=" ">
+      <subfield code="8">2\p</subfield>
+      <subfield code="a">Steiner, Rudolf</subfield>
+      <subfield code="e">Verfasser</subfield>
+      <subfield code="4">aut</subfield>
+    </datafield>
+    <datafield tag="245" ind1="1" ind2="0">
+      <subfield code="a">&#152;Die&#156; Philosophie der Freiheit</subfield>
+      <subfield code="c">Rudolf Steiner</subfield>
+    </datafield>
+    <datafield tag="256" ind1=" " ind2=" ">
+      <subfield code="a">819043 Bytes</subfield>
+    </datafield>
+    <datafield tag="264" ind1=" " ind2="1">
+      <subfield code="a">Berlin</subfield>
+      <subfield code="b">neobooks</subfield>
+      <subfield code="c">2025</subfield>
+    </datafield>
+    <datafield tag="300" ind1=" " ind2=" ">
+      <subfield code="a">Online-Ressource, 253 Seiten</subfield>
+    </datafield>
+    <datafield tag="336" ind1=" " ind2=" ">
+      <subfield code="a">Text</subfield>
+      <subfield code="b">txt</subfield>
+      <subfield code="2">rdacontent</subfield>
+    </datafield>
+    <datafield tag="337" ind1=" " ind2=" ">
+      <subfield code="a">Computermedien</subfield>
+      <subfield code="b">c</subfield>
+      <subfield code="2">rdamedia</subfield>
+    </datafield>
+    <datafield tag="338" ind1=" " ind2=" ">
+      <subfield code="a">Online-Ressource</subfield>
+      <subfield code="b">cr</subfield>
+      <subfield code="2">rdacarrier</subfield>
+    </datafield>
+    <datafield tag="500" ind1=" " ind2=" ">
+      <subfield code="a">Hinweis zur Barrierefreiheit, Version der Online-Ressource: EPUB 2.0.1</subfield>
+    </datafield>
+    <datafield tag="500" ind1=" " ind2=" ">
+      <subfield code="a">Hinweis zur Barrierefreiheit der Online-Ressource: Inaccessible, or known limited accessibility; EPUB2 format is limited accessible</subfield>
+    </datafield>
+    <datafield tag="583" ind1="1" ind2=" ">
+      <subfield code="a">Archivierung/Langzeitarchivierung gewährleistet</subfield>
+      <subfield code="5">DE-101</subfield>
+      <subfield code="2">pdager</subfield>
+    </datafield>
+    <datafield tag="650" ind1=" " ind2="7">
+      <subfield code="8">3\p</subfield>
+      <subfield code="0">(DE-588)4018326-9</subfield>
+      <subfield code="0">https://d-nb.info/gnd/4018326-9</subfield>
+      <subfield code="0">(DE-101)040183262</subfield>
+      <subfield code="a">Freiheit</subfield>
+      <subfield code="2">gnd</subfield>
+    </datafield>
+    <datafield tag="650" ind1=" " ind2="7">
+      <subfield code="8">4\p</subfield>
+      <subfield code="0">(DE-588)4045791-6</subfield>
+      <subfield code="0">https://d-nb.info/gnd/4045791-6</subfield>
+      <subfield code="0">(DE-101)040457915</subfield>
+      <subfield code="a">Philosophie</subfield>
+      <subfield code="2">gnd</subfield>
+    </datafield>
+    <datafield tag="650" ind1=" " ind2="7">
+      <subfield code="8">5\p</subfield>
+      <subfield code="0">(DE-588)4011450-8</subfield>
+      <subfield code="0">https://d-nb.info/gnd/4011450-8</subfield>
+      <subfield code="0">(DE-101)040114503</subfield>
+      <subfield code="a">Denken</subfield>
+      <subfield code="2">gnd</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(Produktform)Digital download</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(Produktform (spezifisch))EPUB</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(Zielgruppe)ab 0 bis 99 Jahre</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(BISAC Subject Heading)PHI021000</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(VLB-WN)9920</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(BISAC Subject Heading)PHI000000</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">covid</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">plandemie</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">corona</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">querdenken</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">querdenker</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">orgon</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(Zielgruppe)Allgemein</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(Zielgruppe)ab 1 bis 99 Jahre</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(BISAC Subject Heading)OCC036000</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(BISAC Subject Heading)MED102000</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(BISAC Subject Heading)PHI007000</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(BISAC Subject Heading)PHI015000</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(BISAC Subject Heading)REL051000</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Rudolf Steiner</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Anthroposophie</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Philosophie</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Freiheit</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Waldorf</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Religion</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Medizin</subfield>
+    </datafield>
+    <datafield tag="850" ind1=" " ind2=" ">
+      <subfield code="a">DE-101a</subfield>
+      <subfield code="a">DE-101b</subfield>
+    </datafield>
+    <datafield tag="856" ind1="4" ind2="0">
+      <subfield code="u">https://nbn-resolving.org/urn:nbn:de:101:1-2508281937227.319919213183</subfield>
+      <subfield code="x">Resolving-System</subfield>
+    </datafield>
+    <datafield tag="856" ind1=" " ind2="0">
+      <subfield code="u">https://d-nb.info/1375019864/34</subfield>
+      <subfield code="x">Langzeitarchivierung Nationalbibliothek</subfield>
+    </datafield>
+    <datafield tag="856" ind1="4" ind2=" ">
+      <subfield code="q">epub</subfield>
+    </datafield>
+    <datafield tag="856" ind1="4" ind2=" ">
+      <subfield code="u">https://www.epubli.de/impressum</subfield>
+      <subfield code="x">Verlag</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">1\p</subfield>
+      <subfield code="a">npi</subfield>
+      <subfield code="d">20250828</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#npi</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">2\p</subfield>
+      <subfield code="a">npi</subfield>
+      <subfield code="d">20250828</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#npi</subfield>
+    </datafield>
+    <datafield tag="883" ind1="0" ind2=" ">
+      <subfield code="8">3\p</subfield>
+      <subfield code="a">emagnd</subfield>
+      <subfield code="c">0,36271</subfield>
+      <subfield code="d">20250829</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#emagnd</subfield>
+    </datafield>
+    <datafield tag="883" ind1="0" ind2=" ">
+      <subfield code="8">4\p</subfield>
+      <subfield code="a">emagnd</subfield>
+      <subfield code="c">0,29033</subfield>
+      <subfield code="d">20250829</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#emagnd</subfield>
+    </datafield>
+    <datafield tag="883" ind1="0" ind2=" ">
+      <subfield code="8">5\p</subfield>
+      <subfield code="a">emagnd</subfield>
+      <subfield code="c">0,09151</subfield>
+      <subfield code="d">20250829</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#emagnd</subfield>
+    </datafield>
+    <datafield tag="883" ind1="0" ind2=" ">
+      <subfield code="8">6\p</subfield>
+      <subfield code="a">emasg</subfield>
+      <subfield code="c">0,57593</subfield>
+      <subfield code="d">20250829</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#emasg</subfield>
+    </datafield>
+    <datafield tag="925" ind1="r" ind2=" ">
+      <subfield code="a">ro</subfield>
+      <subfield code="a">ra</subfield>
+    </datafield>
+    <datafield tag="926" ind1="1" ind2=" ">
+      <subfield code="a">Q</subfield>
+      <subfield code="o">93</subfield>
+      <subfield code="v">1.6</subfield>
+    </datafield>
+    <datafield tag="926" ind1="2" ind2=" ">
+      <subfield code="a">QD</subfield>
+      <subfield code="o">93</subfield>
+      <subfield code="v">1.6</subfield>
+    </datafield>
+    <datafield tag="927" ind1=" " ind2=" ">
+      <subfield code="a">258637825</subfield>
+    </datafield>
+  </record></recordData><recordPosition>4</recordPosition></record><record><recordSchema>MARC21-xml</recordSchema><recordPacking>xml</recordPacking><recordData><record xmlns="http://www.loc.gov/MARC21/slim" type="Bibliographic">
+    <leader>00000ncm a22000008c 4500</leader>
+    <controlfield tag="001">1373301678</controlfield>
+    <controlfield tag="003">DE-101</controlfield>
+    <controlfield tag="005">20260511075626.0</controlfield>
+    <controlfield tag="007">q|</controlfield>
+    <controlfield tag="008">250807s2025    gw |||||r|||||||||||ger  </controlfield>
+    <datafield tag="016" ind1="7" ind2=" ">
+      <subfield code="2">DE-101</subfield>
+      <subfield code="a">1373301678</subfield>
+    </datafield>
+    <datafield tag="020" ind1=" " ind2=" ">
+      <subfield code="c">Spiralbindung : EUR 12.00</subfield>
+    </datafield>
+    <datafield tag="024" ind1="2" ind2=" ">
+      <subfield code="c">Broschur</subfield>
+    </datafield>
+    <datafield tag="028" ind1="3" ind2="2">
+      <subfield code="a">EW083</subfield>
+    </datafield>
+    <datafield tag="035" ind1=" " ind2=" ">
+      <subfield code="a">(DE-599)DNB1373301678</subfield>
+    </datafield>
+    <datafield tag="040" ind1=" " ind2=" ">
+      <subfield code="a">1180</subfield>
+      <subfield code="b">ger</subfield>
+      <subfield code="c">DE-101</subfield>
+      <subfield code="d">1140</subfield>
+    </datafield>
+    <datafield tag="041" ind1=" " ind2=" ">
+      <subfield code="a">ger</subfield>
+    </datafield>
+    <datafield tag="044" ind1=" " ind2=" ">
+      <subfield code="c">XA-DE</subfield>
+    </datafield>
+    <datafield tag="245" ind1="0" ind2="0">
+      <subfield code="a">&#152;Die&#156; Philosophie der Freiheit</subfield>
+      <subfield code="b">für Gesang, Sprechstimme und Klavier</subfield>
+      <subfield code="c">Steffen Hartmann ; Rudolph Steiner</subfield>
+    </datafield>
+    <datafield tag="264" ind1=" " ind2="1">
+      <subfield code="a">Hamburg</subfield>
+      <subfield code="b">Edition Widar</subfield>
+      <subfield code="c">2025</subfield>
+    </datafield>
+    <datafield tag="300" ind1=" " ind2=" ">
+      <subfield code="a">1 Partitur</subfield>
+    </datafield>
+    <datafield tag="336" ind1=" " ind2=" ">
+      <subfield code="a">Noten</subfield>
+      <subfield code="b">ntm</subfield>
+      <subfield code="2">rdacontent</subfield>
+    </datafield>
+    <datafield tag="337" ind1=" " ind2=" ">
+      <subfield code="a">ohne Hilfsmittel zu benutzen</subfield>
+      <subfield code="b">n</subfield>
+      <subfield code="2">rdamedia</subfield>
+    </datafield>
+    <datafield tag="338" ind1=" " ind2=" ">
+      <subfield code="a">Band</subfield>
+      <subfield code="b">nc</subfield>
+      <subfield code="2">rdacarrier</subfield>
+    </datafield>
+    <datafield tag="889" ind1=" " ind2=" ">
+      <subfield code="w">(DE-101)1368322999</subfield>
+    </datafield>
+    <datafield tag="925" ind1="r" ind2=" ">
+      <subfield code="a">rm</subfield>
+    </datafield>
+    <datafield tag="925" ind1="w" ind2=" ">
+      <subfield code="a">f</subfield>
+    </datafield>
+  </record></recordData><recordPosition>5</recordPosition></record><record><recordSchema>MARC21-xml</recordSchema><recordPacking>xml</recordPacking><recordData><record xmlns="http://www.loc.gov/MARC21/slim" type="Bibliographic">
+    <leader>00000nim a2200000uc 4500</leader>
+    <controlfield tag="001">1361765968</controlfield>
+    <controlfield tag="003">DE-101</controlfield>
+    <controlfield tag="005">20250402224943.0</controlfield>
+    <controlfield tag="007">s|||||||||||||</controlfield>
+    <controlfield tag="007">cr||||||||||||</controlfield>
+    <controlfield tag="008">250330s2025    gw |||||o|||||||||||ger  </controlfield>
+    <datafield tag="015" ind1=" " ind2=" ">
+      <subfield code="a">25,O04</subfield>
+      <subfield code="2">dnb</subfield>
+    </datafield>
+    <datafield tag="016" ind1="7" ind2=" ">
+      <subfield code="2">DE-101</subfield>
+      <subfield code="a">1361765968</subfield>
+    </datafield>
+    <datafield tag="020" ind1=" " ind2=" ">
+      <subfield code="a">9783690605274</subfield>
+      <subfield code="9">978-3-690-60527-4</subfield>
+    </datafield>
+    <datafield tag="024" ind1="7" ind2=" ">
+      <subfield code="2">urn</subfield>
+      <subfield code="a">urn:nbn:de:101:1-2503300147471.445876644575</subfield>
+    </datafield>
+    <datafield tag="035" ind1=" " ind2=" ">
+      <subfield code="a">(DE-599)DNB1361765968</subfield>
+    </datafield>
+    <datafield tag="035" ind1=" " ind2=" ">
+      <subfield code="a">(OCoLC)1513013346</subfield>
+    </datafield>
+    <datafield tag="040" ind1=" " ind2=" ">
+      <subfield code="a">1140</subfield>
+      <subfield code="b">ger</subfield>
+      <subfield code="c">DE-101</subfield>
+      <subfield code="d">9999</subfield>
+    </datafield>
+    <datafield tag="041" ind1=" " ind2=" ">
+      <subfield code="8">1\p</subfield>
+      <subfield code="a">ger</subfield>
+    </datafield>
+    <datafield tag="044" ind1=" " ind2=" ">
+      <subfield code="c">XA-DE-BE</subfield>
+    </datafield>
+    <datafield tag="082" ind1="7" ind2="4">
+      <subfield code="8">5\p</subfield>
+      <subfield code="a">100</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="2">23sdnb</subfield>
+    </datafield>
+    <datafield tag="100" ind1="1" ind2=" ">
+      <subfield code="8">2\p</subfield>
+      <subfield code="a">Rudolf Steiner, Rudolf</subfield>
+      <subfield code="e">Künstler</subfield>
+      <subfield code="4">art</subfield>
+    </datafield>
+    <datafield tag="245" ind1="1" ind2="0">
+      <subfield code="a">&#152;Die&#156; Philosophie der Freiheit</subfield>
+      <subfield code="b">Grundzüge einer modernen Weltanschauung</subfield>
+      <subfield code="c">Rudolf Steiner</subfield>
+    </datafield>
+    <datafield tag="250" ind1=" " ind2=" ">
+      <subfield code="a">ungekürzte Ausgabe</subfield>
+    </datafield>
+    <datafield tag="264" ind1=" " ind2="1">
+      <subfield code="a">Berlin</subfield>
+      <subfield code="b">GD Publishing</subfield>
+      <subfield code="c">2025</subfield>
+    </datafield>
+    <datafield tag="300" ind1=" " ind2=" ">
+      <subfield code="a">Online-Ressource</subfield>
+    </datafield>
+    <datafield tag="336" ind1=" " ind2=" ">
+      <subfield code="a">gesprochenes Wort</subfield>
+      <subfield code="b">spw</subfield>
+      <subfield code="2">rdacontent</subfield>
+    </datafield>
+    <datafield tag="337" ind1=" " ind2=" ">
+      <subfield code="a">Computermedien</subfield>
+      <subfield code="b">c</subfield>
+      <subfield code="2">rdamedia</subfield>
+    </datafield>
+    <datafield tag="338" ind1=" " ind2=" ">
+      <subfield code="a">Online-Ressource</subfield>
+      <subfield code="b">cr</subfield>
+      <subfield code="2">rdacarrier</subfield>
+    </datafield>
+    <datafield tag="490" ind1="1" ind2=" ">
+      <subfield code="a">Rudolf Steiner Hörbibliothek</subfield>
+      <subfield code="v">4</subfield>
+    </datafield>
+    <datafield tag="583" ind1="1" ind2=" ">
+      <subfield code="a">Archivierung/Langzeitarchivierung gewährleistet</subfield>
+      <subfield code="5">DE-101</subfield>
+      <subfield code="2">pdager</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(Produktform)Downloadable audio file</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(BISAC Subject Heading)PHI035000</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(Produktform (spezifisch))MP3 format</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Rudolf Steiner</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Anthroposophie</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Philosophie</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Ethik</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Erkenntnistheorie</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">Freiheitsphilosophie</subfield>
+    </datafield>
+    <datafield tag="653" ind1=" " ind2=" ">
+      <subfield code="a">(VLB-WN)9520</subfield>
+    </datafield>
+    <datafield tag="700" ind1="1" ind2=" ">
+      <subfield code="8">3\p</subfield>
+      <subfield code="a">Steiner, Rudolf</subfield>
+      <subfield code="e">Verfasser</subfield>
+      <subfield code="4">aut</subfield>
+    </datafield>
+    <datafield tag="700" ind1="1" ind2=" ">
+      <subfield code="8">4\p</subfield>
+      <subfield code="a">Clement, Christian</subfield>
+      <subfield code="e">Erzähler</subfield>
+      <subfield code="4">nrt</subfield>
+    </datafield>
+    <datafield tag="830" ind1=" " ind2="0">
+      <subfield code="a">Rudolf Steiner Hörbibliothek</subfield>
+      <subfield code="v">4</subfield>
+    </datafield>
+    <datafield tag="850" ind1=" " ind2=" ">
+      <subfield code="a">DE-101a</subfield>
+      <subfield code="a">DE-101b</subfield>
+    </datafield>
+    <datafield tag="856" ind1="4" ind2="0">
+      <subfield code="u">https://nbn-resolving.org/urn:nbn:de:101:1-2503300147471.445876644575</subfield>
+      <subfield code="x">Resolving-System</subfield>
+    </datafield>
+    <datafield tag="856" ind1=" " ind2="0">
+      <subfield code="u">https://d-nb.info/1361765968/34</subfield>
+      <subfield code="x">Langzeitarchivierung Nationalbibliothek</subfield>
+    </datafield>
+    <datafield tag="856" ind1="4" ind2=" ">
+      <subfield code="q">mp3</subfield>
+      <subfield code="u">http://www.xinxii.de</subfield>
+      <subfield code="x">Verlag</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">1\p</subfield>
+      <subfield code="a">npi</subfield>
+      <subfield code="d">20250330</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#npi</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">2\p</subfield>
+      <subfield code="a">npi</subfield>
+      <subfield code="d">20250330</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#npi</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">3\p</subfield>
+      <subfield code="a">npi</subfield>
+      <subfield code="d">20250330</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#npi</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">4\p</subfield>
+      <subfield code="a">npi</subfield>
+      <subfield code="d">20250330</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#npi</subfield>
+    </datafield>
+    <datafield tag="883" ind1="1" ind2=" ">
+      <subfield code="8">5\p</subfield>
+      <subfield code="a">npi</subfield>
+      <subfield code="d">20250330</subfield>
+      <subfield code="q">DE-101</subfield>
+      <subfield code="u">https://d-nb.info/provenance/plan#npi</subfield>
+    </datafield>
+    <datafield tag="925" ind1="r" ind2=" ">
+      <subfield code="a">ro</subfield>
+      <subfield code="a">ra</subfield>
+    </datafield>
+    <datafield tag="926" ind1="1" ind2=" ">
+      <subfield code="a">QRYC5</subfield>
+      <subfield code="o">93</subfield>
+      <subfield code="v">1.5</subfield>
+    </datafield>
+    <datafield tag="927" ind1=" " ind2=" ">
+      <subfield code="a">300744792</subfield>
+    </datafield>
+  </record></recordData><recordPosition>6</recordPosition></record></records><nextRecordPosition>7</nextRecordPosition><echoedSearchRetrieveRequest><version>1.1</version><query>tit="Philosophie der Freiheit" and per="Steiner"</query><xQuery xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/><startRecord>1</startRecord><maximumRecords>6</maximumRecords><recordSchema>MARC21-xml</recordSchema></echoedSearchRetrieveRequest></searchRetrieveResponse>

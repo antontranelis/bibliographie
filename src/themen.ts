@@ -119,3 +119,23 @@ export function entfernen(themen: Thema[], id: string): { themen: Thema[]; entfe
   const entfernt = unterthemen(themen, id)
   return { themen: themen.filter((t) => !entfernt.has(t.id)), entfernt }
 }
+
+const normalTitel = (s: string) => s.toLocaleLowerCase('de').replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+
+/** Dasselbe Thema: gleiche Bezeichnung, oder gleiche Nummer und ein Titel beginnt mit dem anderen. */
+export function gleichesThema(t: Thema, nummer: string, titel: string): boolean {
+  const a = normalTitel(t.titel)
+  const b = normalTitel(titel)
+  if (normalTitel(t.nummer) !== normalTitel(nummer)) return false
+  if (a === b) return true
+  return Boolean(nummer) && Boolean(a) && Boolean(b) && (a.startsWith(`${b} `) || b.startsWith(`${a} `))
+}
+
+/** Neues Thema hinter die letzten Nachkommen seines Elternthemas, oberste Ebene ans Ende. */
+export function neuesNach(themen: Thema[], thema: Thema): Thema[] {
+  if (!thema.elternId) return [...themen, thema]
+  const zweig = unterthemen(themen, thema.elternId)
+  let letzte = -1
+  themen.forEach((t, i) => zweig.has(t.id) && (letzte = i))
+  return letzte < 0 ? [...themen, thema] : [...themen.slice(0, letzte + 1), thema, ...themen.slice(letzte + 1)]
+}
