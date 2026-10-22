@@ -1,5 +1,6 @@
 // Prüft Verlage, ISBN und Erscheinungstag im Browser. Aufruf: node scripts/verlage.mjs <url> [ausgabeordner]
 import { chromium } from 'playwright-core'
+import { gespeichert, leere } from './einspielen.mjs'
 
 const [url = 'http://localhost:4321/', aus] = process.argv.slice(2)
 const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN })
@@ -15,15 +16,14 @@ async function seite({ katalog = false } = {}) {
     await page.route('https://services.dnb.de/**', (r) => r.abort())
   }
   await page.goto(url)
-  await page.evaluate(() => localStorage.clear())
-  await page.reload()
+  await leere(page)
   return page
 }
 // Die App speichert 400 ms verzögert
 const warte = (page) => page.waitForTimeout(500)
 const daten = async (page) => {
   await warte(page)
-  return page.evaluate(() => JSON.parse(localStorage.getItem('bibliographie:datenstamm:v1') ?? '{"werke":[],"verlage":[]}'))
+  return (await gespeichert(page)) ?? { werke: [], verlage: [], listen: [], themen: [] }
 }
 const name = (v) => [...v.namen].sort((a, b) => (parseInt(a.abJahr) || -1e9) - (parseInt(b.abJahr) || -1e9)).at(-1).name
 async function karte(page, { autor, titel, jahr, verlag, ort }) {

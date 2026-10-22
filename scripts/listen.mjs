@@ -1,6 +1,6 @@
 // Prüft gespeicherte Listen im Browser. Aufruf: node scripts/listen.mjs <url> [ausgabeordner]
 import { chromium } from 'playwright-core'
-import { spieleEin } from './einspielen.mjs'
+import { gespeichert, leere, spieleEin } from './einspielen.mjs'
 
 const [url = 'http://localhost:4321/', aus] = process.argv.slice(2)
 const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN })
@@ -15,13 +15,12 @@ page.on('dialog', (d) => d.accept())
 await page.route('https://lobid.org/**', (r) => r.abort())
 await page.route('https://services.dnb.de/**', (r) => r.abort())
 await page.goto(url)
-await page.evaluate(() => localStorage.clear())
-await page.reload()
+await leere(page)
 // Die App speichert 400 ms verzögert
 const warte = (page) => page.waitForTimeout(500)
 const daten = async () => {
   await warte(page)
-  return page.evaluate(() => JSON.parse(localStorage.getItem('bibliographie:datenstamm:v1') ?? '{"werke":[],"verlage":[],"listen":[]}'))
+  return (await gespeichert(page)) ?? { werke: [], verlage: [], listen: [], themen: [] }
 }
 const reiter = (name) => page.locator('.reiter button', { hasText: name })
 const eintraege = () => page.locator('.eintraege .eintrag').allInnerTexts()

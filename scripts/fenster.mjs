@@ -1,6 +1,7 @@
 // Prüft, dass nur ein Fenster schreibt und die Übergabe nichts verliert. Aufruf: node scripts/fenster.mjs <url>
 // Auch gegen den Devserver laufen lassen: dort startet React im StrictMode doppelt.
 import { chromium } from 'playwright-core'
+import { gespeichert } from './einspielen.mjs'
 import { speicherFrei, speicherVoll } from './speicher-voll.mjs'
 
 const [url = 'http://localhost:4321/'] = process.argv.slice(2)
@@ -29,7 +30,7 @@ const inKartei = async (p, titel) => {
   await p.locator('.reiter button', { hasText: 'Kartei' }).click()
   return (await p.locator('.kartei-karte', { hasText: titel }).count()) === 1
 }
-const gespeichert = (p) => p.evaluate(() => localStorage.getItem('bibliographie:datenstamm:v1') ?? '')
+const alsText = async (p) => JSON.stringify(await gespeichert(p))
 
 try {
   const a = await seite()
@@ -40,7 +41,7 @@ try {
   pruefe('Zweites Fenster ist gesperrt', await gesperrt(b).isVisible())
 
   await karte(a, 'Aus Fenster A')
-  pruefe('Karte aus A gespeichert', (await gespeichert(a)).includes('Aus Fenster A'))
+  pruefe('Karte aus A gespeichert', (await alsText(a)).includes('Aus Fenster A'))
 
   await b.getByRole('button', { name: 'Hier weiterarbeiten' }).click()
   await gesperrt(b).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
@@ -83,10 +84,42 @@ try {
     pruefe('Danach rückt A wieder von selbst nach', (await gesperrt(a).count()) === 0)
   }
 
+  // Bitte um Abgabe, während das übernehmende Fenster noch lädt: es gibt nichts ab, schon gar nicht seinen alten Lesestand
+  {
+    const d = await seite()
+    await karte(a, 'Nach dem Öffnen von D in A')
+    pruefe('Karte aus A gespeichert, D hat sie noch nicht gelesen', (await alsText(a)).includes('Nach dem Öffnen von D in A'))
+    // Das Laden in D dauert fünf Sekunden: davor hält eine andere Schreib-Transaktion die Datenbank belegt
+    await d.evaluate(() => {
+      const echt = IDBDatabase.prototype.transaction
+      let einmal = true
+      IDBDatabase.prototype.transaction = function (namen, art, ...x) {
+        if (einmal && art === 'readwrite') {
+          einmal = false
+          const ablage = echt.call(this, ['stamm'], 'readwrite').objectStore('stamm')
+          const ende = Date.now() + 5000
+          const weiter = () => {
+            if (Date.now() < ende) ablage.get('belegt').onsuccess = weiter
+          }
+          weiter()
+        }
+        return echt.call(this, namen, art, ...x)
+      }
+    })
+    await d.getByRole('button', { name: 'Hier weiterarbeiten' }).click()
+    await gesperrt(a).waitFor({ timeout: 5000 })
+    await a.getByRole('button', { name: 'Hier weiterarbeiten' }).click()
+    await a.waitForTimeout(7000)
+    pruefe('Bitte während des Ladens verliert nichts', (await alsText(a)).includes('Nach dem Öffnen von D in A'))
+    pruefe('D schreibt nach dem Laden mit dem frischen Stand', await inKartei(d, 'Nach dem Öffnen von D in A'))
+    await d.close()
+    await gesperrt(a).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+  }
+
   // Gesperrtes Fenster schreibt nie, auch nicht beim Schließen
   const c = await seite()
   await c.close()
-  pruefe('Schließen eines gesperrten Fensters verliert nichts', (await gespeichert(a)).includes('Aus Fenster B'))
+  pruefe('Schließen eines gesperrten Fensters verliert nichts', (await alsText(a)).includes('Aus Fenster B'))
 
 } catch (e) {
   pruefe('Ablauf ohne Abbruch', false, e.message.split('\n')[0])

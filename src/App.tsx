@@ -12,7 +12,8 @@ import type { ImportPlan } from './import/einlesen'
 import { ALLE, hinzufuegen, neueListe } from './listen'
 import { Verlage } from './Verlage'
 import { beispielDaten } from './beispiel'
-import { exportiere, exportiereCsl, importiere, ladeLokal, speichereLokal, zusammenfuehren } from './speicher'
+import { exportiere, exportiereCsl, importiere, zusammenfuehren } from './speicher'
+import { sichereSofort, speichere, uebernimm } from './ablage'
 import { herunterladen } from './herunterladen'
 import { anzeigeName, findeExakt, nameFuerJahr, ortFuerJahr, planeVerlage, wendePlanAn, type VerlagsGruppe } from './verlag'
 import { Abwaerts, Nadel, StatusPunkt } from './Symbole'
@@ -88,8 +89,9 @@ const REITER: { ansicht: Ansicht; label: string; taste: string }[] = [
   { ansicht: 'verlage', label: 'Verlage', taste: 'F6' },
 ]
 
-export default function App() {
-  const [daten, setDaten] = useState<Datenstamm>(() => ladeLokal() ?? leererDatenstamm())
+/** @param start der gespeicherte Stand, vor dem ersten Zeichnen gelesen (main.tsx) */
+export default function App({ start }: { start: Datenstamm }) {
+  const [daten, setDaten] = useState<Datenstamm>(start)
   const [fixiert, setFixiert] = useState<Fixierung>(ladeFixierung)
   const [ansicht, setAnsicht] = useState<Ansicht>('erfassen')
   const [entwurf, setEntwurf] = useState<Werk | null>(() => mitFixierung(leeresWerk(), fixiert, daten.verlage))
@@ -114,24 +116,48 @@ export default function App() {
   const zuSpeichern = useRef(daten)
   zuSpeichern.current = daten
   // Nur das Fenster mit Schreibrecht speichert; andere würden mit altem Stand überschreiben
-  const sofortSpeichern = () => {
-    const ok = speichereLokal(zuSpeichern.current)
+  const sofortSpeichern = async () => {
+    const ok = await speichere(zuSpeichern.current)
     setSpeicherVoll(!ok)
     return ok
   }
   // Schreibrecht, Speichern und Versionswechsel entscheidet allein die Sitzung (sitzung.ts)
-  const fenster = useSitzung(sofortSpeichern, () => setDaten(ladeLokal() ?? leererDatenstamm()))
+  const [ladefehler, setLadefehler] = useState(false)
+  const neuLaden = async () => {
+    try {
+      const d = (await uebernimm()) ?? leererDatenstamm()
+      // Gilt sofort als zu speichernder Stand, nicht erst nach dem nächsten Zeichnen: sonst könnte ein gleich
+      // folgendes Speichern noch den beim Öffnen gelesenen Stand schreiben
+      zuSpeichern.current = d
+      setDaten(d)
+    } catch (e) {
+      setLadefehler(true)
+      throw e
+    }
+  }
+  const fenster = useSitzung(sofortSpeichern, neuLaden)
   const schreibend = fenster.recht === 'ja' && !fenster.wechselt
   const darfSchreiben = useRef(false)
   darfSchreiben.current = schreibend
   useEffect(() => {
-    const t = setTimeout(() => darfSchreiben.current && setSpeicherVoll(!speichereLokal(daten)), 400)
+    const t = setTimeout(() => darfSchreiben.current && speichere(daten).then((ok) => setSpeicherVoll(!ok)), 400)
     return () => clearTimeout(t)
   }, [daten])
   useEffect(() => {
-    const sofort = () => darfSchreiben.current && speichereLokal(zuSpeichern.current)
+    // Beim Verlassen nicht auf das verzögerte Speichern warten. Schon beim Verbergen, das kommt vor dem Schließen.
+    // Ein Speichern, das erst jetzt beginnt, kommt nicht sicher an; der Nachtrag schon (ablage.ts)
+    const sofort = () => {
+      if (!darfSchreiben.current) return
+      sichereSofort(zuSpeichern.current)
+      speichere(zuSpeichern.current)
+    }
+    const verborgen = () => document.visibilityState === 'hidden' && sofort()
     window.addEventListener('pagehide', sofort)
-    return () => window.removeEventListener('pagehide', sofort)
+    document.addEventListener('visibilitychange', verborgen)
+    return () => {
+      window.removeEventListener('pagehide', sofort)
+      document.removeEventListener('visibilitychange', verborgen)
+    }
   }, [])
   useEffect(() => {
     try {
@@ -519,6 +545,11 @@ export default function App() {
           </button>
         </div>
       )}
+      {ladefehler && (
+        <div className="speicher-warnung" role="alert">
+          Die gespeicherten Daten lassen sich gerade nicht lesen, deshalb ist dieses Fenster gesperrt. Bitte die Seite neu laden; hilft das nicht, den Browser neu starten. Die Daten bleiben dabei erhalten.
+        </div>
+      )}
       {speicherVoll && (
         <div className="speicher-warnung" role="alert">
           Der Speicher des Browsers ist voll, die letzten Änderungen sind nur in diesem Fenster. Bitte über „Ablage“ → „Sichern“ eine Datei speichern.
@@ -619,7 +650,7 @@ export default function App() {
         {ansicht === 'verlage' && <Verlage verlage={daten.verlage} werke={daten.werke} onAendern={aendereVerlage} onZurueck={() => setAnsicht('erfassen')} />}
       </main>
       </div>
-      {fenster.recht === 'nein' && (
+      {fenster.recht === 'nein' && !ladefehler && (
         <div className="ueberlagerung schreibrecht" role="dialog" aria-modal="true" aria-label="In einem anderen Fenster geöffnet">
           <div className="papier schreibrecht-kasten">
             <h2>Das Programm ist schon in einem anderen Fenster geöffnet</h2>
