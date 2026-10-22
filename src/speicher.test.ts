@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { neueListe } from './listen'
+import { ALLE, neueListe } from './listen'
 import { exportiere, exportiereCsl, importiere, migriere, zusammenfuehren } from './speicher'
-import { leereAuflage, leereAusgabe, leeresWerk } from './model'
+import { leereAuflage, leereAusgabe, leeresWerk, schlagwortDazu } from './model'
 
 describe('Import und Export', () => {
   const w = { ...leeresWerk(), titel: 'Wahrheit und Wissenschaft' }
@@ -46,6 +46,15 @@ describe('Import und Export', () => {
     expect(l.eintraege).toEqual([{ werkId: 'w' }])
     expect(l.gliederung).toBe('keine')
     expect('kapitel' in l || 'kapitelNummern' in l).toBe(false)
+  })
+  it('Schlagwörter sind gleichwertig und alphabetisch, Listen kennen kein „nur primär“ mehr', () => {
+    const karte = { ...leeresWerk(), schlagwoerter: [{ begriff: 'Freiheit', primaer: true }, { begriff: 'ethik', primaer: false }, { begriff: 'Ästhetik', primaer: false }] }
+    const liste = { ...neueListe('Alt'), regel: { ...ALLE, schlagwort: 'Freiheit', nurPrimaer: true } }
+    const v7 = { format: 'bibliographie-datenstamm', version: 7, verlage: [], themen: [], werke: [karte], listen: [liste] }
+    const d = importiere(JSON.stringify(v7))
+    expect(d.werke[0].schlagwoerter).toEqual([{ begriff: 'Ästhetik' }, { begriff: 'ethik' }, { begriff: 'Freiheit' }])
+    expect(d.listen[0].regel).not.toHaveProperty('nurPrimaer')
+    expect(d.listen[0].regel?.schlagwort).toBe('Freiheit')
   })
   it('ergänzt älteren Karten eine leere Vorlage', () => {
     const { vorlage: _vorlage, ...ohne } = leeresWerk()
@@ -121,5 +130,12 @@ describe('ISBN im CSL-Export', () => {
   it('gibt die ISBN der Auflage mit', () => {
     const buch = { ...leeresWerk(), titel: 'T', ausgaben: [{ ...leereAusgabe(), auflagen: [{ ...leereAuflage(), jahr: '1990', isbn: '3-7274-0040-5' }] }] }
     expect(JSON.parse(exportiereCsl([buch]))[0].ISBN).toBe('3-7274-0040-5')
+  })
+})
+
+describe('Schlagwörter', () => {
+  it('kommen alphabetisch dazu, gleiche nur einmal', () => {
+    const s = schlagwortDazu(schlagwortDazu(schlagwortDazu([], 'Freiheit'), 'Ästhetik'), 'freiheit')
+    expect(s).toEqual([{ begriff: 'Ästhetik' }, { begriff: 'Freiheit' }])
   })
 })

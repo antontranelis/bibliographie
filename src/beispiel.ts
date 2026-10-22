@@ -68,9 +68,9 @@ export function beispielDaten(): Datenstamm {
         kommentar: 'Beispielkarte. Erschien schon Ende 1893, im Buch steht 1894.',
         themen: [erkenntnis.id],
         schlagwoerter: [
-          { begriff: 'Erkenntnistheorie', primaer: true },
-          { begriff: 'Freiheit', primaer: true },
-          { begriff: 'Ethik', primaer: false },
+          { begriff: 'Erkenntnistheorie' },
+          { begriff: 'Ethik' },
+          { begriff: 'Freiheit' },
         ],
       }),
       werk({
@@ -79,7 +79,7 @@ export function beispielDaten(): Datenstamm {
         art: 'aufsatz',
         erschienenIn: { art: 'zeitschrift', titel: 'Lucifer-Gnosis', jahrgang: '', jahr: '1907', heft: '33', ausgabe: '', seitenVon: '', seitenBis: '' },
         kommentar: 'Beispielkarte für einen Aufsatz. Angaben vor Gebrauch prüfen.',
-        schlagwoerter: [{ begriff: 'Pädagogik', primaer: true }],
+        schlagwoerter: [{ begriff: 'Pädagogik' }],
         themen: [kind.id],
       }),
     ],

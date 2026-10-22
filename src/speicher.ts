@@ -1,9 +1,9 @@
 import { STANDARD_STIL } from './format'
 import { ALLE } from './listen'
-import { leereAusgabe, neueId, type Auflage, type Ausgabe, type Datenstamm, type Literaturliste, type Verlag, type Werk } from './model'
+import { leereAusgabe, neueId, sortiereSchlagwoerter, type Auflage, type Ausgabe, type Datenstamm, type ListenRegel, type Literaturliste, type Verlag, type Werk } from './model'
 
 export const FORMAT = 'bibliographie-datenstamm'
-export const VERSION = 7
+export const VERSION = 8
 
 export interface Exportdatei extends Datenstamm {
   format: typeof FORMAT
@@ -35,8 +35,14 @@ export function importiere(text: string): Datenstamm {
  * und Auflagen verwiesen über den Namenstext auf ihn. Bis Version 2 hingen die Auflagen direkt am Werk;
  * sie werden zur ersten Ausgabe. Seit Version 4 gibt es gespeicherte Listen, seit Version 5 die Vorlage aus dem Import,
  * seit Version 6 die Themenordnung. Bis Version 6 konnten Listen eigene Kapitel haben; sie entfallen,
- * die Einträge bleiben in der Liste.
+ * die Einträge bleiben in der Liste. Bis Version 7 waren Schlagwörter primär oder sekundär; jetzt sind sie gleichwertig
+ * und stehen alphabetisch, „nur primär“ in Listenregeln entfällt.
  */
+const ohneNurPrimaer = (r: ListenRegel & { nurPrimaer?: boolean }): ListenRegel => {
+  const { nurPrimaer: _nurPrimaer, ...rest } = r
+  return rest
+}
+
 export function migriere(d: Datenstamm): Datenstamm {
   const verlage: Verlag[] = d.verlage.map((v) => {
     const alt = v as Partial<Verlag> & { name?: string }
@@ -63,6 +69,7 @@ export function migriere(d: Datenstamm): Datenstamm {
       anmerkung: rest.anmerkung ?? '',
       vorlage: rest.vorlage ?? '',
       themen: rest.themen ?? [],
+      schlagwoerter: sortiereSchlagwoerter((rest.schlagwoerter ?? []).map((s) => ({ begriff: s.begriff }))),
       ersterscheinung: rest.ersterscheinung ?? '',
       ...(rest.erschienenIn ? { erschienenIn: { ...rest.erschienenIn, ausgabe: rest.erschienenIn.ausgabe ?? '' } } : {}),
       ausgaben: ausgaben.map((a) => ({ ...leereAusgabe(), ...a, auflagen: a.auflagen.map(auflage) })),
@@ -76,7 +83,7 @@ export function migriere(d: Datenstamm): Datenstamm {
       abschnittsfolge: l.abschnittsfolge ?? {},
       stil: { ...STANDARD_STIL, ...l.stil },
       gliederung: l.gliederung === 'themen' ? 'themen' : 'keine',
-      regel: l.regel && { ...ALLE, ...l.regel },
+      regel: l.regel && ohneNurPrimaer({ ...ALLE, ...l.regel }),
     }
   })
   return { werke, verlage, listen, themen: d.themen ?? [] }

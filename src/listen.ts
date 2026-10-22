@@ -4,7 +4,7 @@ import { baum, bezeichnung, unterthemen } from './themen'
 
 // Gespeicherte Literaturlisten: welche Karten in welcher Reihenfolge stehen, wahlweise gegliedert nach Themen.
 
-export const ALLE: ListenRegel = { person: '', schlagwort: '', nurPrimaer: false, nurFest: false, thema: '', mitUnterthemen: true }
+export const ALLE: ListenRegel = { person: '', schlagwort: '', nurFest: false, thema: '', mitUnterthemen: true }
 
 export function neueListe(name: string, regel: ListenRegel | null = ALLE): Literaturliste {
   const jetzt = new Date().toISOString()
@@ -36,7 +36,7 @@ export function passtZurRegel(w: Werk, r: ListenRegel, themen: Thema[] = []): bo
     (!menge || w.themen.some((t) => menge.has(t))) &&
     (!r.nurFest || w.status === 'fest') &&
     (!r.person || w.personen.some((p) => personSchluessel(p) === r.person)) &&
-    (!r.schlagwort || w.schlagwoerter.some((s) => s.begriff === r.schlagwort && (!r.nurPrimaer || s.primaer)))
+    (!r.schlagwort || w.schlagwoerter.some((s) => s.begriff === r.schlagwort))
   )
 }
 

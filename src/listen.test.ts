@@ -11,7 +11,7 @@ function werk(id: string, personen: ReturnType<typeof p>[], jahr: string, schlag
     titel: id,
     status,
     personen,
-    schlagwoerter: schlagwoerter.map((begriff) => ({ begriff, primaer: true })),
+    schlagwoerter: schlagwoerter.map((begriff) => ({ begriff })),
     ausgaben: [{ ...leereAusgabe(), auflagen: [{ ...leereAuflage(), jahr, ort: 'Basel' }] }],
   }
 }

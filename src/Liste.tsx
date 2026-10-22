@@ -174,11 +174,6 @@ export function Liste({
                   ))}
                 </select>
               </label>
-              {regel.schlagwort && (
-                <label className="pille">
-                  <input type="checkbox" checked={regel.nurPrimaer} onChange={(e) => setzeRegel({ nurPrimaer: e.target.checked })} /> nur primär
-                </label>
-              )}
               {themen.length > 0 && (
                 <>
                   <span className="leise">und</span>

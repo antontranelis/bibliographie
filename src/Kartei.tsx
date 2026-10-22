@@ -443,7 +443,7 @@ function KarteLesen({ werk, themen, onBearbeiten }: { werk: Werk; themen: Thema[
             {werk.schlagwoerter.length > 0 && (
               <div className="schlagwoerter">
                 {werk.schlagwoerter.map((s) => (
-                  <span key={s.begriff} className={`chip lesen ${s.primaer ? 'primaer' : ''}`}>
+                  <span key={s.begriff} className="chip lesen">
                     {s.begriff}
                   </span>
                 ))}

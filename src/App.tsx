@@ -46,7 +46,7 @@ function mitFixierung(w: Werk, fixiert: Fixierung, verlage: Verlag[]): Werk {
   if (fixiert.personen) neu.personen = fixiert.personen.map((p) => ({ ...p }))
   if (fixiert.art) neu.art = fixiert.art
   if (fixiert.erschienenIn) neu.erschienenIn = { ...fixiert.erschienenIn }
-  if (fixiert.schlagwoerter) neu.schlagwoerter = fixiert.schlagwoerter.map((s) => ({ ...s }))
+  if (fixiert.schlagwoerter) neu.schlagwoerter = fixiert.schlagwoerter.map((s) => ({ begriff: s.begriff }))
   if (fixiert.themen) neu.themen = [...fixiert.themen]
   if (fixiert.verlag !== undefined) {
     const v = findeExakt(verlage, fixiert.verlag)

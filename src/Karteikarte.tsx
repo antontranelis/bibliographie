@@ -20,6 +20,7 @@ import {
   type TextArt,
   type Verlag,
   type Werk,
+  schlagwortDazu,
 } from './model'
 import { anzeigeName, findeExakt, nameFuerJahr, ortFuerJahr, ortName, ortsAbweichung, ortswechselEintragen, planeVerlage, type VerlagsGruppe } from './verlag'
 import { auflageLeer } from './entwurf'
@@ -1091,32 +1092,9 @@ function Schlagwoerter({
     ? alle.filter((b) => b.toLowerCase().startsWith(eingabe.trim().toLowerCase()) && !vorhanden.has(b.toLowerCase())).slice(0, 6)
     : []
   const fuegeHinzu = (begriff: string) => {
-    const b = begriff.trim()
-    if (!b || vorhanden.has(b.toLowerCase())) return
-    onAendern([...werk.schlagwoerter, { begriff: b, primaer: werk.schlagwoerter.length === 0 }])
+    if (!begriff.trim() || vorhanden.has(begriff.trim().toLowerCase())) return
+    onAendern(schlagwortDazu(werk.schlagwoerter, begriff))
     setEingabe('')
-  }
-  const primaere = werk.schlagwoerter.filter((s) => s.primaer)
-  const sekundaere = werk.schlagwoerter.filter((s) => !s.primaer)
-  const chip = (s: Werk['schlagwoerter'][number]) => {
-    const i = werk.schlagwoerter.indexOf(s)
-    return (
-      <span key={s.begriff} className={`chip ${s.primaer ? 'primaer' : ''}`}>
-        <button
-          type="button"
-          className="chip-text"
-          title={s.primaer ? 'primär – klicken für sekundär' : 'sekundär – klicken für primär'}
-          aria-label={`${s.begriff}, ${s.primaer ? 'primär' : 'sekundär'}. Klicken wechselt.`}
-          onClick={() => onAendern(werk.schlagwoerter.map((x, j) => (j === i ? { ...x, primaer: !x.primaer } : x)))}
-        >
-          {s.begriff}
-          {fixiert.includes(s.begriff) && <Nadel groesse={12} />}
-        </button>
-        <button type="button" className="chip-weg" aria-label={`${s.begriff} entfernen`} onClick={() => onAendern(werk.schlagwoerter.filter((_, j) => j !== i))}>
-          ×
-        </button>
-      </span>
-    )
   }
 
   return (
@@ -1126,9 +1104,17 @@ function Schlagwoerter({
         {nadel}
       </div>
       <div className="schlagwoerter">
-        {primaere.map(chip)}
-        {primaere.length > 0 && sekundaere.length > 0 && <span className="trenner" aria-hidden="true" />}
-        {sekundaere.map(chip)}
+        {werk.schlagwoerter.map((s, i) => (
+          <span key={s.begriff} className="chip">
+            <span className="chip-text">
+              {s.begriff}
+              {fixiert.includes(s.begriff) && <Nadel groesse={12} />}
+            </span>
+            <button type="button" className="chip-weg" aria-label={`${s.begriff} entfernen`} onClick={() => onAendern(werk.schlagwoerter.filter((_, j) => j !== i))}>
+              ×
+            </button>
+          </span>
+        ))}
         <span className="schlagwort-eingabe">
           <input
             className="eingabe serif"
@@ -1155,7 +1141,6 @@ function Schlagwoerter({
           )}
         </span>
       </div>
-      <p className="hinweis">Gefüllt = primär, umrandet = sekundär. Ein Klick wechselt.</p>
     </div>
   )
 }
