@@ -126,6 +126,143 @@ try {
     await p.close()
   }
 
+  // Ein Fenster ohne Schreibrecht verändert nichts, auch keinen liegengebliebenen Nachtrag
+  {
+    const a = await seite()
+    await speicherVoll(a)
+    await reiter(a, 'Erfassen').click()
+    await a.getByLabel('Nachname, Person 1').fill('Steiner')
+    await a.getByRole('combobox', { name: 'Titel' }).fill('Nur im Nachtrag')
+    await a.waitForTimeout(600)
+    await a.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    const vorher = await a.evaluate(() => localStorage.getItem('bibliographie:nachtrag'))
+    const b = await seite()
+    await b.waitForTimeout(800)
+    const nachher = await b.evaluate(() => localStorage.getItem('bibliographie:nachtrag'))
+    pruefe('Lesefenster lässt den Nachtrag liegen', !!vorher && nachher === vorher)
+    await b.close()
+    // Schließen bei blockiertem Speichern: der Nachtrag bringt die Karte beim nächsten Start zurück
+    await a.close({ runBeforeUnload: true })
+    const c = await seite()
+    const d = await daten(c)
+    pruefe('Nachtrag beim Start eingespielt', d.werke.some((w) => w.titel === 'Nur im Nachtrag'), `${d.werke.length} Karten`)
+    pruefe('Nachtrag danach gelöscht', (await c.evaluate(() => localStorage.getItem('bibliographie:nachtrag'))) === null)
+    c.once('dialog', (x) => x.accept())
+    await reiter(c, 'Kartei').click()
+    await c.locator('.kartei-karte', { hasText: 'Nur im Nachtrag' }).dblclick()
+    await c.getByRole('button', { name: 'Karte löschen' }).click()
+    await daten(c)
+    await c.close()
+  }
+
+  // Gescheitertes Speichern: das nächste gelungene holt alles nach. Löschen bei blockiertem Speichern trägt der Nachtrag
+  {
+    const p = await seite()
+    const neu = async (titel) => {
+      await reiter(p, 'Erfassen').click()
+      await p.getByRole('button', { name: /Vorläufig lassen/ }).click()
+      await p.getByLabel('Nachname, Person 1').fill('Steiner')
+      await p.getByRole('combobox', { name: 'Titel' }).fill(titel)
+      await p.keyboard.press('Escape')
+      await p.waitForTimeout(700)
+    }
+    await speicherVoll(p)
+    await neu('Gescheitert X')
+    pruefe('Gescheitertes Speichern wird gemeldet', (await p.locator('.speicher-warnung').count()) === 1)
+    await speicherFrei(p)
+    await neu('Danach Y')
+    const d = await gespeichert(p)
+    pruefe('Nächstes Speichern holt nach', ['Gescheitert X', 'Danach Y'].every((t) => d.werke.some((w) => w.titel === t)) && (await p.locator('.speicher-warnung').count()) === 0)
+    await speicherVoll(p)
+    p.on('dialog', (x) => x.accept())
+    for (const t of ['Gescheitert X', 'Danach Y']) {
+      await reiter(p, 'Kartei').click()
+      await p.locator('.kartei-karte', { hasText: t }).dblclick()
+      await p.getByRole('button', { name: 'Karte löschen' }).click()
+    }
+    await p.waitForTimeout(600)
+    await p.close({ runBeforeUnload: true })
+    const q = await seite()
+    const e = await daten(q)
+    pruefe('Nachtrag trägt Löschungen', !e.werke.some((w) => ['Gescheitert X', 'Danach Y'].includes(w.titel)), e.werke.map((w) => w.titel).join(' | '))
+    await q.close()
+  }
+
+  // Ein Nachtrag ohne bekannte Grundlage ersetzt den Bestand und holt gelöschte Karten nicht zurück
+  {
+    const p = await seite()
+    const d = await daten(p)
+    const [erste] = d.werke
+    await p.evaluate(
+      ([w, rest]) => localStorage.setItem('bibliographie:nachtrag', JSON.stringify({ werke: [w], weg: [], rest, voll: true })),
+      [erste, { verlage: d.verlage, listen: d.listen, themen: d.themen, reihenfolge: [erste.id] }],
+    )
+    await p.close()
+    const q = await seite()
+    const e = await daten(q)
+    pruefe('Voller Nachtrag holt nichts zurück', e.werke.length === 1 && e.werke[0].id === erste.id, `${e.werke.length} Karten`)
+    // Bestand wiederherstellen
+    await q.evaluate(
+      ([w, rest]) => localStorage.setItem('bibliographie:nachtrag', JSON.stringify({ werke: w, weg: [], rest, voll: true })),
+      [d.werke, { verlage: d.verlage, listen: d.listen, themen: d.themen, reihenfolge: d.werke.map((w) => w.id) }],
+    )
+    await q.close()
+  }
+
+  // Unlesbarer Datensatz: Hinweis statt leerer Kartei, nichts wird überschrieben
+  {
+    const p = await seite()
+    await daten(p)
+    const vorher = await gespeichert(p)
+    await p.evaluate(
+      () =>
+        new Promise((f) => {
+          const o = indexedDB.open('bibliographie')
+          o.onsuccess = () => {
+            const t = o.result.transaction('stamm', 'readwrite')
+            t.objectStore('stamm').put({ kaputt: true }, 'rest')
+            t.oncomplete = () => {
+              o.result.close()
+              f()
+            }
+          }
+        }),
+    )
+    await p.reload()
+    await p.waitForTimeout(800)
+    pruefe('Unlesbar: Hinweis statt App', (await p.locator('.ladefehler').count()) === 1 && (await p.locator('.reiter').count()) === 0)
+    const roh = await p.evaluate(
+      () =>
+        new Promise((f) => {
+          const o = indexedDB.open('bibliographie')
+          o.onsuccess = () => {
+            const t = o.result.transaction(['werke', 'stamm'])
+            const w = t.objectStore('werke').count()
+            const r = t.objectStore('stamm').get('rest')
+            t.oncomplete = () => f({ faecher: w.result, rest: r.result })
+          }
+        }),
+    )
+    pruefe('Unlesbar: nichts überschrieben', roh.faecher > 0 && roh.rest?.kaputt === true)
+    // Wiederherstellen
+    await p.evaluate(
+      (d) =>
+        new Promise((f) => {
+          const o = indexedDB.open('bibliographie')
+          o.onsuccess = () => {
+            const t = o.result.transaction('stamm', 'readwrite')
+            t.objectStore('stamm').put({ verlage: d.verlage, listen: d.listen, themen: d.themen, reihenfolge: d.werke.map((w) => w.id) }, 'rest')
+            t.oncomplete = () => f()
+          }
+        }),
+      vorher,
+    )
+    await p.close()
+  }
+
   // Große Kartei über die Exportdatei einlesen
   {
     const p = await seite()

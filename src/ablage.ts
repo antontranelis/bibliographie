@@ -8,9 +8,11 @@ import { migriere } from './speicher'
 // Bestände viel zu langsam (20.000 Datensätze: über 15 s), ein einziger Datensatz für alles beim Tippen
 // (jede Pause kopiert die ganze Kartei). Verlage, Listen, Themen und die Reihenfolge der Karten stehen zusammen
 // in einem weiteren Datensatz.
-// Bis zu dieser Fassung lag alles in localStorage; beim ersten Start zieht es um. Der alte Stand wird erst
-// gelöscht, wenn er sicher in der Datenbank steht. Lässt sich IndexedDB beim Laden nicht öffnen (sehr alte oder
-// gesperrte Browser), bleibt es für dieses Fenster bei localStorage.
+// Verändert wird die Datenbank nur vom Fenster mit Schreibrecht (sitzung.ts), und das lädt beim Erwerb immer
+// frisch (`uebernimm`). Ohne Schreibrecht wird nur gelesen (`lies`).
+// Bis zu dieser Fassung lag alles in localStorage; das Fenster mit Schreibrecht zieht es um. Der alte Stand wird
+// erst gelöscht, wenn er sicher in der Datenbank steht. Lässt sich IndexedDB nicht öffnen (sehr alte oder
+// gesperrte Browser), bleibt es bei localStorage, aber nur, solange der Bestand nie in der Datenbank stand.
 // Ein Speichervorgang, der erst beim Verlassen der Seite beginnt, kommt nicht sicher an. Deshalb schreibt das
 // Fenster beim Verbergen und Verlassen zusätzlich synchron einen Nachtrag in localStorage: was seit dem letzten
 // abgeschlossenen Speichern fehlt, meist ein paar Karten. Der nächste Start spielt ihn ein; ein Speichern, das
@@ -23,6 +25,8 @@ const STAMM = 'stamm'
 const REST = 'rest'
 const ALT = 'bibliographie:datenstamm:v1'
 const NACHTRAG = 'bibliographie:nachtrag'
+/** Gesetzt, sobald der Bestand in der Datenbank steht */
+const IN_DATENBANK = 'bibliographie:in-datenbank'
 /** Mehr geänderte Karten passen nicht sicher in localStorage */
 const NACHTRAG_HOECHSTENS = 2000
 const FAECHER = 256
@@ -54,6 +58,8 @@ interface Nachtrag {
   /** Gelöschte Karten */
   weg: string[]
   rest: Rest
+  /** Ohne bekannte Grundlage: enthält alle Karten und ersetzt den Bestand */
+  voll: boolean
 }
 
 interface Abbild {
@@ -170,7 +176,7 @@ function nachtragLesen(): Nachtrag | null {
 }
 
 function nachtragAnwenden(d: Datenstamm | null, n: Nachtrag): Datenstamm {
-  const werke = new Map((d?.werke ?? []).map((w) => [w.id, w]))
+  const werke = new Map((n.voll ? [] : (d?.werke ?? [])).map((w) => [w.id, w]))
   for (const id of n.weg) werke.delete(id)
   for (const w of n.werke) werke.set(w.id, w)
   return zusammensetzen(werke.values(), n.rest)
@@ -192,7 +198,7 @@ export function sichereSofort(d: Datenstamm) {
     if (werke.length > NACHTRAG_HOECHSTENS) return
     const ids = new Set(d.werke.map((w) => w.id))
     const weg = basis ? [...basis.werke.keys()].filter((id) => !ids.has(id)) : []
-    const n: Nachtrag = { werke, weg, rest: restVon(d) }
+    const n: Nachtrag = { werke, weg, rest: restVon(d), voll: !basis }
     localStorage.setItem(NACHTRAG, JSON.stringify(n))
     nachtragNr++
   } catch {
@@ -201,54 +207,24 @@ export function sichereSofort(d: Datenstamm) {
 }
 
 /**
- * Liest den gespeicherten Stand, null wenn noch nichts gespeichert ist. Steht nur ein alter Stand in localStorage,
- * kommt er in derselben Transaktion in die Datenbank, damit kein zweites Fenster dazwischen schreibt; ebenso ein
- * Nachtrag. Wirft, wenn die Datenbank da ist, sich aber nicht lesen lässt: Leer zu starten hieße, beim nächsten
- * Speichern alles zu überschreiben.
+ * Stand für das erste Zeichnen, nur lesend: ohne Schreibrecht wird die Datenbank nicht verändert. Ein alter Stand
+ * in localStorage und ein Nachtrag gelten nur im Speicher; eingespielt werden sie von `uebernimm`.
+ * Null, wenn noch nichts gespeichert ist. Wirft, wenn sich der Stand nicht lesen lässt: Leer zu starten hieße,
+ * beim nächsten Speichern alles zu überschreiben.
  */
-export async function lade(): Promise<Datenstamm | null> {
+export async function lies(): Promise<Datenstamm | null> {
+  const { stand } = await lese(false)
+  return stand && migriere(stand)
+}
+
+/**
+ * Stand für ein Fenster, das eben das Schreibrecht bekommen hat: frisch gelesen, Umzug und Nachtrag in derselben
+ * Transaktion eingespielt. Grundlage für alle folgenden Speichervorgänge dieses Fensters. Wirft wie `lies`.
+ */
+export async function uebernimm(): Promise<Datenstamm | null> {
   zuletzt = null
   gesichert = null
-  const db = await oeffne()
-  ohneDatenbank = !db
-  if (!db) {
-    const alt = altLesen()
-    return alt && migriere(alt)
-  }
-  const { stand, sicher } = await new Promise<{ stand: Datenstamm | null; sicher: boolean }>((fertig, fehler) => {
-    let stand: Datenstamm | null = null
-    let umgezogen = false
-    let nachgetragen = false
-    try {
-      const t = db.transaction([WERKE, STAMM], 'readwrite')
-      const rest = t.objectStore(STAMM).get(REST)
-      const werke = t.objectStore(WERKE).getAll()
-      werke.onsuccess = () => {
-        const r = rest.result as Rest | undefined
-        if (r) stand = zusammensetzen((werke.result as Werk[][]).flat(), r)
-        else {
-          stand = altLesen()
-          umgezogen = !!stand
-        }
-        const n = nachtragLesen()
-        if (n) {
-          stand = nachtragAnwenden(stand, n)
-          nachgetragen = true
-        }
-        if (umgezogen || nachgetragen) schreibe(t, stand!, null)
-      }
-      t.oncomplete = () => {
-        if (umgezogen) localStorage.removeItem(ALT)
-        if (nachgetragen) localStorage.removeItem(NACHTRAG)
-        fertig({ stand, sicher: true })
-      }
-      // Umzug oder Nachtrag nicht geschrieben (etwa Speicher voll): der Stand gilt als ungespeichert,
-      // alte Quellen bleiben, das nächste Speichern schreibt alles
-      t.onabort = () => (werke.readyState === 'done' && !werke.error ? fertig({ stand, sicher: false }) : fehler(t.error))
-    } catch (e) {
-      fehler(e)
-    }
-  })
+  const { stand, sicher } = await lese(true)
   if (!stand) return null
   const d = migriere(stand)
   // Die Datenbank hält den Stand vor der Migration; die migrierten Karten gelten trotzdem als gespeichert,
@@ -258,6 +234,62 @@ export async function lade(): Promise<Datenstamm | null> {
     gesichert = zuletzt
   } else if (nachtragLesen()) nachtragNr++ // Das nächste gelungene Speichern enthält den Nachtrag und löscht ihn
   return d
+}
+
+async function lese(einspielen: boolean): Promise<{ stand: Datenstamm | null; sicher: boolean }> {
+  const db = await oeffne()
+  ohneDatenbank = !db
+  if (!db) {
+    // Steht der Bestand schon in der Datenbank, ist localStorage veraltet: nicht leer oder alt weiterarbeiten
+    if (localStorage.getItem(IN_DATENBANK)) throw new Error('Datenbank nicht erreichbar')
+    return { stand: altLesen(), sicher: true }
+  }
+  return new Promise((fertig, fehler) => {
+    let stand: Datenstamm | null = null
+    let berechnet = false
+    let kaputt: unknown = null
+    let umgezogen = false
+    let nachgetragen = false
+    try {
+      const t = db.transaction([WERKE, STAMM], einspielen ? 'readwrite' : 'readonly')
+      const rest = t.objectStore(STAMM).get(REST)
+      const werke = t.objectStore(WERKE).getAll()
+      werke.onsuccess = () => {
+        try {
+          const r = rest.result as Rest | undefined
+          if (r) stand = zusammensetzen((werke.result as Werk[][]).flat(), r)
+          else {
+            stand = altLesen()
+            umgezogen = !!stand
+          }
+          const n = nachtragLesen()
+          if (n) {
+            stand = nachtragAnwenden(stand, n)
+            nachgetragen = true
+          }
+          berechnet = true
+          if (einspielen && (umgezogen || nachgetragen)) schreibe(t, stand!, null)
+        } catch (e) {
+          // Unlesbarer Datensatz: nicht so tun, als wäre nichts gespeichert
+          if (!berechnet) kaputt = e
+          t.abort()
+        }
+      }
+      t.oncomplete = () => {
+        if (einspielen) {
+          if (stand) localStorage.setItem(IN_DATENBANK, '1')
+          if (umgezogen) localStorage.removeItem(ALT)
+          if (nachgetragen) localStorage.removeItem(NACHTRAG)
+        }
+        fertig({ stand, sicher: true })
+      }
+      // Umzug oder Nachtrag nicht geschrieben (etwa Speicher voll): der Stand gilt als ungespeichert,
+      // alte Quellen bleiben, das nächste Speichern schreibt alles
+      t.onabort = () => (berechnet ? fertig({ stand, sicher: false }) : fehler(kaputt ?? t.error ?? new Error('Lesen abgebrochen')))
+    } catch (e) {
+      fehler(e)
+    }
+  })
 }
 
 /** Speichert den Stand. Falsch, wenn der Speicher voll oder gesperrt ist: dann bleibt nur die Exportdatei. */
@@ -284,6 +316,7 @@ export async function speichere(d: Datenstamm): Promise<boolean> {
         const ok = gescheitert === stand
         // Ein früherer Vorgang ist gescheitert: was jetzt in der Datenbank steht, ist unbekannt
         gesichert = ok ? neu : null
+        if (ok) localStorage.setItem(IN_DATENBANK, '1')
         // Begann nach dem letzten Nachtrag: enthält ihn
         if (ok && nr > 0 && nr === nachtragNr) localStorage.removeItem(NACHTRAG)
         fertig(ok)
@@ -296,14 +329,14 @@ export async function speichere(d: Datenstamm): Promise<boolean> {
       schreibe(t, d, vorher)
       zuletzt = neu
     } catch {
-      gescheitert++
-      zuletzt = null
-      // Nichts halb schreiben
+      // Nichts halb schreiben; der Abbruch zählt im onabort
       try {
-        t?.abort()
+        if (t) t.abort()
+        else gescheitert++
       } catch {
         /* schon beendet */
       }
+      zuletzt = null
       fertig(false)
     }
   })

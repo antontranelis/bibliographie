@@ -9,7 +9,9 @@ import { schalteScharf, verbinde } from './aktualisierung'
 // Nur ein Fenster schreibt. Jedes Fenster hält den ganzen Datenstand und schreibt ihn komplett zurück;
 // zwei schreibende Fenster würden sich gegenseitig überschreiben. Das Schreibrecht ist eine Sperre des
 // Browsers (Web Locks). Wer es nicht hat, schreibt nie und steht in der Schlange; schließt das schreibende
-// Fenster, rückt das nächste nach und lädt den gespeicherten Stand.
+// Fenster, rückt das nächste nach. Wer das Schreibrecht bekommt, lädt immer zuerst den gespeicherten Stand,
+// auch beim ersten Erwerb: was beim Öffnen gelesen wurde, kann inzwischen überholt sein.
+// Lässt sich der Stand nicht laden, gibt das Fenster die Sperre zurück und stellt sich nicht wieder an.
 // „Hier weiterarbeiten“: Das schreibende Fenster hört auf zu schreiben, meldet „speichert“, speichert und meldet „abgegeben“;
 // dann nimmt das bittende Fenster die Sperre (steal). Kommt keiner, schreibt das erste weiter.
 // Gelingt das Speichern nicht (Speicher voll), meldet es „verweigert“ und schreibt weiter. Antwortet das
@@ -50,7 +52,7 @@ const STARTFENSTER = 10_000
 
 /**
  * @param speichern schreibt den aktuellen Stand sofort; falsch, wenn das nicht gelingt
- * @param neuLaden holt den Stand aus dem Speicher, wenn das Schreibrecht hierher wechselt
+ * @param neuLaden holt den Stand aus dem Speicher, wenn das Schreibrecht hierher kommt; wirft, wenn das nicht geht
  */
 export function useSitzung(speichern: () => Promise<boolean>, neuLaden: () => Promise<void>): Sitzung {
   const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined
@@ -73,6 +75,10 @@ export function useSitzung(speichern: () => Promise<boolean>, neuLaden: () => Pr
     halte: false,
     /** Gibt gerade ab und speichert dafür */
     gibtAb: false,
+    /** Hat abgegeben und wartet auf die Übernahme */
+    abgegeben: false,
+    /** Laden beim Erwerb gescheitert: nicht wieder anstellen */
+    kaputt: false,
     loslassen: null as (() => void) | null,
     schlange: null as AbortController | null,
     kanal: null as BroadcastChannel | null,
@@ -145,7 +151,7 @@ export function useSitzung(speichern: () => Promise<boolean>, neuLaden: () => Pr
 
   /** Sperre anfragen und halten, bis sie weggenommen wird oder das Fenster schließt. */
   const erwerben = useCallback(
-    (optionen: LockOptions, zuvorLesend: boolean): Promise<boolean> => {
+    (optionen: LockOptions): Promise<boolean> => {
       if (!locks) return Promise.resolve(false)
       let meine = 0
       const aufbau = z.abbau
@@ -158,9 +164,15 @@ export function useSitzung(speichern: () => Promise<boolean>, neuLaden: () => Pr
           z.schlange = null
           meine = ++z.generation
           z.halte = true
-          if (zuvorLesend) await rueckruf.current.neuLaden()
+          try {
+            await rueckruf.current.neuLaden()
+          } catch {
+            z.kaputt = true
+            return
+          }
           // Während des Ladens abgebaut oder weggenommen: nicht mehr schreiben
           if (z.generation !== meine || !z.halte) return
+          z.abgegeben = false
           setRecht('ja')
           // Gehalten bis steal, Schließen des Fensters oder Abbau der Komponente
           return new Promise<void>((fertig) => {
@@ -172,8 +184,9 @@ export function useSitzung(speichern: () => Promise<boolean>, neuLaden: () => Pr
           if (meine && z.generation === meine) {
             // Weggenommen: lesend weiter, wieder anstellen
             z.halte = false
+            z.abgegeben = false
             setRecht('nein')
-            anstellenRef.current()
+            if (!z.kaputt) anstellenRef.current()
           }
           return meine > 0
         })
@@ -186,7 +199,7 @@ export function useSitzung(speichern: () => Promise<boolean>, neuLaden: () => Pr
     if (!locks || z.schlange || z.halte) return
     const abbruch = new AbortController()
     z.schlange = abbruch
-    erwerben({ signal: abbruch.signal }, true).finally(() => {
+    erwerben({ signal: abbruch.signal }).finally(() => {
       if (z.schlange === abbruch) z.schlange = null
     })
   }
@@ -200,6 +213,9 @@ export function useSitzung(speichern: () => Promise<boolean>, neuLaden: () => Pr
       if (e.data !== 'gib-ab' || !z.halte) return
       // Schon dabei: die Antwort geht an alle bittenden Fenster
       if (z.gibtAb) return k.postMessage('speichert')
+      if (z.abgegeben) return k.postMessage('abgegeben')
+      // Lädt noch: was hier im Speicher steht, ist nicht der gespeicherte Stand; nichts davon abgeben
+      if (z.recht !== 'ja') return
       // Während eines Versionswechsels nicht abgeben
       if (z.wechselt) return k.postMessage('verweigert')
       // Erst aufhören zu schreiben, dann speichern: nur abgeben, was sicher gespeichert ist
@@ -216,13 +232,18 @@ export function useSitzung(speichern: () => Promise<boolean>, neuLaden: () => Pr
         k.postMessage('verweigert')
         return
       }
+      z.abgegeben = true
       k.postMessage('abgegeben')
       // Übernimmt niemand, bleibt das Schreibrecht hier
-      weiter = setTimeout(() => z.halte && z.generation === g && setRecht('ja'), UEBERGABE)
+      weiter = setTimeout(() => {
+        if (!z.halte || z.generation !== g) return
+        z.abgegeben = false
+        setRecht('ja')
+      }, UEBERGABE)
     }
     let aktiv = true
     // Beim Start: frei → schreiben; sonst lesend in die Schlange
-    erwerben({ ifAvailable: true }, false).then((ok) => {
+    erwerben({ ifAvailable: true }).then((ok) => {
       if (ok || !aktiv) return
       setRecht('nein')
       anstellenRef.current()
@@ -259,7 +280,7 @@ export function useSitzung(speichern: () => Promise<boolean>, neuLaden: () => Pr
     const nehmen = (optionen: LockOptions) => {
       z.schlange?.abort()
       z.schlange = null
-      erwerben(optionen, true).then((ok) => ok || anstellenRef.current())
+      erwerben(optionen).then((ok) => ok || anstellenRef.current())
     }
     // Antwortet niemand: nur übernehmen, wenn die Sperre wirklich frei ist
     const keineAntwort = async () => {

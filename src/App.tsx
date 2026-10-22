@@ -13,7 +13,7 @@ import { ALLE, hinzufuegen, neueListe } from './listen'
 import { Verlage } from './Verlage'
 import { beispielDaten } from './beispiel'
 import { exportiere, exportiereCsl, importiere, zusammenfuehren } from './speicher'
-import { lade, sichereSofort, speichere } from './ablage'
+import { sichereSofort, speichere, uebernimm } from './ablage'
 import { herunterladen } from './herunterladen'
 import { anzeigeName, findeExakt, nameFuerJahr, ortFuerJahr, planeVerlage, wendePlanAn, type VerlagsGruppe } from './verlag'
 import { Abwaerts, Nadel, StatusPunkt } from './Symbole'
@@ -122,7 +122,16 @@ export default function App({ start }: { start: Datenstamm }) {
     return ok
   }
   // Schreibrecht, Speichern und Versionswechsel entscheidet allein die Sitzung (sitzung.ts)
-  const fenster = useSitzung(sofortSpeichern, async () => setDaten((await lade()) ?? leererDatenstamm()))
+  const [ladefehler, setLadefehler] = useState(false)
+  const neuLaden = async () => {
+    try {
+      setDaten((await uebernimm()) ?? leererDatenstamm())
+    } catch (e) {
+      setLadefehler(true)
+      throw e
+    }
+  }
+  const fenster = useSitzung(sofortSpeichern, neuLaden)
   const schreibend = fenster.recht === 'ja' && !fenster.wechselt
   const darfSchreiben = useRef(false)
   darfSchreiben.current = schreibend
@@ -532,6 +541,11 @@ export default function App({ start }: { start: Datenstamm }) {
           </button>
         </div>
       )}
+      {ladefehler && (
+        <div className="speicher-warnung" role="alert">
+          Die gespeicherten Daten lassen sich gerade nicht lesen, deshalb ist dieses Fenster gesperrt. Bitte die Seite neu laden; hilft das nicht, den Browser neu starten. Die Daten bleiben dabei erhalten.
+        </div>
+      )}
       {speicherVoll && (
         <div className="speicher-warnung" role="alert">
           Der Speicher des Browsers ist voll, die letzten Änderungen sind nur in diesem Fenster. Bitte über „Ablage“ → „Sichern“ eine Datei speichern.
@@ -632,7 +646,7 @@ export default function App({ start }: { start: Datenstamm }) {
         {ansicht === 'verlage' && <Verlage verlage={daten.verlage} werke={daten.werke} onAendern={aendereVerlage} onZurueck={() => setAnsicht('erfassen')} />}
       </main>
       </div>
-      {fenster.recht === 'nein' && (
+      {fenster.recht === 'nein' && !ladefehler && (
         <div className="ueberlagerung schreibrecht" role="dialog" aria-modal="true" aria-label="In einem anderen Fenster geöffnet">
           <div className="papier schreibrecht-kasten">
             <h2>Das Programm ist schon in einem anderen Fenster geöffnet</h2>

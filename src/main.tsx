@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import { starteAktualisierung } from './aktualisierung'
-import { bitteUmDauer, lade } from './ablage'
+import { bitteUmDauer, lies } from './ablage'
 import { leererDatenstamm } from './model'
 import '@fontsource-variable/source-serif-4/opsz.css'
 import '@fontsource-variable/source-serif-4/opsz-italic.css'
@@ -17,7 +17,7 @@ if (import.meta.env.PROD) starteAktualisierung()
 // Der gespeicherte Stand wird vor dem ersten Zeichnen gelesen, damit die App nie mit leerer Kartei startet.
 // Lässt er sich nicht lesen, startet sie gar nicht: leer zu starten würde ihn beim ersten Speichern überschreiben.
 const wurzel = createRoot(document.getElementById('root')!)
-lade().then(
+lies().then(
   (start) => {
     bitteUmDauer()
     wurzel.render(
