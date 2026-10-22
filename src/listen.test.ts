@@ -11,7 +11,7 @@ function werk(id: string, personen: ReturnType<typeof p>[], jahr: string, schlag
     titel: id,
     status,
     personen,
-    schlagwoerter: schlagwoerter.map((begriff) => ({ begriff, primaer: true })),
+    schlagwoerter: schlagwoerter.map((begriff) => ({ begriff })),
     ausgaben: [{ ...leereAusgabe(), auflagen: [{ ...leereAuflage(), jahr, ort: 'Basel' }] }],
   }
 }
@@ -27,6 +27,9 @@ describe('abschnitte', () => {
     expect(ids(abschnitte(l, werke))).toEqual([':film,briefe,pdf'])
     expect(ids(abschnitte({ ...l, regel: { ...l.regel!, schlagwort: 'Freiheit' } }, werke))).toEqual([':briefe,pdf'])
     expect(ids(abschnitte({ ...l, regel: { ...l.regel!, nurFest: true } }, werke))).toEqual([':film,pdf'])
+    // Schlagwort wie in der Kartei ohne Rücksicht auf Groß- und Kleinschreibung
+    const klein = werk('klein', [p('Anna', 'Adler')], '1990', ['freiheit'])
+    expect(ids(abschnitte({ ...l, regel: { ...l.regel!, schlagwort: 'Freiheit' } }, [...werke, klein]))).toEqual([':klein,briefe,pdf'])
     expect(ids(abschnitte({ ...l, regel: { ...l.regel!, person: 'Steiner|Marie' } }, werke))).toEqual([':briefe'])
   })
   it('ohne Regel nur von Hand aufgenommene Karten', () => {

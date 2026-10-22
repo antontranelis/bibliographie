@@ -152,10 +152,23 @@ export interface ErschienenIn {
   seitenBis: string
 }
 
+/** Schlagwörter sind gleichwertig und stehen alphabetisch */
 export interface Schlagwort {
   begriff: string
-  primaer: boolean
 }
+
+/**
+ * Schlagwort an seinem alphabetischen Platz dazunehmen; ein gleiches (ohne Groß- und Kleinschreibung) nur einmal.
+ * Steht es schon im Bestand, gilt dessen Schreibweise.
+ */
+export function schlagwortDazu(s: Schlagwort[], begriff: string, bestand: string[] = []): Schlagwort[] {
+  const gleich = (x: string) => x.toLowerCase() === begriff.trim().toLowerCase()
+  const b = bestand.find(gleich) ?? begriff.trim()
+  if (!b || s.some((x) => gleich(x.begriff))) return s
+  return sortiereSchlagwoerter([...s, { begriff: b }])
+}
+
+export const sortiereSchlagwoerter = (s: Schlagwort[]): Schlagwort[] => [...s].sort((a, b) => a.begriff.localeCompare(b.begriff, 'de'))
 
 export interface Werk {
   id: string
@@ -223,7 +236,6 @@ export interface ListenRegel {
   /** Schlüssel „Nachname|Vorname“ */
   person: string
   schlagwort: string
-  nurPrimaer: boolean
   nurFest: boolean
   /** ID eines Themas */
   thema: string

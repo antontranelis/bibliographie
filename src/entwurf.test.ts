@@ -28,7 +28,7 @@ describe('weichtAb', () => {
     ['nur eine Bearbeitung', (w) => (w.ausgaben[0].auflagen[0].bearbeitung = 'erw.')],
     ['nur eine weitere Ausgabe', (w) => w.ausgaben.push({ ...leereAusgabe('uebersetzung'), sprache: 'deutsch' })],
     ['nur die Ersterscheinung', (w) => (w.ersterscheinung = '1890')],
-    ['nur ein Schlagwort', (w) => w.schlagwoerter.push({ begriff: 'Ethik', primaer: true })],
+    ['nur ein Schlagwort', (w) => w.schlagwoerter.push({ begriff: 'Ethik' })],
     ['nur die Reihe', (w) => (w.reihe = 'Gesamtausgabe')],
     ['nur die Art', (w) => (w.art = 'aufsatz')],
     ['nur Erschienen in', (w) => (w.erschienenIn = { art: 'zeitschrift', titel: 'Das Goetheanum', jahrgang: '', jahr: '', heft: '', ausgabe: '', seitenVon: '', seitenBis: '' })],
