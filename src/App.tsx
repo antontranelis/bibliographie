@@ -125,7 +125,11 @@ export default function App({ start }: { start: Datenstamm }) {
   const [ladefehler, setLadefehler] = useState(false)
   const neuLaden = async () => {
     try {
-      setDaten((await uebernimm()) ?? leererDatenstamm())
+      const d = (await uebernimm()) ?? leererDatenstamm()
+      // Gilt sofort als zu speichernder Stand, nicht erst nach dem nächsten Zeichnen: sonst könnte ein gleich
+      // folgendes Speichern noch den beim Öffnen gelesenen Stand schreiben
+      zuSpeichern.current = d
+      setDaten(d)
     } catch (e) {
       setLadefehler(true)
       throw e

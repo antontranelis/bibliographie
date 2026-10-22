@@ -56,7 +56,7 @@ const STARTFENSTER = 10_000
  */
 export function useSitzung(speichern: () => Promise<boolean>, neuLaden: () => Promise<void>): Sitzung {
   const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined
-  const [recht, setRechtZustand] = useState<Schreibrecht>(locks ? 'pruefen' : 'ja')
+  const [recht, setRechtZustand] = useState<Schreibrecht>('pruefen')
   const [absage, setAbsage] = useState<Absage>('')
   const [wechselt, setWechselt] = useState(false)
   const [neueVersion, setNeueVersion] = useState(false)
@@ -66,7 +66,7 @@ export function useSitzung(speichern: () => Promise<boolean>, neuLaden: () => Pr
   // generation: zählt jeden Erwerb; nur das Ende des aktuellen Haltens zählt
   const z = useRef({
     /** Spiegel des Zustands für Entscheidungen im selben Augenblick */
-    recht: (locks ? 'pruefen' : 'ja') as Schreibrecht,
+    recht: 'pruefen' as Schreibrecht,
     wechselt: false,
     startWunschBis: 0,
     generation: 0,
@@ -164,6 +164,8 @@ export function useSitzung(speichern: () => Promise<boolean>, neuLaden: () => Pr
           z.schlange = null
           meine = ++z.generation
           z.halte = true
+          // Lädt: weder gesperrt noch schreibend
+          setRecht('pruefen')
           try {
             await rueckruf.current.neuLaden()
           } catch {
@@ -203,6 +205,19 @@ export function useSitzung(speichern: () => Promise<boolean>, neuLaden: () => Pr
       if (z.schlange === abbruch) z.schlange = null
     })
   }
+
+  // Ohne Web Locks (sehr alte Browser) schreibt jedes Fenster; auch dann erst nach frischem Laden
+  useEffect(() => {
+    if (locks) return
+    let aktiv = true
+    rueckruf.current.neuLaden().then(
+      () => aktiv && setRecht('ja'),
+      () => {},
+    )
+    return () => {
+      aktiv = false
+    }
+  }, [locks, setRecht])
 
   useEffect(() => {
     if (!locks) return

@@ -195,14 +195,20 @@ export function sichereSofort(d: Datenstamm) {
     const basis = gesichert
     if (basis?.d === d) return
     const werke = basis ? d.werke.filter((w) => basis.werke.get(w.id) !== w) : d.werke
-    if (werke.length > NACHTRAG_HOECHSTENS) return
+    // Passt der Nachtrag nicht, darf auch kein älterer liegen bleiben: er könnte hinter der Datenbank zurückliegen
+    if (werke.length > NACHTRAG_HOECHSTENS) return localStorage.removeItem(NACHTRAG)
     const ids = new Set(d.werke.map((w) => w.id))
     const weg = basis ? [...basis.werke.keys()].filter((id) => !ids.has(id)) : []
     const n: Nachtrag = { werke, weg, rest: restVon(d), voll: !basis }
     localStorage.setItem(NACHTRAG, JSON.stringify(n))
     nachtragNr++
   } catch {
-    /* zu groß: dann bleibt nur das Speichern */
+    // Zu groß: dann bleibt nur das Speichern, und ein älterer Nachtrag darf nicht liegen bleiben
+    try {
+      localStorage.removeItem(NACHTRAG)
+    } catch {
+      /* gesperrt */
+    }
   }
 }
 
@@ -227,8 +233,8 @@ export async function uebernimm(): Promise<Datenstamm | null> {
   const { stand, sicher } = await lese(true)
   if (!stand) return null
   const d = migriere(stand)
-  // Die Datenbank hält den Stand vor der Migration; die migrierten Karten gelten trotzdem als gespeichert,
-  // sie werden bei jedem Laden gleich migriert
+  // Die Datenbank hält den Stand vor der Migration; die migrierten Karten gelten trotzdem als gespeichert.
+  // Sie werden bei jedem Laden wieder migriert, nur neue IDs für Verlage ohne ID erst mit der nächsten Änderung fest
   if (sicher) {
     zuletzt = abbild(d)
     gesichert = zuletzt
@@ -316,7 +322,11 @@ export async function speichere(d: Datenstamm): Promise<boolean> {
         const ok = gescheitert === stand
         // Ein früherer Vorgang ist gescheitert: was jetzt in der Datenbank steht, ist unbekannt
         gesichert = ok ? neu : null
-        if (ok) localStorage.setItem(IN_DATENBANK, '1')
+        if (ok) {
+          localStorage.setItem(IN_DATENBANK, '1')
+          // Nach gescheitertem Umzug liegt der alte Stand noch da; jetzt steht alles in der Datenbank
+          localStorage.removeItem(ALT)
+        }
         // Begann nach dem letzten Nachtrag: enthält ihn
         if (ok && nr > 0 && nr === nachtragNr) localStorage.removeItem(NACHTRAG)
         fertig(ok)

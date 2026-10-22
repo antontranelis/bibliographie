@@ -263,6 +263,45 @@ try {
     await p.close()
   }
 
+  // Ohne Web Locks: auch dann erst frisch laden und den Nachtrag einspielen, bevor geschrieben wird
+  {
+    const p = await seite()
+    const d = await daten(p)
+    const neu = { ...d.werke[0], id: 'ohne-sperre', titel: 'Aus dem Nachtrag ohne Web Locks' }
+    await p.evaluate(
+      ([w, rest]) => localStorage.setItem('bibliographie:nachtrag', JSON.stringify({ werke: [w], weg: [], rest, voll: false })),
+      [neu, { verlage: d.verlage, listen: d.listen, themen: d.themen, reihenfolge: [...d.werke.map((w) => w.id), neu.id] }],
+    )
+    await p.close()
+    const q = await kontext.newPage()
+    q.on('pageerror', (e) => fehler.push(e.message))
+    await q.addInitScript(() => Object.defineProperty(Navigator.prototype, 'locks', { configurable: true, get: () => undefined }))
+    await q.goto(url)
+    const e = await daten(q)
+    pruefe('Ohne Web Locks: Nachtrag eingespielt', e.werke.some((w) => w.id === 'ohne-sperre'))
+    pruefe('Ohne Web Locks: Nachtrag danach gelöscht', (await q.evaluate(() => localStorage.getItem('bibliographie:nachtrag'))) === null)
+    q.once('dialog', (x) => x.accept())
+    await reiter(q, 'Kartei').click()
+    await q.locator('.kartei-karte', { hasText: 'Aus dem Nachtrag ohne Web Locks' }).dblclick()
+    await q.getByRole('button', { name: 'Karte löschen' }).click()
+    await daten(q)
+    await q.close()
+  }
+
+  // Steht der Bestand in der Datenbank und lässt sie sich nicht öffnen: Hinweis statt leerer App
+  {
+    const q = await kontext.newPage()
+    await q.addInitScript(() => {
+      IDBFactory.prototype.open = function () {
+        throw new DOMException('gesperrt', 'InvalidStateError')
+      }
+    })
+    await q.goto(url)
+    await q.waitForTimeout(800)
+    pruefe('Datenbank nicht erreichbar: Hinweis statt App', (await q.locator('.ladefehler').count()) === 1 && (await q.locator('.reiter').count()) === 0)
+    await q.close()
+  }
+
   // Große Kartei über die Exportdatei einlesen
   {
     const p = await seite()
