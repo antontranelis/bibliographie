@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { TEXT_ARTEN, alleAuflagen, leererDatenstamm, leeresWerk, mitAuflagen, type Datenstamm, type Thema, type Literaturliste, type ErschienenIn, type Person, type Schlagwort, type TextArt, type Verlag, type Werk } from './model'
+import { TEXT_ARTEN, alleAuflagen, leererDatenstamm, leeresWerk, mitAuflagen, schlagwortDazu, type Datenstamm, type Thema, type Literaturliste, type ErschienenIn, type Person, type Schlagwort, type TextArt, type Verlag, type Werk } from './model'
 import { Karteikarte } from './Karteikarte'
 import { Kartei, LEERE_SICHT, type KarteiSicht, type ListenVorgabe } from './Kartei'
 import { Liste } from './Liste'
@@ -34,7 +34,10 @@ const FIX_SCHLUESSEL = 'bibliographie:fixierung'
 
 function ladeFixierung(): Fixierung {
   try {
-    return JSON.parse(localStorage.getItem(FIX_SCHLUESSEL) ?? '{}') as Fixierung
+    const f = JSON.parse(localStorage.getItem(FIX_SCHLUESSEL) ?? '{}') as Fixierung
+    // Fixiert unter einer älteren Fassung: Schlagwörter gleichwertig und alphabetisch
+    if (f.schlagwoerter) f.schlagwoerter = f.schlagwoerter.reduce<Schlagwort[]>((s, x) => schlagwortDazu(s, x.begriff), [])
+    return f
   } catch {
     return {}
   }
@@ -46,7 +49,7 @@ function mitFixierung(w: Werk, fixiert: Fixierung, verlage: Verlag[]): Werk {
   if (fixiert.personen) neu.personen = fixiert.personen.map((p) => ({ ...p }))
   if (fixiert.art) neu.art = fixiert.art
   if (fixiert.erschienenIn) neu.erschienenIn = { ...fixiert.erschienenIn }
-  if (fixiert.schlagwoerter) neu.schlagwoerter = fixiert.schlagwoerter.map((s) => ({ begriff: s.begriff }))
+  if (fixiert.schlagwoerter) neu.schlagwoerter = fixiert.schlagwoerter.map((s) => ({ ...s }))
   if (fixiert.themen) neu.themen = [...fixiert.themen]
   if (fixiert.verlag !== undefined) {
     const v = findeExakt(verlage, fixiert.verlag)

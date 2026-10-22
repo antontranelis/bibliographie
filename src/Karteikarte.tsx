@@ -1093,7 +1093,7 @@ function Schlagwoerter({
     : []
   const fuegeHinzu = (begriff: string) => {
     if (!begriff.trim() || vorhanden.has(begriff.trim().toLowerCase())) return
-    onAendern(schlagwortDazu(werk.schlagwoerter, begriff))
+    onAendern(schlagwortDazu(werk.schlagwoerter, begriff, alle))
     setEingabe('')
   }
 

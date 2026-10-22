@@ -1,6 +1,6 @@
 import { STANDARD_STIL } from './format'
 import { ALLE } from './listen'
-import { leereAusgabe, neueId, sortiereSchlagwoerter, type Auflage, type Ausgabe, type Datenstamm, type ListenRegel, type Literaturliste, type Verlag, type Werk } from './model'
+import { leereAusgabe, neueId, schlagwortDazu, type Schlagwort, type Auflage, type Ausgabe, type Datenstamm, type ListenRegel, type Literaturliste, type Verlag, type Werk } from './model'
 
 export const FORMAT = 'bibliographie-datenstamm'
 export const VERSION = 8
@@ -69,7 +69,7 @@ export function migriere(d: Datenstamm): Datenstamm {
       anmerkung: rest.anmerkung ?? '',
       vorlage: rest.vorlage ?? '',
       themen: rest.themen ?? [],
-      schlagwoerter: sortiereSchlagwoerter((rest.schlagwoerter ?? []).map((s) => ({ begriff: s.begriff }))),
+      schlagwoerter: (rest.schlagwoerter ?? []).reduce<Schlagwort[]>((s, x) => schlagwortDazu(s, x.begriff), []),
       ersterscheinung: rest.ersterscheinung ?? '',
       ...(rest.erschienenIn ? { erschienenIn: { ...rest.erschienenIn, ausgabe: rest.erschienenIn.ausgabe ?? '' } } : {}),
       ausgaben: ausgaben.map((a) => ({ ...leereAusgabe(), ...a, auflagen: a.auflagen.map(auflage) })),

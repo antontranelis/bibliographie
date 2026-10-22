@@ -157,10 +157,14 @@ export interface Schlagwort {
   begriff: string
 }
 
-/** Schlagwort an seinem alphabetischen Platz dazunehmen; ein gleiches (ohne Groß- und Kleinschreibung) nur einmal */
-export function schlagwortDazu(s: Schlagwort[], begriff: string): Schlagwort[] {
-  const b = begriff.trim()
-  if (!b || s.some((x) => x.begriff.toLowerCase() === b.toLowerCase())) return s
+/**
+ * Schlagwort an seinem alphabetischen Platz dazunehmen; ein gleiches (ohne Groß- und Kleinschreibung) nur einmal.
+ * Steht es schon im Bestand, gilt dessen Schreibweise.
+ */
+export function schlagwortDazu(s: Schlagwort[], begriff: string, bestand: string[] = []): Schlagwort[] {
+  const gleich = (x: string) => x.toLowerCase() === begriff.trim().toLowerCase()
+  const b = bestand.find(gleich) ?? begriff.trim()
+  if (!b || s.some((x) => gleich(x.begriff))) return s
   return sortiereSchlagwoerter([...s, { begriff: b }])
 }
 

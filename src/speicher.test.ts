@@ -55,6 +55,11 @@ describe('Import und Export', () => {
     expect(d.werke[0].schlagwoerter).toEqual([{ begriff: 'Ästhetik' }, { begriff: 'ethik' }, { begriff: 'Freiheit' }])
     expect(d.listen[0].regel).not.toHaveProperty('nurPrimaer')
     expect(d.listen[0].regel?.schlagwort).toBe('Freiheit')
+    expect(migriere(d)).toEqual(d)
+  })
+  it('gleiche Schlagwörter mit anderer Groß- und Kleinschreibung auf einer Karte werden eins', () => {
+    const karte = { ...leeresWerk(), schlagwoerter: [{ begriff: 'Freiheit' }, { begriff: 'freiheit' }] }
+    expect(migriere({ werke: [karte], verlage: [], listen: [], themen: [] }).werke[0].schlagwoerter).toEqual([{ begriff: 'Freiheit' }])
   })
   it('ergänzt älteren Karten eine leere Vorlage', () => {
     const { vorlage: _vorlage, ...ohne } = leeresWerk()
@@ -137,5 +142,11 @@ describe('Schlagwörter', () => {
   it('kommen alphabetisch dazu, gleiche nur einmal', () => {
     const s = schlagwortDazu(schlagwortDazu(schlagwortDazu([], 'Freiheit'), 'Ästhetik'), 'freiheit')
     expect(s).toEqual([{ begriff: 'Ästhetik' }, { begriff: 'Freiheit' }])
+  })
+})
+
+describe('Schlagwörter aus dem Bestand', () => {
+  it('übernehmen die vorhandene Schreibweise', () => {
+    expect(schlagwortDazu([], 'freiheit', ['Freiheit', 'Ethik'])).toEqual([{ begriff: 'Freiheit' }])
   })
 })

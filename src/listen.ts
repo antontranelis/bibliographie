@@ -36,7 +36,7 @@ export function passtZurRegel(w: Werk, r: ListenRegel, themen: Thema[] = []): bo
     (!menge || w.themen.some((t) => menge.has(t))) &&
     (!r.nurFest || w.status === 'fest') &&
     (!r.person || w.personen.some((p) => personSchluessel(p) === r.person)) &&
-    (!r.schlagwort || w.schlagwoerter.some((s) => s.begriff === r.schlagwort))
+    (!r.schlagwort || w.schlagwoerter.some((s) => s.begriff.toLowerCase() === r.schlagwort.toLowerCase()))
   )
 }
 

@@ -139,6 +139,13 @@ pruefe('Liste gelöscht, Karten bleiben', (await daten()).listen.length === 2 &&
   await reiter('Liste').click()
   await page.getByLabel(/von\s+selbst aufnehmen/).check()
   pruefe('Kein „nur primär“ in der Liste', (await page.getByText('nur primär').count()) === 0)
+
+  // Unter der alten Fassung fixierte Schlagwörter kommen alphabetisch auf die nächste Karte
+  await page.evaluate(() => localStorage.setItem('bibliographie:fixierung', JSON.stringify({ schlagwoerter: [{ begriff: 'Freiheit', primaer: true }, { begriff: 'Ethik', primaer: false }] })))
+  await page.reload()
+  await reiter('Erfassen').click()
+  const fixiert = (await page.locator('.feld', { has: feld }).locator('.chip').allInnerTexts()).map((t) => t.replace('×', '').trim())
+  pruefe('Alte Fixierung alphabetisch', fixiert.join(',') === 'Ethik,Freiheit', fixiert.join(','))
 }
 
 // Schmal
