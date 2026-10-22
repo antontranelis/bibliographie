@@ -12,7 +12,8 @@ import type { ImportPlan } from './import/einlesen'
 import { ALLE, hinzufuegen, neueListe } from './listen'
 import { Verlage } from './Verlage'
 import { beispielDaten } from './beispiel'
-import { exportiere, exportiereCsl, importiere, ladeLokal, speichereLokal, zusammenfuehren } from './speicher'
+import { exportiere, exportiereCsl, importiere, zusammenfuehren } from './speicher'
+import { lade, sichereSofort, speichere } from './ablage'
 import { herunterladen } from './herunterladen'
 import { anzeigeName, findeExakt, nameFuerJahr, ortFuerJahr, planeVerlage, wendePlanAn, type VerlagsGruppe } from './verlag'
 import { Abwaerts, Nadel, StatusPunkt } from './Symbole'
@@ -88,8 +89,9 @@ const REITER: { ansicht: Ansicht; label: string; taste: string }[] = [
   { ansicht: 'verlage', label: 'Verlage', taste: 'F6' },
 ]
 
-export default function App() {
-  const [daten, setDaten] = useState<Datenstamm>(() => ladeLokal() ?? leererDatenstamm())
+/** @param start der gespeicherte Stand, vor dem ersten Zeichnen gelesen (main.tsx) */
+export default function App({ start }: { start: Datenstamm }) {
+  const [daten, setDaten] = useState<Datenstamm>(start)
   const [fixiert, setFixiert] = useState<Fixierung>(ladeFixierung)
   const [ansicht, setAnsicht] = useState<Ansicht>('erfassen')
   const [entwurf, setEntwurf] = useState<Werk | null>(() => mitFixierung(leeresWerk(), fixiert, daten.verlage))
@@ -114,24 +116,35 @@ export default function App() {
   const zuSpeichern = useRef(daten)
   zuSpeichern.current = daten
   // Nur das Fenster mit Schreibrecht speichert; andere würden mit altem Stand überschreiben
-  const sofortSpeichern = () => {
-    const ok = speichereLokal(zuSpeichern.current)
+  const sofortSpeichern = async () => {
+    const ok = await speichere(zuSpeichern.current)
     setSpeicherVoll(!ok)
     return ok
   }
   // Schreibrecht, Speichern und Versionswechsel entscheidet allein die Sitzung (sitzung.ts)
-  const fenster = useSitzung(sofortSpeichern, () => setDaten(ladeLokal() ?? leererDatenstamm()))
+  const fenster = useSitzung(sofortSpeichern, async () => setDaten((await lade()) ?? leererDatenstamm()))
   const schreibend = fenster.recht === 'ja' && !fenster.wechselt
   const darfSchreiben = useRef(false)
   darfSchreiben.current = schreibend
   useEffect(() => {
-    const t = setTimeout(() => darfSchreiben.current && setSpeicherVoll(!speichereLokal(daten)), 400)
+    const t = setTimeout(() => darfSchreiben.current && speichere(daten).then((ok) => setSpeicherVoll(!ok)), 400)
     return () => clearTimeout(t)
   }, [daten])
   useEffect(() => {
-    const sofort = () => darfSchreiben.current && speichereLokal(zuSpeichern.current)
+    // Beim Verlassen nicht auf das verzögerte Speichern warten. Schon beim Verbergen, das kommt vor dem Schließen.
+    // Ein Speichern, das erst jetzt beginnt, kommt nicht sicher an; der Nachtrag schon (ablage.ts)
+    const sofort = () => {
+      if (!darfSchreiben.current) return
+      sichereSofort(zuSpeichern.current)
+      speichere(zuSpeichern.current)
+    }
+    const verborgen = () => document.visibilityState === 'hidden' && sofort()
     window.addEventListener('pagehide', sofort)
-    return () => window.removeEventListener('pagehide', sofort)
+    document.addEventListener('visibilitychange', verborgen)
+    return () => {
+      window.removeEventListener('pagehide', sofort)
+      document.removeEventListener('visibilitychange', verborgen)
+    }
   }, [])
   useEffect(() => {
     try {

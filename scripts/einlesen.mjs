@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { strToU8, zipSync } from 'fflate'
 import { chromium } from 'playwright-core'
-import { spieleEin } from './einspielen.mjs'
+import { gespeichert, leere, spieleEin } from './einspielen.mjs'
 
 const [url = 'http://localhost:4321/', aus] = process.argv.slice(2)
 const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN })
@@ -34,11 +34,10 @@ page.on('pageerror', (e) => fehler.push(e.message))
 await page.route('https://lobid.org/**', (r) => r.abort())
 await page.route('https://services.dnb.de/**', (r) => r.abort())
 await page.goto(url)
-await page.evaluate(() => localStorage.clear())
-await page.reload()
+await leere(page)
 const daten = async () => {
   await page.waitForTimeout(500)
-  return page.evaluate(() => JSON.parse(localStorage.getItem('bibliographie:datenstamm:v1') ?? '{"werke":[],"verlage":[],"listen":[]}'))
+  return (await gespeichert(page)) ?? { werke: [], verlage: [], listen: [], themen: [] }
 }
 const reiter = (name) => page.locator('.reiter button', { hasText: name })
 const einlesen = async (name, buffer) => {
@@ -151,10 +150,8 @@ if (process.env.ODT_DATEI) {
   await knopf.click()
   await page.locator('#listen-name').waitFor()
   const anlegen = Date.now() - t2
-  const groesse = await page.evaluate(async () => {
-    await new Promise((r) => setTimeout(r, 800))
-    return (localStorage.getItem('bibliographie:datenstamm:v1') ?? '').length
-  })
+  await page.waitForTimeout(800)
+  const groesse = JSON.stringify(await gespeichert(page)).length
   const koepfe = await page.locator('.eintraege .thema-kopf').count()
   const weitere = await page.locator('.weitere-eintraege').innerText()
   pruefe('Gekürzte Ansicht endet ganz: keine Überschrift ohne ihre Einträge', koepfe === 2 && /unter 1 weiteren Thema/.test(weitere), `${koepfe} Überschriften, „${weitere}“`)

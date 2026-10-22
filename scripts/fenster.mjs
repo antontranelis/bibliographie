@@ -1,6 +1,7 @@
 // Prüft, dass nur ein Fenster schreibt und die Übergabe nichts verliert. Aufruf: node scripts/fenster.mjs <url>
 // Auch gegen den Devserver laufen lassen: dort startet React im StrictMode doppelt.
 import { chromium } from 'playwright-core'
+import { gespeichert } from './einspielen.mjs'
 import { speicherFrei, speicherVoll } from './speicher-voll.mjs'
 
 const [url = 'http://localhost:4321/'] = process.argv.slice(2)
@@ -29,7 +30,7 @@ const inKartei = async (p, titel) => {
   await p.locator('.reiter button', { hasText: 'Kartei' }).click()
   return (await p.locator('.kartei-karte', { hasText: titel }).count()) === 1
 }
-const gespeichert = (p) => p.evaluate(() => localStorage.getItem('bibliographie:datenstamm:v1') ?? '')
+const alsText = async (p) => JSON.stringify(await gespeichert(p))
 
 try {
   const a = await seite()
@@ -40,7 +41,7 @@ try {
   pruefe('Zweites Fenster ist gesperrt', await gesperrt(b).isVisible())
 
   await karte(a, 'Aus Fenster A')
-  pruefe('Karte aus A gespeichert', (await gespeichert(a)).includes('Aus Fenster A'))
+  pruefe('Karte aus A gespeichert', (await alsText(a)).includes('Aus Fenster A'))
 
   await b.getByRole('button', { name: 'Hier weiterarbeiten' }).click()
   await gesperrt(b).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
@@ -86,7 +87,7 @@ try {
   // Gesperrtes Fenster schreibt nie, auch nicht beim Schließen
   const c = await seite()
   await c.close()
-  pruefe('Schließen eines gesperrten Fensters verliert nichts', (await gespeichert(a)).includes('Aus Fenster B'))
+  pruefe('Schließen eines gesperrten Fensters verliert nichts', (await alsText(a)).includes('Aus Fenster B'))
 
 } catch (e) {
   pruefe('Ablauf ohne Abbruch', false, e.message.split('\n')[0])

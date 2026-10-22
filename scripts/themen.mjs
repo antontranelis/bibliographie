@@ -1,5 +1,6 @@
 // Prüft Themenordnung, Themen auf der Karte, Kartei-Register und Listen nach Themen. Aufruf: node scripts/themen.mjs <url> [ausgabeordner]
 import { chromium } from 'playwright-core'
+import { gespeichert } from './einspielen.mjs'
 
 const [url = 'http://localhost:4321/', aus] = process.argv.slice(2)
 const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN })
@@ -15,7 +16,7 @@ await page.route('https://services.dnb.de/**', (r) => r.abort())
 await page.goto(url)
 const daten = async () => {
   await page.waitForTimeout(500)
-  return page.evaluate(() => JSON.parse(localStorage.getItem('bibliographie:datenstamm:v1') ?? '{}'))
+  return (await gespeichert(page)) ?? { werke: [], verlage: [], listen: [], themen: [] }
 }
 const reiter = (name) => page.locator('.reiter button', { hasText: name })
 

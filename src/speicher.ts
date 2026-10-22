@@ -147,25 +147,4 @@ export function exportiereCsl(werke: Werk[]): string {
   return JSON.stringify(items, null, 2)
 }
 
-const SCHLUESSEL = 'bibliographie:datenstamm:v1'
-
-export function ladeLokal(): Datenstamm | null {
-  try {
-    const text = localStorage.getItem(SCHLUESSEL)
-    return text ? migriere(JSON.parse(text) as Datenstamm) : null
-  } catch {
-    return null
-  }
-}
-
-/** Speichert im Browser. Falsch, wenn der Speicher voll oder gesperrt ist: dann bleibt nur die Exportdatei. */
-export function speichereLokal(d: Datenstamm): boolean {
-  try {
-    localStorage.setItem(SCHLUESSEL, JSON.stringify(d))
-    return true
-  } catch {
-    return false
-  }
-}
-
 export { neueId }

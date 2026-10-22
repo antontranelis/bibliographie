@@ -29,7 +29,7 @@ pnpm test
 pnpm build
 ```
 
-Rundgang mit Bildschirmfotos gegen `pnpm preview --port 4321`; `scripts/datenverlust.mjs` und `scripts/verlage.mjs` prüfen gezielte Abläufe:
+Rundgang mit Bildschirmfotos gegen `pnpm preview --port 4321`; die übrigen Skripte in `scripts/` prüfen gezielte Abläufe, etwa `scripts/ablage.mjs` den Speicher mit 20.000 Karten:
 
 ```sh
 CHROME_BIN=<pfad-zu-chrome> node scripts/rundgang.mjs http://localhost:4321/ <ordner>
@@ -37,4 +37,4 @@ CHROME_BIN=<pfad-zu-chrome> node scripts/rundgang.mjs http://localhost:4321/ <or
 
 ## Datenformat
 
-Die Sicherungsdatei ist JSON mit `format: "bibliographie-datenstamm"` und einer Versionsnummer, derzeit 2. Dateien der Version 1 werden beim Einlesen übersetzt. Sie enthält `werke` und `verlage`, das Modell steht in `src/model.ts`. Beim Einlesen werden Karten mit gleicher ID zusammengeführt, die zuletzt geänderte Fassung gewinnt.
+Im Browser liegen die Daten in IndexedDB (`src/ablage.ts`). Die Sicherungsdatei ist JSON mit `format: "bibliographie-datenstamm"` und einer Versionsnummer, derzeit 7. Ältere Dateien werden beim Einlesen übersetzt. Sie enthält `werke`, `verlage`, `listen` und `themen`, das Modell steht in `src/model.ts`. Beim Einlesen werden Karten mit gleicher ID zusammengeführt, die zuletzt geänderte Fassung gewinnt.

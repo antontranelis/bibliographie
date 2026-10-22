@@ -10,7 +10,7 @@ import { schalteScharf, verbinde } from './aktualisierung'
 // zwei schreibende Fenster würden sich gegenseitig überschreiben. Das Schreibrecht ist eine Sperre des
 // Browsers (Web Locks). Wer es nicht hat, schreibt nie und steht in der Schlange; schließt das schreibende
 // Fenster, rückt das nächste nach und lädt den gespeicherten Stand.
-// „Hier weiterarbeiten“: Das schreibende Fenster speichert, hört auf zu schreiben und meldet „abgegeben“;
+// „Hier weiterarbeiten“: Das schreibende Fenster hört auf zu schreiben, meldet „speichert“, speichert und meldet „abgegeben“;
 // dann nimmt das bittende Fenster die Sperre (steal). Kommt keiner, schreibt das erste weiter.
 // Gelingt das Speichern nicht (Speicher voll), meldet es „verweigert“ und schreibt weiter. Antwortet das
 // schreibende Fenster gar nicht, wird nur übernommen, wenn die Sperre wirklich frei ist.
@@ -19,6 +19,10 @@ const SPERRE = 'bibliographie-schreibrecht'
 const KANAL = 'bibliographie-schreibrecht'
 /** So lange wartet ein abgebendes Fenster auf die Übernahme */
 const UEBERGABE = 3000
+/** So lange wartet ein bittendes Fenster auf eine erste Antwort */
+const ANTWORT = 1500
+/** So lange wartet es, wenn das schreibende Fenster gerade speichert (große Karteien) */
+const SPEICHERN = 30_000
 
 export type Schreibrecht = 'pruefen' | 'ja' | 'nein'
 
@@ -38,7 +42,7 @@ export interface Sitzung {
   nichtGespeichert: boolean
   absage: Absage
   uebernehmen: () => void
-  aktualisieren: () => Wechsel
+  aktualisieren: () => Promise<Wechsel>
 }
 
 /** So lange nach dem Öffnen darf eine „beim Start“ gemeldete Version noch von selbst übernehmen */
@@ -48,7 +52,7 @@ const STARTFENSTER = 10_000
  * @param speichern schreibt den aktuellen Stand sofort; falsch, wenn das nicht gelingt
  * @param neuLaden holt den Stand aus dem Speicher, wenn das Schreibrecht hierher wechselt
  */
-export function useSitzung(speichern: () => boolean, neuLaden: () => void): Sitzung {
+export function useSitzung(speichern: () => Promise<boolean>, neuLaden: () => Promise<void>): Sitzung {
   const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined
   const [recht, setRechtZustand] = useState<Schreibrecht>(locks ? 'pruefen' : 'ja')
   const [absage, setAbsage] = useState<Absage>('')
@@ -67,6 +71,8 @@ export function useSitzung(speichern: () => boolean, neuLaden: () => void): Sitz
     /** Zählt jeden Abbau der Komponente; eine Sperre, die erst danach bewilligt wird, gehört niemandem mehr */
     abbau: 0,
     halte: false,
+    /** Gibt gerade ab und speichert dafür */
+    gibtAb: false,
     loslassen: null as (() => void) | null,
     schlange: null as AbortController | null,
     kanal: null as BroadcastChannel | null,
@@ -81,11 +87,11 @@ export function useSitzung(speichern: () => boolean, neuLaden: () => void): Sitz
   )
 
   /** Neue Version übernehmen: nur als Schreiber, nur nach erfolgreichem Speichern; danach eingefroren. */
-  const aktualisieren = useCallback((): Wechsel => {
+  const aktualisieren = useCallback(async (): Promise<Wechsel> => {
     if (z.recht !== 'ja' || z.wechselt) return 'nicht-erlaubt'
     z.wechselt = true
     setWechselt(true)
-    if (!rueckruf.current.speichern()) {
+    if (!(await rueckruf.current.speichern())) {
       z.wechselt = false
       setWechselt(false)
       setNichtGespeichert(true)
@@ -118,13 +124,13 @@ export function useSitzung(speichern: () => boolean, neuLaden: () => void): Sitz
             startVersuchen()
           }
         },
-        uebernommen: () => {
+        uebernommen: async () => {
           // Selbst freigegeben oder ohne Schreibrecht: nichts zu verlieren
           if (z.wechselt || z.recht !== 'ja') return location.reload()
           // Unerwartet als Schreiber: nur neu laden, wenn gespeichert ist
           z.wechselt = true
           setWechselt(true)
-          if (rueckruf.current.speichern()) return location.reload()
+          if (await rueckruf.current.speichern()) return location.reload()
           z.wechselt = false
           setWechselt(false)
           setNichtGespeichert(true)
@@ -144,7 +150,7 @@ export function useSitzung(speichern: () => boolean, neuLaden: () => void): Sitz
       let meine = 0
       const aufbau = z.abbau
       return locks
-        .request(SPERRE, optionen, (sperre) => {
+        .request(SPERRE, optionen, async (sperre) => {
           if (!sperre) return null
           // Erst nach dem Abbau bewilligt (etwa beim doppelten Start im Entwicklungsmodus): sofort zurückgeben
           if (z.abbau !== aufbau) return null
@@ -152,7 +158,9 @@ export function useSitzung(speichern: () => boolean, neuLaden: () => void): Sitz
           z.schlange = null
           meine = ++z.generation
           z.halte = true
-          if (zuvorLesend) rueckruf.current.neuLaden()
+          if (zuvorLesend) await rueckruf.current.neuLaden()
+          // Während des Ladens abgebaut oder weggenommen: nicht mehr schreiben
+          if (z.generation !== meine || !z.halte) return
           setRecht('ja')
           // Gehalten bis steal, Schließen des Fensters oder Abbau der Komponente
           return new Promise<void>((fertig) => {
@@ -188,15 +196,26 @@ export function useSitzung(speichern: () => boolean, neuLaden: () => void): Sitz
     const k = new BroadcastChannel(KANAL)
     z.kanal = k
     let weiter: ReturnType<typeof setTimeout> | undefined
-    k.onmessage = (e) => {
+    k.onmessage = async (e) => {
       if (e.data !== 'gib-ab' || !z.halte) return
-      // Nur abgeben, was sicher gespeichert ist; während eines Versionswechsels gar nicht
-      if (z.wechselt || !rueckruf.current.speichern()) {
+      // Schon dabei: die Antwort geht an alle bittenden Fenster
+      if (z.gibtAb) return k.postMessage('speichert')
+      // Während eines Versionswechsels nicht abgeben
+      if (z.wechselt) return k.postMessage('verweigert')
+      // Erst aufhören zu schreiben, dann speichern: nur abgeben, was sicher gespeichert ist
+      const g = z.generation
+      z.gibtAb = true
+      setRecht('nein')
+      k.postMessage('speichert')
+      const ok = await rueckruf.current.speichern()
+      z.gibtAb = false
+      // Inzwischen abgebaut oder weggenommen
+      if (!z.halte || z.generation !== g) return
+      if (!ok) {
+        setRecht('ja')
         k.postMessage('verweigert')
         return
       }
-      setRecht('nein')
-      const g = z.generation
       k.postMessage('abgegeben')
       // Übernimmt niemand, bleibt das Schreibrecht hier
       weiter = setTimeout(() => z.halte && z.generation === g && setRecht('ja'), UEBERGABE)
@@ -216,6 +235,7 @@ export function useSitzung(speichern: () => boolean, neuLaden: () => void): Sitz
       z.abbau++
       z.generation++
       z.halte = false
+      z.gibtAb = false
       z.loslassen?.()
       z.loslassen = null
       z.schlange?.abort()
@@ -241,17 +261,22 @@ export function useSitzung(speichern: () => boolean, neuLaden: () => void): Sitz
       z.schlange = null
       erwerben(optionen, true).then((ok) => ok || anstellenRef.current())
     }
-    const antwort = (e: MessageEvent) => {
-      if (e.data === 'abgegeben' && ende()) nehmen({ steal: true })
-      if (e.data === 'verweigert' && ende()) setAbsage('verweigert')
-    }
     // Antwortet niemand: nur übernehmen, wenn die Sperre wirklich frei ist
-    const t = setTimeout(async () => {
+    const keineAntwort = async () => {
       if (!ende()) return
       const stand = await locks.query()
       if (stand.held?.some((s) => s.name === SPERRE)) setAbsage('antwortet-nicht')
       else nehmen({ ifAvailable: true })
-    }, 1500)
+    }
+    let t = setTimeout(keineAntwort, ANTWORT)
+    const antwort = (e: MessageEvent) => {
+      if (e.data === 'speichert' && !erledigt) {
+        clearTimeout(t)
+        t = setTimeout(keineAntwort, SPEICHERN)
+      }
+      if (e.data === 'abgegeben' && ende()) nehmen({ steal: true })
+      if (e.data === 'verweigert' && ende()) setAbsage('verweigert')
+    }
     k.addEventListener('message', antwort)
     k.postMessage('gib-ab')
   }, [locks, erwerben, z])
