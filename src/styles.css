@@ -431,7 +431,7 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
 .themen-baum { padding: 8px 0; }
 .thema-zeile { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding-top: 6px; padding-bottom: 6px; padding-right: 12px; border-bottom: 1px solid var(--zart); }
 .thema-zeile:last-child { border-bottom: 0; }
-.thema-nummer { width: 64px; flex: 0 0 auto; }
+.thema-nummer { width: 6.5em; flex: 0 0 auto; }
 .thema-titel { flex: 1 1 240px; font-size: 17px; }
 .thema-anzahl { min-width: 90px; }
 .thema-knoepfe { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -458,9 +458,9 @@ tbody.mit-warnung tr { background: var(--warn-bg); }
 .import-zahlen dt { font: 600 11px/1.2 var(--sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--lab); }
 .import-zahlen dd { margin: 2px 0 0; font: 600 22px/1.2 var(--serif); }
 .geruest-vorschau { max-height: 55vh; overflow-y: auto; box-shadow: none; border: 1px solid var(--linie); }
-.geruest-vorschau .thema-zeile { cursor: pointer; font-family: var(--serif); }
+.geruest-vorschau .thema-zeile { cursor: pointer; font-family: var(--serif); flex-wrap: nowrap; align-items: baseline; }
 .geruest-vorschau .thema-zeile.abgewaehlt { color: var(--blass); text-decoration: line-through; }
-.geruest-nummer { min-width: 44px; color: var(--lab); }
+.geruest-nummer { flex: 0 0 auto; min-width: 5.5em; color: var(--lab); }
 .import-hinweis { margin: -6px 0 0 26px; }
 .import-name { display: grid; gap: 4px; max-width: 420px; }
 .klein-wahl { font: 600 13px/1 var(--sans); border: 1px solid var(--linie2); background: #fff; border-radius: 5px; padding: 6px 8px; }
