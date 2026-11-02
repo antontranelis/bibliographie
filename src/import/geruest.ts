@@ -10,10 +10,10 @@ const NUMMER = /^((?:(?:[IVXLCDM]+|\d+)(?:\.[A-Za-z0-9/]+)+|[IVXLCDM]+|[ivxlc]{2
 /** Zusammengesetzter Code: römische Zahl oder Ziffer vorn, dann Glieder nach Punkten */
 const CODE = /^(?:[IVXLCDM]+|\d+)\.[A-Za-z0-9]/
 
-/** Zahl der Glieder: „I.A.1a1“ → I, A, 1, a, 1; „1/2“ ist ein Glied */
-function glieder(nummer: string): number {
+/** Glieder eines Codes: „I.A.1a1“ → I, A, 1, a, 1; „1/2“ ist ein Glied */
+function glieder(nummer: string): string[] {
   const [kopf, ...rest] = nummer.replace(/[.)]$/, '').split('.')
-  return (kopf ? 1 : 0) + rest.reduce((n, teil) => n + (teil.match(/\d+(?:\/\d+)*|[A-Za-z]/g)?.length ?? 0), 0)
+  return [...(kopf ? [kopf] : []), ...rest.flatMap((teil) => teil.match(/\d+(?:\/\d+)*|[A-Za-z]/g) ?? [])]
 }
 
 /** „V. Medien“ → Nummer „V.“, Titel „Medien“. Ein Wort ohne Satzzeichen nach einem Buchstaben ist keine Nummer. */
@@ -56,6 +56,7 @@ function bauen(zeilen: Zeile[]): Thema[] {
   const tiefen = [...new Set(eintraege.map((z) => z.tiefe))].sort((a, b) => a - b)
   const nummeriert = eintraege.filter((z) => z.nummer).length >= eintraege.length / 2
   const dezimal = eintraege.some((z) => z.nummer && art(z.nummer) === 'dezimal')
+  const istCode = (nummer: string) => dezimal && (CODE.test(nummer) || /^(?:[IVXLCDM]+|\d+)[.)]?$/.test(nummer))
 
   const ebenen: number[] = []
   if (tiefen.length > 1) {
@@ -68,8 +69,9 @@ function bauen(zeilen: Zeile[]): Thema[] {
     for (const z of eintraege) {
       let e: number
       if (!z.nummer) e = Math.max(vorige, 0)
-      // Codes und ihre obersten Nummern („I.“ zu „I.A.1“, „1“ zu „1.2“) nach der Zahl ihrer Glieder
-      else if (dezimal && (CODE.test(z.nummer) || /^(?:[IVXLCDM]+|\d+)[.)]?$/.test(z.nummer))) e = glieder(z.nummer) - 1
+      // Codes und ihre obersten Nummern („I.“ zu „I.A.1“, „1“ zu „1.2“) nach der Zahl ihrer Glieder;
+      // eingehängt werden sie unten beim nächsten vorhandenen Code ihres Zweigs
+      else if (istCode(z.nummer)) e = glieder(z.nummer).length - 1
       else {
         const a = art(z.nummer)
         if (!ebeneVonArt.has(a)) ebeneVonArt.set(a, vorige + 1)
@@ -80,13 +82,24 @@ function bauen(zeilen: Zeile[]): Thema[] {
     }
   } else eintraege.forEach(() => ebenen.push(0))
 
-  // Baum: keine Sprünge um mehr als eine Ebene nach unten
+  // Baum: keine Sprünge um mehr als eine Ebene nach unten. Codes hängen am längsten schon vorhandenen Code,
+  // der ihr Anfang ist („I.C.5a“ ohne „I.C.5“ unter „I.C.“), nie in einem fremden Zweig
   const themen: Thema[] = []
   const eltern: string[] = []
+  const codes = new Map<string, { id: string; ebene: number }>()
   let vorige = -1
   eintraege.forEach((z, i) => {
-    const e = Math.min(ebenen[i], vorige + 1)
-    const thema: Thema = { id: neueId(), nummer: z.nummer, titel: z.titel, elternId: e > 0 ? eltern[e - 1] : '' }
+    let e = Math.min(ebenen[i], vorige + 1)
+    let elternId = e > 0 ? eltern[e - 1] : ''
+    if (tiefen.length === 1 && z.nummer && istCode(z.nummer)) {
+      const g = glieder(z.nummer)
+      let anfang: { id: string; ebene: number } | undefined
+      for (let n = g.length - 1; n > 0 && !anfang; n--) anfang = codes.get(g.slice(0, n).join('.'))
+      e = anfang ? anfang.ebene + 1 : 0
+      elternId = anfang?.id ?? ''
+    }
+    const thema: Thema = { id: neueId(), nummer: z.nummer, titel: z.titel, elternId }
+    if (z.nummer && istCode(z.nummer)) codes.set(glieder(z.nummer).join('.'), { id: thema.id, ebene: e })
     eltern[e] = thema.id
     eltern.length = e + 1
     themen.push(thema)

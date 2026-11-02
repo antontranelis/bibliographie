@@ -173,10 +173,20 @@ export function leseAbsaetze(bytes: Uint8Array): { text: string; tiefe: number }
   let listenTiefe = 0
   let absatzTiefe = 0
   let text = ''
-  /** Zellen der laufenden Tabellenzeile, null außerhalb einer Tabelle */
-  let zeile: string[] | null = null
+  // Offene Tabellenzeilen, innerste zuletzt, mit der Listentiefe, in der sie stehen. Absätze direkt in der
+  // innersten Zeile sammeln sich zu einer Zeile; eine Tabelle oder Liste in einer Zelle schließt das Gesammelte
+  // vorher ab, damit nichts verloren geht und die Reihenfolge bleibt.
+  const zeilen: { zellen: string[]; liste: number }[] = []
+  const abschliessen = () => {
+    const z = zeilen.at(-1)
+    if (!z) return
+    const t = z.zellen.join(' ').replace(/\s+/g, ' ').trim()
+    if (t) aus.push({ text: t, tiefe: z.liste })
+    z.zellen = []
+  }
   const absatz = (t: string) => {
-    if (zeile) zeile.push(t)
+    const z = zeilen.at(-1)
+    if (z && z.liste === listenTiefe) z.zellen.push(t)
     else aus.push({ text: t, tiefe: listenTiefe })
   }
   for (const [, schliessend, tag, , selbst, inhalt] of koerper.matchAll(/<(\/?)([\w:-]+)([^>]*?)(\/?)>|([^<]+)/g)) {
@@ -185,13 +195,17 @@ export function leseAbsaetze(bytes: Uint8Array): { text: string; tiefe: number }
       continue
     }
     if (tag === 'table:table-row' && !selbst) {
-      if (!schliessend) zeile = []
-      else if (zeile) {
-        const t = zeile.join(' ').replace(/\s+/g, ' ').trim()
-        if (t) aus.push({ text: t, tiefe: listenTiefe })
-        zeile = null
+      if (!schliessend) {
+        abschliessen()
+        zeilen.push({ zellen: [], liste: listenTiefe })
+      } else {
+        abschliessen()
+        zeilen.pop()
       }
-    } else if (tag === 'text:list') listenTiefe += !schliessend && !selbst ? 1 : schliessend ? -1 : 0
+    } else if (tag === 'text:list') {
+      if (!schliessend && !selbst && zeilen.at(-1)?.liste === listenTiefe) abschliessen()
+      listenTiefe += !schliessend && !selbst ? 1 : schliessend ? -1 : 0
+    }
     else if (tag === 'text:p' || tag === 'text:h') {
       if (!schliessend && !selbst) {
         if (absatzTiefe++ === 0) text = ''
