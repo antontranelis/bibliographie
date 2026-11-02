@@ -53,6 +53,29 @@ describe('leseOdtDokument', () => {
 })
 
 describe('leseAbsaetze', () => {
+  it('verschachtelte Tabelle und Liste in einer Zelle: nichts geht verloren, nichts wird zusammengezogen', () => {
+    const zelle = (x: string) => `<table:table-cell>${x}</table:table-cell>`
+    const verschachtelt = leseAbsaetze(
+      dokument(`<table:table><table:table-row>${zelle('<text:p>I.</text:p>')}${zelle('<text:p>Hauptthema</text:p><table:table><table:table-row>' + zelle('<text:p>a)</text:p>') + zelle('<text:p>Unterthema</text:p>') + '</table:table-row></table:table><text:p>Folgeabsatz</text:p>')}</table:table-row></table:table>`),
+    )
+    expect(verschachtelt.map((a) => a.text)).toEqual(['I. Hauptthema', 'a) Unterthema', 'Folgeabsatz'])
+    const liste = leseAbsaetze(
+      dokument(`<table:table><table:table-row>${zelle('<text:p>I.</text:p>')}${zelle('<text:p>Hauptthema</text:p><text:list><text:list-item><text:p>a) Unterthema</text:p></text:list-item></text:list>')}</table:table-row></table:table>`),
+    )
+    expect(liste).toEqual([
+      { text: 'I. Hauptthema', tiefe: 0 },
+      { text: 'a) Unterthema', tiefe: 1 },
+    ])
+  })
+  it('eine Tabellenzeile ist eine Zeile: Nummer und Titel in zwei Spalten', () => {
+    const zeile = (n: string, t: string) => `<table:table-row><table:table-cell><text:p>${n}</text:p></table:table-cell><table:table-cell><text:p>${t}</text:p></table:table-cell></table:table-row>`
+    const a = leseAbsaetze(dokument(`<table:table><table:table-column/>${zeile('V.', 'Medien')}${zeile('a)', 'Film')}<table:table-row><table:table-cell><text:p/></table:table-cell><table:table-cell/></table:table-row></table:table><text:p>Danach</text:p>`))
+    expect(a).toEqual([
+      { text: 'V. Medien', tiefe: 0 },
+      { text: 'a) Film', tiefe: 0 },
+      { text: 'Danach', tiefe: 0 },
+    ])
+  })
   it('alle Absätze in Reihenfolge, mit der Tiefe ihrer Aufzählung', () => {
     const a = leseAbsaetze(
       dokument(

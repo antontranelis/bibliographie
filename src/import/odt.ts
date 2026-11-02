@@ -163,6 +163,7 @@ export const leseOdt = (bytes: Uint8Array): OdtEintrag[] => leseOdtDokument(byte
 /**
  * Alle Absätze in Lesereihenfolge mit der Tiefe ihrer Aufzählung (0 = außerhalb einer Liste).
  * Für Gliederungen wie ein Gesamtgerüst, bei denen nicht nur die oberste Listenebene zählt.
+ * Eine Tabellenzeile zählt als ein Absatz, ihre Zellen nebeneinander (etwa Nummer | Titel).
  */
 export function leseAbsaetze(bytes: Uint8Array): { text: string; tiefe: number }[] {
   const dateien = unzipSync(bytes, { filter: (f) => f.name === 'content.xml' })
@@ -172,18 +173,45 @@ export function leseAbsaetze(bytes: Uint8Array): { text: string; tiefe: number }
   let listenTiefe = 0
   let absatzTiefe = 0
   let text = ''
+  // Offene Tabellenzeilen, innerste zuletzt, mit der Listentiefe, in der sie stehen. Absätze direkt in der
+  // innersten Zeile sammeln sich zu einer Zeile; eine Tabelle oder Liste in einer Zelle schließt das Gesammelte
+  // vorher ab, damit nichts verloren geht und die Reihenfolge bleibt.
+  const zeilen: { zellen: string[]; liste: number }[] = []
+  const abschliessen = () => {
+    const z = zeilen.at(-1)
+    if (!z) return
+    const t = z.zellen.join(' ').replace(/\s+/g, ' ').trim()
+    if (t) aus.push({ text: t, tiefe: z.liste })
+    z.zellen = []
+  }
+  const absatz = (t: string) => {
+    const z = zeilen.at(-1)
+    if (z && z.liste === listenTiefe) z.zellen.push(t)
+    else aus.push({ text: t, tiefe: listenTiefe })
+  }
   for (const [, schliessend, tag, , selbst, inhalt] of koerper.matchAll(/<(\/?)([\w:-]+)([^>]*?)(\/?)>|([^<]+)/g)) {
     if (inhalt !== undefined) {
       if (absatzTiefe > 0) text += dekodiere(inhalt)
       continue
     }
-    if (tag === 'text:list') listenTiefe += !schliessend && !selbst ? 1 : schliessend ? -1 : 0
+    if (tag === 'table:table-row' && !selbst) {
+      if (!schliessend) {
+        abschliessen()
+        zeilen.push({ zellen: [], liste: listenTiefe })
+      } else {
+        abschliessen()
+        zeilen.pop()
+      }
+    } else if (tag === 'text:list') {
+      if (!schliessend && !selbst && zeilen.at(-1)?.liste === listenTiefe) abschliessen()
+      listenTiefe += !schliessend && !selbst ? 1 : schliessend ? -1 : 0
+    }
     else if (tag === 'text:p' || tag === 'text:h') {
       if (!schliessend && !selbst) {
         if (absatzTiefe++ === 0) text = ''
       } else if (schliessend && absatzTiefe > 0 && --absatzTiefe === 0) {
         const t = text.replace(/\s+/g, ' ').trim()
-        if (t) aus.push({ text: t, tiefe: listenTiefe })
+        if (t) absatz(t)
       }
     } else if (absatzTiefe > 0 && !schliessend && (tag === 'text:s' || tag === 'text:tab' || tag === 'text:line-break')) text += ' '
   }

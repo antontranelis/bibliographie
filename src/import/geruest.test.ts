@@ -21,6 +21,14 @@ describe('geruestAusText', () => {
     const t = geruestAusText('I. Erkenntnis\na) Freiheit\nb) Denken\nII. Medien\na) Film\n1. Stummfilm\nb) Rundfunk\n')
     expect(zeigen(t)).toEqual(['0:I. Erkenntnis', '1:a) Freiheit', '1:b) Denken', '0:II. Medien', '1:a) Film', '2:1. Stummfilm', '1:b) Rundfunk'])
   })
+  it('Gliederungscodes wie I.A.1a1: jedes Glied eine Ebene, doppelter Buchstabe am Titel entfällt', () => {
+    const t = geruestAusText('I. Schöpfung\nI.A. A. Bildekräfte\nI.A.1 Goetheanismus\nI.A.1a Formen\nI.A.1a1 Blätter\nI.A.2 Naturkunde\nI.B. Äther\nII. Ursprung\nII.C.1/2 Urindien\nII.C.1/2a Tibet')
+    expect(zeigen(t)).toEqual(['0:I. Schöpfung', '1:I.A. Bildekräfte', '2:I.A.1 Goetheanismus', '3:I.A.1a Formen', '4:I.A.1a1 Blätter', '2:I.A.2 Naturkunde', '1:I.B. Äther', '0:II. Ursprung', '1:II.C.1/2 Urindien', '2:II.C.1/2a Tibet'])
+  })
+  it('Gliederungscodes: fehlt eine Zwischennummer, gilt die nächste vorhandene davor im eigenen Zweig', () => {
+    const t = geruestAusText('I. Natur\nI.C. Erde\nI.C.4 Steine\nI.C.5a Kristalle\nII. Mensch\nII.B.1c Kind\nII.B.1d1 Spiel')
+    expect(zeigen(t)).toEqual(['0:I. Natur', '1:I.C. Erde', '2:I.C.4 Steine', '2:I.C.5a Kristalle', '0:II. Mensch', '1:II.B.1c Kind', '1:II.B.1d1 Spiel'])
+  })
   it('Dezimalnummern nach Punkten', () => {
     expect(zeigen(geruestAusText('1 Medien\n1.1 Film\n1.1.1 Stummfilm\n1.2 Rundfunk\n2 Technik'))).toEqual(['0:1 Medien', '1:1.1 Film', '2:1.1.1 Stummfilm', '1:1.2 Rundfunk', '0:2 Technik'])
   })
