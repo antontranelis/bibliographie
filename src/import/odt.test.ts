@@ -53,6 +53,15 @@ describe('leseOdtDokument', () => {
 })
 
 describe('leseAbsaetze', () => {
+  it('eine Tabellenzeile ist eine Zeile: Nummer und Titel in zwei Spalten', () => {
+    const zeile = (n: string, t: string) => `<table:table-row><table:table-cell><text:p>${n}</text:p></table:table-cell><table:table-cell><text:p>${t}</text:p></table:table-cell></table:table-row>`
+    const a = leseAbsaetze(dokument(`<table:table><table:table-column/>${zeile('V.', 'Medien')}${zeile('a)', 'Film')}<table:table-row><table:table-cell><text:p/></table:table-cell><table:table-cell/></table:table-row></table:table><text:p>Danach</text:p>`))
+    expect(a).toEqual([
+      { text: 'V. Medien', tiefe: 0 },
+      { text: 'a) Film', tiefe: 0 },
+      { text: 'Danach', tiefe: 0 },
+    ])
+  })
   it('alle Absätze in Reihenfolge, mit der Tiefe ihrer Aufzählung', () => {
     const a = leseAbsaetze(
       dokument(

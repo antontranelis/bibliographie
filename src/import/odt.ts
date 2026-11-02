@@ -163,6 +163,7 @@ export const leseOdt = (bytes: Uint8Array): OdtEintrag[] => leseOdtDokument(byte
 /**
  * Alle Absätze in Lesereihenfolge mit der Tiefe ihrer Aufzählung (0 = außerhalb einer Liste).
  * Für Gliederungen wie ein Gesamtgerüst, bei denen nicht nur die oberste Listenebene zählt.
+ * Eine Tabellenzeile zählt als ein Absatz, ihre Zellen nebeneinander (etwa Nummer | Titel).
  */
 export function leseAbsaetze(bytes: Uint8Array): { text: string; tiefe: number }[] {
   const dateien = unzipSync(bytes, { filter: (f) => f.name === 'content.xml' })
@@ -172,18 +173,31 @@ export function leseAbsaetze(bytes: Uint8Array): { text: string; tiefe: number }
   let listenTiefe = 0
   let absatzTiefe = 0
   let text = ''
+  /** Zellen der laufenden Tabellenzeile, null außerhalb einer Tabelle */
+  let zeile: string[] | null = null
+  const absatz = (t: string) => {
+    if (zeile) zeile.push(t)
+    else aus.push({ text: t, tiefe: listenTiefe })
+  }
   for (const [, schliessend, tag, , selbst, inhalt] of koerper.matchAll(/<(\/?)([\w:-]+)([^>]*?)(\/?)>|([^<]+)/g)) {
     if (inhalt !== undefined) {
       if (absatzTiefe > 0) text += dekodiere(inhalt)
       continue
     }
-    if (tag === 'text:list') listenTiefe += !schliessend && !selbst ? 1 : schliessend ? -1 : 0
+    if (tag === 'table:table-row' && !selbst) {
+      if (!schliessend) zeile = []
+      else if (zeile) {
+        const t = zeile.join(' ').replace(/\s+/g, ' ').trim()
+        if (t) aus.push({ text: t, tiefe: listenTiefe })
+        zeile = null
+      }
+    } else if (tag === 'text:list') listenTiefe += !schliessend && !selbst ? 1 : schliessend ? -1 : 0
     else if (tag === 'text:p' || tag === 'text:h') {
       if (!schliessend && !selbst) {
         if (absatzTiefe++ === 0) text = ''
       } else if (schliessend && absatzTiefe > 0 && --absatzTiefe === 0) {
         const t = text.replace(/\s+/g, ' ').trim()
-        if (t) aus.push({ text: t, tiefe: listenTiefe })
+        if (t) absatz(t)
       }
     } else if (absatzTiefe > 0 && !schliessend && (tag === 'text:s' || tag === 'text:tab' || tag === 'text:line-break')) text += ' '
   }
