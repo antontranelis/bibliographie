@@ -2,10 +2,19 @@ import { neueId, type Thema } from '../model'
 import { gleichesThema, neuesNach } from '../themen'
 
 // Gesamtgerüst als Themenordnung einlesen. Jede Zeile oder jeder Absatz wird ein Thema; eine Nummer am Anfang
-// („V.“, „a)“, „1.2“) wird abgetrennt. Die Ebene ergibt sich, in dieser Reihenfolge, aus der Verschachtelung
+// („V.“, „a)“, „1.2“, „I.A.1a“) wird abgetrennt. Die Ebene ergibt sich, in dieser Reihenfolge, aus der Verschachtelung
 // der Aufzählung, aus der Art der Nummern oder aus der Einrückung.
 
-const NUMMER = /^((?:[IVXLCDM]+|[ivxlc]{2,}|[A-Za-z]|\d+(?:\.\d+)*)[.)]?)\s+(\S.*)$/
+const NUMMER = /^((?:(?:[IVXLCDM]+|\d+)(?:\.[A-Za-z0-9/]+)+|[IVXLCDM]+|[ivxlc]{2,}|[A-Za-z]|\d+)[.)]?)\s+(\S.*)$/
+
+/** Zusammengesetzter Code: römische Zahl oder Ziffer vorn, dann Glieder nach Punkten */
+const CODE = /^(?:[IVXLCDM]+|\d+)\.[A-Za-z0-9]/
+
+/** Zahl der Glieder: „I.A.1a1“ → I, A, 1, a, 1; „1/2“ ist ein Glied */
+function glieder(nummer: string): number {
+  const [kopf, ...rest] = nummer.replace(/[.)]$/, '').split('.')
+  return (kopf ? 1 : 0) + rest.reduce((n, teil) => n + (teil.match(/\d+(?:\/\d+)*|[A-Za-z]/g)?.length ?? 0), 0)
+}
 
 /** „V. Medien“ → Nummer „V.“, Titel „Medien“. Ein Wort ohne Satzzeichen nach einem Buchstaben ist keine Nummer. */
 export function nummerUndTitel(text: string): { nummer: string; titel: string } {
@@ -14,8 +23,11 @@ export function nummerUndTitel(text: string): { nummer: string; titel: string } 
   if (!m) return { nummer: '', titel: t }
   const nummer = m[1]
   // Ohne Punkt oder Klammer nur Ziffern: „Die Medien“ ist kein „D“ mit Titel
-  if (!/[.)]$/.test(nummer) && !/^\d/.test(nummer)) return { nummer: '', titel: t }
-  return { nummer, titel: m[2].trim() }
+  if (!/[.)]$/.test(nummer) && !/^\d/.test(nummer) && !CODE.test(nummer)) return { nummer: '', titel: t }
+  // „I.A. A. Bildekräfte“: der letzte Buchstabe des Codes steht noch einmal vor dem Titel
+  const letzter = nummer.replace(/[.)]$/, '').match(/\.([A-Za-z])$/)?.[1]
+  const titel = letzter ? m[2].replace(new RegExp(`^${letzter}[.)]\\s+(?=\\S)`), '') : m[2]
+  return { nummer, titel: titel.trim() }
 }
 
 /** Art einer Nummer: römisch, Buchstabe, Ziffer, jeweils mit Satzzeichen; Dezimalnummern zählen nach Teilen. */
@@ -23,14 +35,13 @@ function art(nummer: string): string {
   const satz = nummer.slice(-1).match(/[.)]/)?.[0] ?? ''
   const kern = satz ? nummer.slice(0, -1) : nummer
   if (/^\d+$/.test(kern)) return `ziffer${satz}`
-  if (/^\d+(\.\d+)+$/.test(kern)) return 'dezimal'
+  if (CODE.test(kern)) return 'dezimal'
   if (/^[IVXLCDM]+$/.test(kern)) return `roemisch${satz}`
   if (/^[ivxlc]{2,}$/.test(kern)) return `roemisch-klein${satz}`
   if (/^[A-Z]$/.test(kern)) return `Buchstabe${satz}`
   return `buchstabe${satz}`
 }
 
-const teile = (nummer: string) => nummer.replace(/[.)]$/, '').split('.').length
 
 interface Zeile {
   text: string
@@ -57,7 +68,8 @@ function bauen(zeilen: Zeile[]): Thema[] {
     for (const z of eintraege) {
       let e: number
       if (!z.nummer) e = Math.max(vorige, 0)
-      else if (dezimal && /^\d/.test(z.nummer)) e = teile(z.nummer) - 1
+      // Codes und ihre obersten Nummern („I.“ zu „I.A.1“, „1“ zu „1.2“) nach der Zahl ihrer Glieder
+      else if (dezimal && (CODE.test(z.nummer) || /^(?:[IVXLCDM]+|\d+)[.)]?$/.test(z.nummer))) e = glieder(z.nummer) - 1
       else {
         const a = art(z.nummer)
         if (!ebeneVonArt.has(a)) ebeneVonArt.set(a, vorige + 1)
