@@ -302,6 +302,67 @@ try {
     await q.close()
   }
 
+  // Volles localStorage (echte Quota, kein Nachbau): Umzug und Speichern schließen ab, Übergabe hängt nicht (#37)
+  {
+    // Füllt localStorage bis zur Quota; der Rest passt nicht mehr, auch nicht der Merker
+    const fuelle = () => {
+      let stueck = 'x'.repeat(1 << 20)
+      let i = 0
+      while (stueck.length >= 1) {
+        try {
+          localStorage.setItem(`fuellung-${i}`, stueck)
+          i++
+        } catch {
+          stueck = stueck.slice(0, stueck.length >> 1)
+        }
+      }
+    }
+    const p = await seite()
+    const d = await daten(p)
+    // Umzug: alter Stand in localStorage, Datenbank leer, Merker fehlt, Rest von localStorage voll
+    await p.addInitScript(
+      ([alt, fuellen, marke]) => {
+        if (sessionStorage.getItem(marke)) return
+        sessionStorage.setItem(marke, '1')
+        indexedDB.deleteDatabase('bibliographie')
+        localStorage.clear()
+        localStorage.setItem('bibliographie:datenstamm:v1', JSON.stringify(alt))
+        new Function(`(${fuellen})()`)()
+      },
+      [d, fuelle.toString(), `voll-${Math.random()}`],
+    )
+    await p.reload()
+    await p.waitForTimeout(1500)
+    const nachUmzug = await gespeichert(p)
+    pruefe('Voll: Umzug schließt ab und schreibt', (await p.locator('.app-inhalt').evaluate((x) => !x.inert)) && nachUmzug?.werke.length === d.werke.length)
+    pruefe('Voll: Merker steht, alter Stand weg', await p.evaluate(() => localStorage.getItem('bibliographie:in-datenbank') === '1' && localStorage.getItem('bibliographie:datenstamm:v1') === null))
+    // Normales Speichern: Merker fehlt, localStorage voll; Übergabe an ein zweites Fenster gelingt trotzdem
+    await p.evaluate(`localStorage.removeItem('bibliographie:in-datenbank'); (${fuelle})()`)
+    await reiter(p, 'Erfassen').click()
+    await p.getByRole('button', { name: /Vorläufig lassen/ }).click()
+    await p.getByLabel('Nachname, Person 1').fill('Steiner')
+    await p.getByRole('combobox', { name: 'Titel' }).fill('Bei vollem localStorage')
+    await p.keyboard.press('Escape')
+    await p.waitForTimeout(700)
+    const q = await seite()
+    await q.getByRole('button', { name: 'Hier weiterarbeiten' }).click()
+    const uebernommen = await q
+      .getByRole('dialog', { name: 'In einem anderen Fenster geöffnet' })
+      .waitFor({ state: 'hidden', timeout: 5000 })
+      .then(() => true, () => false)
+    pruefe('Voll: Übergabe hängt nicht', uebernommen)
+    pruefe('Voll: Karte gespeichert', ((await gespeichert(q))?.werke ?? []).some((w) => w.titel === 'Bei vollem localStorage'))
+    // Aufräumen
+    await q.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('fuellung-')).forEach((k) => localStorage.removeItem(k)))
+    q.once('dialog', (x) => x.accept())
+    await reiter(q, 'Kartei').click()
+    await q.locator('.kartei-karte', { hasText: 'Bei vollem localStorage' }).dblclick()
+    await q.getByRole('button', { name: 'Karte löschen' }).click()
+    await daten(q)
+    await p.close()
+    await q.close()
+  }
+
   // Große Kartei über die Exportdatei einlesen
   {
     const p = await seite()

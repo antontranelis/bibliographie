@@ -118,6 +118,32 @@ function oeffne(): Promise<IDBDatabase | null> {
   return verbindung
 }
 
+// Die Datenbank ist das Maß; localStorage hält nur Merker und Reste. Nach einem Abschluss in der Datenbank darf
+// keiner dieser Zugriffe werfen, sonst bleibt das Ergebnis aus und die Sitzung hängt (volles localStorage).
+function entferne(schluessel: string) {
+  try {
+    localStorage.removeItem(schluessel)
+  } catch {
+    /* gesperrt */
+  }
+}
+
+/**
+ * Merker setzen, dass der Bestand in der Datenbank steht. Ist localStorage voll, macht der alte Stand Platz:
+ * Er steht ja jetzt in der Datenbank, und ohne Merker würde ein Start ohne Datenbank ihn für den Bestand halten.
+ */
+function markiereInDatenbank() {
+  for (const platz of [null, ALT]) {
+    if (platz) entferne(platz)
+    try {
+      localStorage.setItem(IN_DATENBANK, '1')
+      return
+    } catch {
+      /* voll: nächsten Platz freimachen */
+    }
+  }
+}
+
 const altLesen = (): Datenstamm | null => {
   try {
     const text = localStorage.getItem(ALT)
@@ -283,9 +309,9 @@ async function lese(einspielen: boolean): Promise<{ stand: Datenstamm | null; si
       }
       t.oncomplete = () => {
         if (einspielen) {
-          if (stand) localStorage.setItem(IN_DATENBANK, '1')
-          if (umgezogen) localStorage.removeItem(ALT)
-          if (nachgetragen) localStorage.removeItem(NACHTRAG)
+          if (stand) markiereInDatenbank()
+          if (umgezogen) entferne(ALT)
+          if (nachgetragen) entferne(NACHTRAG)
         }
         fertig({ stand, sicher: true })
       }
@@ -323,12 +349,12 @@ export async function speichere(d: Datenstamm): Promise<boolean> {
         // Ein früherer Vorgang ist gescheitert: was jetzt in der Datenbank steht, ist unbekannt
         gesichert = ok ? neu : null
         if (ok) {
-          localStorage.setItem(IN_DATENBANK, '1')
+          markiereInDatenbank()
           // Nach gescheitertem Umzug liegt der alte Stand noch da; jetzt steht alles in der Datenbank
-          localStorage.removeItem(ALT)
+          entferne(ALT)
         }
         // Begann nach dem letzten Nachtrag: enthält ihn
-        if (ok && nr > 0 && nr === nachtragNr) localStorage.removeItem(NACHTRAG)
+        if (ok && nr > 0 && nr === nachtragNr) entferne(NACHTRAG)
         fertig(ok)
       }
       t.onabort = () => {
