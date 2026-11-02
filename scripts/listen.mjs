@@ -98,7 +98,7 @@ pruefe('Liste gelöscht, Karten bleiben', (await daten()).listen.length === 2 &&
   const vorlage = (await daten()).werke[0]
   const werk = (id, personen) => ({ ...vorlage, id, titel: id, untertitel: '', status: 'fest', personen, schlagwoerter: [], ausgaben: [{ ...vorlage.ausgaben[0], auflagen: [{ ...vorlage.ausgaben[0].auflagen[0], jahr: '1990', ort: 'Basel', gedrucktesJahr: '' }] }] })
   const p = (vorname, nachname) => ({ vorname, nachname, rolle: 'autor' })
-  const liste = { ...(await daten()).listen[0], id: 'personen', name: 'Personen', regel: { person: '', schlagwort: '', nurPrimaer: false, nurFest: false }, eintraege: [], ausgenommen: [], sortierung: 'name', jedePerson: true }
+  const liste = { ...(await daten()).listen[0], id: 'personen', name: 'Personen', regel: { person: '', schlagwort: '', nurFest: false }, eintraege: [], ausgenommen: [], sortierung: 'name', jedePerson: true }
   const neu = { werke: [werk('Gemeinschaftswerk', [p('Anna', 'Adler'), p('Zoe', 'Zebra')]), werk('Mittelwerk', [p('Max', 'Mitte')])], verlage: [], listen: [liste] }
   await spieleEin(page, neu)
   await reiter('Liste').click()
@@ -116,12 +116,36 @@ pruefe('Liste gelöscht, Karten bleiben', (await daten()).listen.length === 2 &&
 {
   const vorlage = (await daten()).werke[0]
   const werke = Array.from({ length: 80 }, (_, i) => ({ ...vorlage, id: `lang-${i}`, titel: `Titel ${String(i).padStart(2, '0')}`, untertitel: '' }))
-  await spieleEin(page, { werke, verlage: [], listen: [{ ...(await daten()).listen[0], id: 'lang', name: 'Lang', regel: { person: '', schlagwort: '', nurPrimaer: false, nurFest: false, thema: '', mitUnterthemen: true }, eintraege: [], ausgenommen: [], gliederung: 'keine' }], themen: [] })
+  await spieleEin(page, { werke, verlage: [], listen: [{ ...(await daten()).listen[0], id: 'lang', name: 'Lang', regel: { person: '', schlagwort: '', nurFest: false, thema: '', mitUnterthemen: true }, eintraege: [], ausgenommen: [], gliederung: 'keine' }], themen: [] })
   await reiter('Liste').click()
   await page.getByRole('button', { name: 'Blattvorschau ansehen' }).click()
   const blatt = await page.locator('.blatt').evaluate((b) => ({ hoehe: b.clientHeight, inhalt: b.scrollHeight, absaetze: b.querySelectorAll('p').length }))
   pruefe('Langes Blatt wächst mit dem Inhalt', blatt.absaetze >= 80 && blatt.inhalt <= blatt.hoehe + 1, `${blatt.absaetze} Zeilen, Höhe ${blatt.hoehe}, Inhalt ${blatt.inhalt}`)
   await page.keyboard.press('Escape')
+}
+
+// Schlagwörter: gleichwertig und alphabetisch, kein „primär“ mehr
+{
+  await reiter('Erfassen').click()
+  const feld = page.getByLabel('Schlagwort hinzufügen')
+  for (const b of ['Zeit', 'Ästhetik', 'Freiheit']) {
+    await feld.fill(b)
+    await feld.press('Enter')
+  }
+  const schlagwoerter = page.locator('.feld', { has: feld })
+  const chips = (await schlagwoerter.locator('.chip').allInnerTexts()).map((t) => t.replace('×', '').trim())
+  pruefe('Schlagwörter alphabetisch', chips.join(',') === 'Ästhetik,Freiheit,Zeit', chips.join(','))
+  pruefe('Kein primär oder sekundär auf der Karte', !/primär|sekundär/i.test(await schlagwoerter.innerText()))
+  await reiter('Liste').click()
+  await page.getByLabel(/von\s+selbst aufnehmen/).check()
+  pruefe('Kein „nur primär“ in der Liste', (await page.getByText('nur primär').count()) === 0)
+
+  // Unter der alten Fassung fixierte Schlagwörter kommen alphabetisch auf die nächste Karte
+  await page.evaluate(() => localStorage.setItem('bibliographie:fixierung', JSON.stringify({ schlagwoerter: [{ begriff: 'Freiheit', primaer: true }, { begriff: 'Ethik', primaer: false }] })))
+  await page.reload()
+  await reiter('Erfassen').click()
+  const fixiert = (await page.locator('.feld', { has: feld }).locator('.chip').allInnerTexts()).map((t) => t.replace('×', '').trim())
+  pruefe('Alte Fixierung alphabetisch', fixiert.join(',') === 'Ethik,Freiheit', fixiert.join(','))
 }
 
 // Schmal

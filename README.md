@@ -6,7 +6,7 @@ Dies ist ein Klick-Prototyp. Die Daten liegen nur im Browser. Mit „Sichern“ 
 
 ## Was der Prototyp kann
 
-- Karteikarte mit Autoren oder Herausgebern, Titel, Untertitel, Schriftenreihe, Kommentar und Schlagwörtern (primär oder sekundär)
+- Karteikarte mit Autoren oder Herausgebern, Titel, Untertitel, Schriftenreihe, Kommentar und Schlagwörtern (gleichwertig, alphabetisch)
 - Ein Werk mit beliebig vielen Auflagen: Auflagenzahl, reales und abweichend gedrucktes Jahr, Erscheinungstag, Verlag, Ort, Seiten
 - Aufsätze mit „erschienen in“ (Zeitschrift, Zeitung, Sammelband)
 - Status „vorläufig“ bis „fest anlegen“
