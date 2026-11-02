@@ -3,6 +3,7 @@
 // Jeder Build ändert über den Build-Stempel auch den Word-Teil, so wie ein echtes Update.
 import { execSync } from 'node:child_process'
 import { chromium } from 'playwright-core'
+import { gespeichert } from './einspielen.mjs'
 import { speicherFrei, speicherVoll } from './speicher-voll.mjs'
 
 const [url = 'http://localhost:4321/'] = process.argv.slice(2)
@@ -49,7 +50,7 @@ try {
     const b = await seite(kontext)
     await b.goto(url)
     pruefe('Wieder geöffnet: neue Version übernimmt beim Start', await neuerStand(b, alt), `${alt} → ${await stand(b)}`)
-    pruefe('Karte ist nach dem Update noch da', (await b.evaluate(() => localStorage.getItem('bibliographie:datenstamm:v1') ?? '')).includes('Vor dem Update angelegt'))
+    pruefe('Karte ist nach dem Update noch da', JSON.stringify(await gespeichert(b)).includes('Vor dem Update angelegt'))
     pruefe('Nur der neue Vorrat', (await vorraete(b)).length === 1, (await vorraete(b)).join(', '))
     await kontext.close()
   }
@@ -113,7 +114,7 @@ try {
     pruefe('Knopf bringt alle Tabs auf den neuen Stand', alle.every(Boolean), alle.join(','))
     pruefe('Danach nur der neue Vorrat', (await vorraete(a)).length === 1, (await vorraete(a)).join(', '))
     await a.waitForTimeout(800)
-    const nachUpdate = await a.evaluate(() => localStorage.getItem('bibliographie:datenstamm:v1') ?? '')
+    const nachUpdate = JSON.stringify(await gespeichert(a))
     pruefe('Karte aus A übersteht das Update aller Tabs', nachUpdate.includes('Nur in A angelegt'))
     pruefe('Karte vom vollen Speicher ist nach dem Update da', nachUpdate.includes('Ungespeichert vor dem Update'))
     await kontext.close()

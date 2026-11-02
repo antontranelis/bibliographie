@@ -1,6 +1,7 @@
 // Prüft das Einlesen einer Themenordnung und die Themen beim Einlesen einer Literaturliste. Aufruf: node scripts/geruest.mjs <url> [ausgabeordner]
 import { strToU8, zipSync } from 'fflate'
 import { chromium } from 'playwright-core'
+import { gespeichert } from './einspielen.mjs'
 
 const [url = 'http://localhost:4321/', aus] = process.argv.slice(2)
 const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN })
@@ -28,7 +29,7 @@ await page.goto(url)
 await page.waitForTimeout(500)
 const daten = async () => {
   await page.waitForTimeout(500)
-  return page.evaluate(() => JSON.parse(localStorage.getItem('bibliographie:datenstamm:v1') ?? '{}'))
+  return (await gespeichert(page)) ?? { werke: [], verlage: [], listen: [], themen: [] }
 }
 const datei = async (menue, name, mimeType, buffer, dialog) => {
   await page.getByRole('button', { name: /Ablage/ }).click()

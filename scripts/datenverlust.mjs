@@ -1,5 +1,6 @@
 // Spielt die Datenverlust-Fälle aus dem Review zu PR #1 nach. Aufruf: node scripts/datenverlust.mjs <url>
 import { chromium } from 'playwright-core'
+import { gespeichert, leere } from './einspielen.mjs'
 
 const [url = 'http://localhost:4321/'] = process.argv.slice(2)
 const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN })
@@ -12,15 +13,14 @@ async function frischeSeite() {
   await page.route('https://lobid.org/**', (r) => r.abort())
   await page.route('https://services.dnb.de/**', (r) => r.abort())
   await page.goto(url)
-  await page.evaluate(() => localStorage.clear())
-  await page.reload()
+  await leere(page)
   return page
 }
 // Die App speichert 400 ms verzögert
 const warte = (page) => page.waitForTimeout(500)
 const werke = async (page) => {
   await warte(page)
-  return page.evaluate(() => JSON.parse(localStorage.getItem('bibliographie:datenstamm:v1') ?? '{"werke":[]}').werke)
+  return ((await gespeichert(page)) ?? { werke: [], verlage: [], listen: [], themen: [] }).werke
 }
 
 // Fall 1: nur ein Nachname, dann „Vorläufig lassen, nächste Karte“
